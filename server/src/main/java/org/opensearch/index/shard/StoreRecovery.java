@@ -73,6 +73,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static org.opensearch.common.unit.TimeValue.timeValueMillis;
@@ -116,7 +117,7 @@ final class StoreRecovery {
     }
 
     void recoverFromLocalShards(
-        BiConsumer<String, MappingMetadata> mappingUpdateConsumer,
+        Consumer<MappingMetadata> mappingUpdateConsumer,
         IndexShard indexShard,
         List<LocalShardSnapshot> shards,
         ActionListener<Boolean> listener
@@ -133,7 +134,7 @@ final class StoreRecovery {
             }
             IndexMetadata sourceMetadata = shards.get(0).getIndexMetadata();
             for (ObjectObjectCursor<String, MappingMetadata> mapping : sourceMetadata.getMappings()) {
-                mappingUpdateConsumer.accept(mapping.key, mapping.value);
+                mappingUpdateConsumer.accept(mapping.value);
             }
             indexShard.mapperService().merge(sourceMetadata, MapperService.MergeReason.MAPPING_RECOVERY);
             // now that the mapping is merged we can validate the index sort configuration.

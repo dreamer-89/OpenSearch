@@ -96,7 +96,7 @@ import static org.hamcrest.Matchers.notNullValue;
 @SuppressCodecs("*") // requires custom completion format
 public class CompletionSuggestSearchIT extends OpenSearchIntegTestCase {
     private final String INDEX = RandomStrings.randomAsciiOfLength(random(), 10).toLowerCase(Locale.ROOT);
-    private final String TYPE = RandomStrings.randomAsciiOfLength(random(), 10).toLowerCase(Locale.ROOT);
+    private final String TYPE = "_doc";
     private final String FIELD = RandomStrings.randomAsciiOfLength(random(), 10).toLowerCase(Locale.ROOT);
     private final CompletionMappingBuilder completionMappingBuilder = new CompletionMappingBuilder();
 
@@ -678,10 +678,9 @@ public class CompletionSuggestSearchIT extends OpenSearchIntegTestCase {
         AcknowledgedResponse putMappingResponse = client().admin()
             .indices()
             .preparePutMapping(INDEX)
-            .setType(TYPE)
             .setSource(
                 jsonBuilder().startObject()
-                    .startObject(TYPE)
+                    .startObject("_doc")
                     .startObject("properties")
                     .startObject(FIELD)
                     .field("type", "text")
@@ -937,10 +936,9 @@ public class CompletionSuggestSearchIT extends OpenSearchIntegTestCase {
         AcknowledgedResponse putMappingResponse = client().admin()
             .indices()
             .preparePutMapping(INDEX)
-            .setType(TYPE)
             .setSource(
                 jsonBuilder().startObject()
-                    .startObject(TYPE)
+                    .startObject("_doc")
                     .startObject("properties")
                     .startObject(FIELD)
                     .field("type", "completion")

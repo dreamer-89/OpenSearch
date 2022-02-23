@@ -1438,7 +1438,6 @@ public class IndexRecoveryIT extends OpenSearchIntegTestCase {
         client().admin()
             .indices()
             .preparePutMapping("test")
-            .setType("_doc")
             .setSource("test_field", "type=text,analyzer=test_analyzer")
             .get();
         int numDocs = between(1, 10);

@@ -39,21 +39,10 @@ import org.opensearch.cluster.ack.IndicesClusterStateUpdateRequest;
  */
 public class PutMappingClusterStateUpdateRequest extends IndicesClusterStateUpdateRequest<PutMappingClusterStateUpdateRequest> {
 
-    private String type;
-
     private String source;
 
     public PutMappingClusterStateUpdateRequest() {
 
-    }
-
-    public String type() {
-        return type;
-    }
-
-    public PutMappingClusterStateUpdateRequest type(String type) {
-        this.type = type;
-        return this;
     }
 
     public String source() {

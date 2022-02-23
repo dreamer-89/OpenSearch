@@ -153,7 +153,6 @@ public class UpdateMappingIntegrationIT extends OpenSearchIntegTestCase {
         AcknowledgedResponse putMappingResponse = client().admin()
             .indices()
             .preparePutMapping("test")
-            .setType("_doc")
             .setSource("{\"properties\":{\"date\":{\"type\":\"integer\"}}}", XContentType.JSON)
             .execute()
             .actionGet();
@@ -179,7 +178,6 @@ public class UpdateMappingIntegrationIT extends OpenSearchIntegTestCase {
         AcknowledgedResponse putMappingResponse = client().admin()
             .indices()
             .preparePutMapping("test")
-            .setType("_doc")
             .setSource("{\"properties\":{\"date\":{\"type\":\"integer\"}}}", XContentType.JSON)
             .execute()
             .actionGet();
@@ -207,7 +205,6 @@ public class UpdateMappingIntegrationIT extends OpenSearchIntegTestCase {
             client().admin()
                 .indices()
                 .preparePutMapping("test")
-                .setType("type")
                 .setSource("{\"type\":{\"properties\":{\"body\":{\"type\":\"integer\"}}}}", XContentType.JSON)
                 .execute()
                 .actionGet();
@@ -228,7 +225,6 @@ public class UpdateMappingIntegrationIT extends OpenSearchIntegTestCase {
             client().admin()
                 .indices()
                 .preparePutMapping("test")
-                .setType("type")
                 .setSource("{\"type\":{\"properties\":{\"body\":{\"type\":\"text\", \"norms\": true }}}}", XContentType.JSON)
                 .execute()
                 .actionGet();
@@ -254,7 +250,6 @@ public class UpdateMappingIntegrationIT extends OpenSearchIntegTestCase {
         AcknowledgedResponse putMappingResponse = client().admin()
             .indices()
             .preparePutMapping("test")
-            .setType("type")
             .setSource("{\"type\":{\"properties\":{\"body\":{\"type\":\"text\"}}}}", XContentType.JSON)
             .execute()
             .actionGet();
@@ -294,11 +289,10 @@ public class UpdateMappingIntegrationIT extends OpenSearchIntegTestCase {
                         AcknowledgedResponse response = client1.admin()
                             .indices()
                             .preparePutMapping(indexName)
-                            .setType(typeName)
                             .setSource(
                                 JsonXContent.contentBuilder()
                                     .startObject()
-                                    .startObject(typeName)
+                                    .startObject("_doc")
                                     .startObject("properties")
                                     .startObject(fieldName)
                                     .field("type", "text")
@@ -349,7 +343,6 @@ public class UpdateMappingIntegrationIT extends OpenSearchIntegTestCase {
                     client().admin()
                         .indices()
                         .preparePutMapping("test")
-                        .setType("_doc")
                         .setSource("{\"properties\":{\"date\":{\"type\":\"integer\"}}}", XContentType.JSON)
                 );
             } finally {
@@ -364,7 +357,6 @@ public class UpdateMappingIntegrationIT extends OpenSearchIntegTestCase {
                     client().admin()
                         .indices()
                         .preparePutMapping("test")
-                        .setType("_doc")
                         .setSource("{\"properties\":{\"date\":{\"type\":\"integer\"}}}", XContentType.JSON)
                 );
             } finally {

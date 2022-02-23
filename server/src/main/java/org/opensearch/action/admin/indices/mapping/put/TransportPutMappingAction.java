@@ -132,10 +132,7 @@ public class TransportPutMappingAction extends TransportMasterNodeAction<PutMapp
             }
             performMappingUpdate(concreteIndices, request, listener, metadataMappingService);
         } catch (IndexNotFoundException ex) {
-            logger.debug(
-                () -> new ParameterizedMessage("failed to put mappings on indices [{}], type [{}]", request.indices(), request.type()),
-                ex
-            );
+            logger.debug(() -> new ParameterizedMessage("failed to put mappings on indices [{}]", Arrays.asList(resolveIndices(state, request, indexNameExpressionResolver))), ex);
             throw ex;
         }
     }
@@ -173,7 +170,6 @@ public class TransportPutMappingAction extends TransportMasterNodeAction<PutMapp
         PutMappingClusterStateUpdateRequest updateRequest = new PutMappingClusterStateUpdateRequest().ackTimeout(request.timeout())
             .masterNodeTimeout(request.masterNodeTimeout())
             .indices(concreteIndices)
-            .type(request.type())
             .source(request.source());
 
         metadataMappingService.putMapping(updateRequest, new ActionListener<ClusterStateUpdateResponse>() {

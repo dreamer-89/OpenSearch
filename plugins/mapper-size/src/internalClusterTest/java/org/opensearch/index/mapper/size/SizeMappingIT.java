@@ -81,7 +81,6 @@ public class SizeMappingIT extends OpenSearchIntegTestCase {
         AcknowledgedResponse putMappingResponse = client().admin()
             .indices()
             .preparePutMapping(index)
-            .setType(type)
             .setSource(updateMappingBuilder)
             .get();
         assertAcked(putMappingResponse);
@@ -109,7 +108,6 @@ public class SizeMappingIT extends OpenSearchIntegTestCase {
         AcknowledgedResponse putMappingResponse = client().admin()
             .indices()
             .preparePutMapping(index)
-            .setType(type)
             .setSource(updateMappingBuilder)
             .get();
         assertAcked(putMappingResponse);

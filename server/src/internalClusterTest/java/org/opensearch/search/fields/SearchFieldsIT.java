@@ -187,7 +187,7 @@ public class SearchFieldsIT extends OpenSearchIntegTestCase {
         String mapping = Strings.toString(
             XContentFactory.jsonBuilder()
                 .startObject()
-                .startObject("type1")
+                .startObject("_doc")
                 .startObject("properties")
                 .startObject("field1")
                 .field("type", "text")
@@ -206,7 +206,7 @@ public class SearchFieldsIT extends OpenSearchIntegTestCase {
                 .endObject()
         );
 
-        client().admin().indices().preparePutMapping().setType("type1").setSource(mapping, XContentType.JSON).get();
+        client().admin().indices().preparePutMapping().setSource(mapping, XContentType.JSON).get();
 
         client().prepareIndex("test", "type1", "1")
             .setSource(
@@ -289,7 +289,7 @@ public class SearchFieldsIT extends OpenSearchIntegTestCase {
         String mapping = Strings.toString(
             XContentFactory.jsonBuilder()
                 .startObject()
-                .startObject("type1")
+                .startObject("_doc")
                 .startObject("properties")
                 .startObject("num1")
                 .field("type", "double")
@@ -300,7 +300,7 @@ public class SearchFieldsIT extends OpenSearchIntegTestCase {
                 .endObject()
         );
 
-        client().admin().indices().preparePutMapping().setType("type1").setSource(mapping, XContentType.JSON).get();
+        client().admin().indices().preparePutMapping().setSource(mapping, XContentType.JSON).get();
 
         client().prepareIndex("test", "type1", "1")
             .setSource(
@@ -388,7 +388,7 @@ public class SearchFieldsIT extends OpenSearchIntegTestCase {
         String mapping = Strings.toString(
             XContentFactory.jsonBuilder()
                 .startObject()
-                .startObject("doc")
+                .startObject("_doc")
                 .startObject("properties")
                 .startObject("date")
                 .field("type", "date_nanos")
@@ -398,7 +398,7 @@ public class SearchFieldsIT extends OpenSearchIntegTestCase {
                 .endObject()
         );
 
-        client().admin().indices().preparePutMapping().setType("doc").setSource(mapping, XContentType.JSON).get();
+        client().admin().indices().preparePutMapping().setSource(mapping, XContentType.JSON).get();
         String date = "2019-01-31T10:00:00.123456789Z";
         indexRandom(
             true,
@@ -617,7 +617,7 @@ public class SearchFieldsIT extends OpenSearchIntegTestCase {
         String mapping = Strings.toString(
             XContentFactory.jsonBuilder()
                 .startObject()
-                .startObject("type1")
+                .startObject("_doc")
                 .startObject("_source")
                 .field("enabled", false)
                 .endObject()
@@ -663,7 +663,7 @@ public class SearchFieldsIT extends OpenSearchIntegTestCase {
                 .endObject()
         );
 
-        client().admin().indices().preparePutMapping().setType("type1").setSource(mapping, XContentType.JSON).get();
+        client().admin().indices().preparePutMapping().setSource(mapping, XContentType.JSON).get();
 
         ZonedDateTime date = ZonedDateTime.of(2012, 3, 22, 0, 0, 0, 0, ZoneOffset.UTC);
         client().prepareIndex("test", "type1", "1")
@@ -847,7 +847,7 @@ public class SearchFieldsIT extends OpenSearchIntegTestCase {
         String mapping = Strings.toString(
             XContentFactory.jsonBuilder()
                 .startObject()
-                .startObject("type1")
+                .startObject("_doc")
                 .startObject("_source")
                 .field("enabled", false)
                 .endObject()
@@ -895,7 +895,7 @@ public class SearchFieldsIT extends OpenSearchIntegTestCase {
                 .endObject()
         );
 
-        client().admin().indices().preparePutMapping().setType("type1").setSource(mapping, XContentType.JSON).get();
+        client().admin().indices().preparePutMapping().setSource(mapping, XContentType.JSON).get();
 
         ZonedDateTime date = ZonedDateTime.of(2012, 3, 22, 0, 0, 0, 0, ZoneOffset.UTC);
         client().prepareIndex("test", "type1", "1")
@@ -1167,7 +1167,7 @@ public class SearchFieldsIT extends OpenSearchIntegTestCase {
     public void testDocValueFieldsWithFieldAlias() throws Exception {
         XContentBuilder mapping = XContentFactory.jsonBuilder()
             .startObject()
-            .startObject("type")
+            .startObject("_doc")
             .startObject("_source")
             .field("enabled", false)
             .endObject()

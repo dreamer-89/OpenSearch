@@ -264,7 +264,7 @@ public class RareClusterStateIT extends OpenSearchIntegTestCase {
 
         // Add a new mapping...
         ActionFuture<AcknowledgedResponse> putMappingResponse = executeAndCancelCommittedPublication(
-            client().admin().indices().preparePutMapping("index").setType("type").setSource("field", "type=long")
+            client().admin().indices().preparePutMapping("index").setSource("field", "type=long")
         );
 
         // ...and wait for mappings to be available on master
@@ -361,7 +361,7 @@ public class RareClusterStateIT extends OpenSearchIntegTestCase {
         internalCluster().setDisruptionScheme(disruption);
         disruption.startDisrupting();
         final ActionFuture<AcknowledgedResponse> putMappingResponse = executeAndCancelCommittedPublication(
-            client().admin().indices().preparePutMapping("index").setType("type").setSource("field", "type=long")
+            client().admin().indices().preparePutMapping("index").setSource("field", "type=long")
         );
 
         final Index index = resolveIndex("index");

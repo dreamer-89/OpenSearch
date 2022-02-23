@@ -62,7 +62,7 @@ public class PartitionedRoutingIT extends OpenSearchIntegTestCase {
                             .put("index.number_of_routing_shards", shards)
                             .put("index.routing_partition_size", partitionSize)
                     )
-                    .addMapping("type", "{\"type\":{\"_routing\":{\"required\":true}}}", XContentType.JSON)
+                    .addMapping("_doc", "{\"_doc\":{\"_routing\":{\"required\":true}}}", XContentType.JSON)
                     .execute()
                     .actionGet();
                 ensureGreen();

@@ -78,11 +78,7 @@ public class SizeMappingIT extends OpenSearchIntegTestCase {
             .endObject()
             .endObject()
             .endObject();
-        AcknowledgedResponse putMappingResponse = client().admin()
-            .indices()
-            .preparePutMapping(index)
-            .setSource(updateMappingBuilder)
-            .get();
+        AcknowledgedResponse putMappingResponse = client().admin().indices().preparePutMapping(index).setSource(updateMappingBuilder).get();
         assertAcked(putMappingResponse);
 
         // make sure size field is still in mapping
@@ -105,11 +101,7 @@ public class SizeMappingIT extends OpenSearchIntegTestCase {
             .field("enabled", false)
             .endObject()
             .endObject();
-        AcknowledgedResponse putMappingResponse = client().admin()
-            .indices()
-            .preparePutMapping(index)
-            .setSource(updateMappingBuilder)
-            .get();
+        AcknowledgedResponse putMappingResponse = client().admin().indices().preparePutMapping(index).setSource(updateMappingBuilder).get();
         assertAcked(putMappingResponse);
 
         // make sure size field is still in mapping

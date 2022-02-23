@@ -262,7 +262,6 @@ public class IndicesRequestConvertersTests extends OpenSearchTestCase {
         putMappingRequest.indices(indices);
 
         String type = OpenSearchTestCase.randomAlphaOfLengthBetween(3, 10);
-        putMappingRequest.type(type);
 
         Map<String, String> expectedParams = new HashMap<>();
 

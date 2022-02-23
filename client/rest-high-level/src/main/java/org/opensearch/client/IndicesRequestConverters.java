@@ -213,10 +213,7 @@ final class IndicesRequestConverters {
             throw new IllegalArgumentException("concreteIndex cannot be set on PutMapping requests made over the REST API");
         }
 
-        Request request = new Request(
-            HttpPut.METHOD_NAME,
-            RequestConverters.endpoint(putMappingRequest.indices(), "_mapping", putMappingRequest.type())
-        );
+        Request request = new Request(HttpPut.METHOD_NAME, RequestConverters.endpoint(putMappingRequest.indices(), "_mapping"));
 
         RequestConverters.Params parameters = new RequestConverters.Params();
         parameters.withTimeout(putMappingRequest.timeout());

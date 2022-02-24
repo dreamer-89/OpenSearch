@@ -215,7 +215,7 @@ final class IndicesRequestConverters {
 
         Request request = new Request(
             HttpPut.METHOD_NAME,
-            RequestConverters.endpoint(putMappingRequest.indices(), "_mapping", putMappingRequest.type())
+            RequestConverters.endpoint(putMappingRequest.indices(), "_mapping")
         );
 
         RequestConverters.Params parameters = new RequestConverters.Params();

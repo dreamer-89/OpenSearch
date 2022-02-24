@@ -50,7 +50,6 @@ import java.util.Map;
 import static java.util.Arrays.asList;
 import static java.util.Collections.unmodifiableList;
 import static org.opensearch.client.Requests.putMappingRequest;
-import static org.opensearch.index.mapper.MapperService.isMappingSourceTyped;
 import static org.opensearch.rest.RestRequest.Method.POST;
 import static org.opensearch.rest.RestRequest.Method.PUT;
 

@@ -127,12 +127,9 @@ import org.opensearch.index.query.QueryBuilder;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.rest.RestStatus;
 import org.opensearch.rest.action.admin.indices.RestCreateIndexAction;
-import org.opensearch.rest.action.admin.indices.RestGetFieldMappingAction;
 import org.opensearch.rest.action.admin.indices.RestGetIndexTemplateAction;
 import org.opensearch.rest.action.admin.indices.RestGetIndicesAction;
-import org.opensearch.rest.action.admin.indices.RestGetMappingAction;
 import org.opensearch.rest.action.admin.indices.RestPutIndexTemplateAction;
-import org.opensearch.rest.action.admin.indices.RestPutMappingAction;
 import org.opensearch.rest.action.admin.indices.RestRolloverIndexAction;
 
 import java.io.IOException;

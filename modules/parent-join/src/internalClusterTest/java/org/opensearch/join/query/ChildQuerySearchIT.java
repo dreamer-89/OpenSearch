@@ -1326,7 +1326,7 @@ public class ChildQuerySearchIT extends ParentChildTestCase {
         ensureGreen();
 
         String parentId = "p1";
-        client().prepareIndex("test", "doc", parentId).setSource("p_field", "1").get();
+        client().prepareIndex("test", "_doc", parentId).setSource("p_field", "1").get();
         refresh();
 
         try {

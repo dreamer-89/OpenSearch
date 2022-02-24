@@ -51,10 +51,10 @@ public class ReindexBasicTests extends ReindexTestCase {
     public void testFiltering() throws Exception {
         indexRandom(
             true,
-            client().prepareIndex("source", "test", "1").setSource("foo", "a"),
-            client().prepareIndex("source", "test", "2").setSource("foo", "a"),
-            client().prepareIndex("source", "test", "3").setSource("foo", "b"),
-            client().prepareIndex("source", "test", "4").setSource("foo", "c")
+            client().prepareIndex("source", "_doc", "1").setSource("foo", "a"),
+            client().prepareIndex("source", "_doc", "2").setSource("foo", "a"),
+            client().prepareIndex("source", "_doc", "3").setSource("foo", "b"),
+            client().prepareIndex("source", "_doc", "4").setSource("foo", "c")
         );
         assertHitCount(client().prepareSearch("source").setSize(0).get(), 4);
 
@@ -84,7 +84,7 @@ public class ReindexBasicTests extends ReindexTestCase {
         List<IndexRequestBuilder> docs = new ArrayList<>();
         int max = between(150, 500);
         for (int i = 0; i < max; i++) {
-            docs.add(client().prepareIndex("source", "test", Integer.toString(i)).setSource("foo", "a"));
+            docs.add(client().prepareIndex("source", "_doc", Integer.toString(i)).setSource("foo", "a"));
         }
 
         indexRandom(true, docs);
@@ -111,7 +111,7 @@ public class ReindexBasicTests extends ReindexTestCase {
         List<IndexRequestBuilder> docs = new ArrayList<>();
         int max = between(150, 500);
         for (int i = 0; i < max; i++) {
-            docs.add(client().prepareIndex("source", "test", Integer.toString(i)).setSource("foo", "a"));
+            docs.add(client().prepareIndex("source", "_doc", Integer.toString(i)).setSource("foo", "a"));
         }
 
         indexRandom(true, docs);
@@ -144,11 +144,10 @@ public class ReindexBasicTests extends ReindexTestCase {
         Map<String, List<IndexRequestBuilder>> docs = new HashMap<>();
         for (int sourceIndex = 0; sourceIndex < sourceIndices; sourceIndex++) {
             String indexName = "source" + sourceIndex;
-            String typeName = "test" + sourceIndex;
             docs.put(indexName, new ArrayList<>());
             int numDocs = between(50, 200);
             for (int i = 0; i < numDocs; i++) {
-                docs.get(indexName).add(client().prepareIndex(indexName, typeName, "id_" + sourceIndex + "_" + i).setSource("foo", "a"));
+                docs.get(indexName).add(client().prepareIndex(indexName, "_doc", "id_" + sourceIndex + "_" + i).setSource("foo", "a"));
             }
         }
 
@@ -162,7 +161,7 @@ public class ReindexBasicTests extends ReindexTestCase {
         int expectedSlices = expectedSliceStatuses(slices, docs.keySet());
 
         String[] sourceIndexNames = docs.keySet().toArray(new String[docs.size()]);
-        ReindexRequestBuilder request = reindex().source(sourceIndexNames).destination("dest", "type").refresh(true).setSlices(slices);
+        ReindexRequestBuilder request = reindex().source(sourceIndexNames).destination("dest", "_doc").refresh(true).setSlices(slices);
 
         BulkByScrollResponse response = request.get();
         assertThat(response, matcher().created(allDocs.size()).slices(hasSize(expectedSlices)));

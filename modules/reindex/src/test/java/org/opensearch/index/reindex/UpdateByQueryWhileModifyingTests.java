@@ -55,7 +55,7 @@ public class UpdateByQueryWhileModifyingTests extends ReindexTestCase {
 
     public void testUpdateWhileReindexing() throws Exception {
         AtomicReference<String> value = new AtomicReference<>(randomSimpleString(random()));
-        indexRandom(true, client().prepareIndex("test", "test", "test").setSource("test", value.get()));
+        indexRandom(true, client().prepareIndex("test", "_doc", "test").setSource("test", value.get()));
 
         AtomicReference<Exception> failure = new AtomicReference<>();
         AtomicBoolean keepUpdating = new AtomicBoolean(true);

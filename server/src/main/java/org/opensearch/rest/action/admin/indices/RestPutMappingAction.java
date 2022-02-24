@@ -81,8 +81,11 @@ public class RestPutMappingAction extends BaseRestHandler {
         PutMappingRequest putMappingRequest = putMappingRequest(Strings.splitStringByCommaToArray(request.param("index")));
 
         final boolean includeTypeName = request.paramAsBoolean(INCLUDE_TYPE_NAME_PARAMETER, DEFAULT_INCLUDE_TYPE_NAME_POLICY);
-        final String type = request.param("type");
-        putMappingRequest.type(includeTypeName ? type : MapperService.SINGLE_MAPPING_NAME);
+        if (request.hasParam(INCLUDE_TYPE_NAME_PARAMETER)) {
+            deprecationLogger.deprecate("put_mapping_with_types", TYPES_DEPRECATION_MESSAGE);
+        }
+
+        putMappingRequest.type(MapperService.SINGLE_MAPPING_NAME);
 
         Map<String, Object> sourceAsMap = XContentHelper.convertToMap(request.requiredContent(), false, request.getXContentType()).v2();
 

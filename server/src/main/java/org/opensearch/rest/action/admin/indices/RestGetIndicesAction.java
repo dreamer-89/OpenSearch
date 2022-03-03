@@ -59,15 +59,6 @@ import static org.opensearch.rest.RestRequest.Method.HEAD;
  */
 public class RestGetIndicesAction extends BaseRestHandler {
 
-    private static final DeprecationLogger deprecationLogger = DeprecationLogger.getLogger(RestGetIndicesAction.class);
-    public static final String TYPES_DEPRECATION_MESSAGE = "[types removal] Using `include_type_name` in get indices requests"
-        + " is deprecated. The parameter will be removed in the next major version.";
-
-    private static final Set<String> allowedResponseParameters = Collections.unmodifiableSet(
-        Stream.concat(Collections.singleton(INCLUDE_TYPE_NAME_PARAMETER).stream(), Settings.FORMAT_PARAMS.stream())
-            .collect(Collectors.toSet())
-    );
-
     @Override
     public List<Route> routes() {
         return unmodifiableList(asList(new Route(GET, "/{index}"), new Route(HEAD, "/{index}")));
@@ -81,10 +72,7 @@ public class RestGetIndicesAction extends BaseRestHandler {
     @Override
     public RestChannelConsumer prepareRequest(final RestRequest request, final NodeClient client) throws IOException {
         String[] indices = Strings.splitStringByCommaToArray(request.param("index"));
-        // starting with 7.0 we don't include types by default in the response to GET requests
-        if (request.hasParam(INCLUDE_TYPE_NAME_PARAMETER) && request.method().equals(GET)) {
-            deprecationLogger.deprecate("get_indices_with_types", TYPES_DEPRECATION_MESSAGE);
-        }
+
         final GetIndexRequest getIndexRequest = new GetIndexRequest();
         getIndexRequest.indices(indices);
         getIndexRequest.indicesOptions(IndicesOptions.fromRequest(request, getIndexRequest.indicesOptions()));
@@ -101,6 +89,6 @@ public class RestGetIndicesAction extends BaseRestHandler {
      */
     @Override
     protected Set<String> responseParams() {
-        return allowedResponseParameters;
+        return Settings.FORMAT_PARAMS;
     }
 }

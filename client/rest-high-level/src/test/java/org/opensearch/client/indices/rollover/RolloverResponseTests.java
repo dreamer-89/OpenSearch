@@ -94,7 +94,6 @@ public class RolloverResponseTests extends OpenSearchTestCase {
     }
 
     private static void toXContent(RolloverResponse response, XContentBuilder builder) throws IOException {
-        Params params = new ToXContent.MapParams(Collections.singletonMap(BaseRestHandler.INCLUDE_TYPE_NAME_PARAMETER, "false"));
         org.opensearch.action.admin.indices.rollover.RolloverResponse serverResponse =
             new org.opensearch.action.admin.indices.rollover.RolloverResponse(
                 response.getOldIndex(),
@@ -105,6 +104,6 @@ public class RolloverResponseTests extends OpenSearchTestCase {
                 response.isAcknowledged(),
                 response.isShardsAcknowledged()
             );
-        serverResponse.toXContent(builder, params);
+        serverResponse.toXContent(builder, null);
     }
 }

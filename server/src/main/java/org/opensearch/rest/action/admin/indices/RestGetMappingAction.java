@@ -61,10 +61,6 @@ import static java.util.Collections.unmodifiableList;
 import static org.opensearch.rest.RestRequest.Method.GET;
 
 public class RestGetMappingAction extends BaseRestHandler {
-    private static final Logger logger = LogManager.getLogger(RestGetMappingAction.class);
-    private static final DeprecationLogger deprecationLogger = DeprecationLogger.getLogger(logger.getName());
-    public static final String TYPES_DEPRECATION_MESSAGE = "[types removal] Using include_type_name in get"
-        + " mapping requests is deprecated. The parameter will be removed in the next major version.";
 
     private final ThreadPool threadPool;
 

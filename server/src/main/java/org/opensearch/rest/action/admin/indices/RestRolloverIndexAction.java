@@ -50,9 +50,6 @@ import static org.opensearch.rest.RestRequest.Method.POST;
 public class RestRolloverIndexAction extends BaseRestHandler {
 
     private static final DeprecationLogger deprecationLogger = DeprecationLogger.getLogger(RestRolloverIndexAction.class);
-    public static final String TYPES_DEPRECATION_MESSAGE = "[types removal] Using include_type_name in rollover "
-        + "index requests is deprecated. The parameter will be removed in the next major version.";
-
     @Override
     public List<Route> routes() {
         return unmodifiableList(asList(new Route(POST, "/{index}/_rollover"), new Route(POST, "/{index}/_rollover/{new_index}")));
@@ -65,12 +62,8 @@ public class RestRolloverIndexAction extends BaseRestHandler {
 
     @Override
     public RestChannelConsumer prepareRequest(final RestRequest request, final NodeClient client) throws IOException {
-        final boolean includeTypeName = request.paramAsBoolean(INCLUDE_TYPE_NAME_PARAMETER, DEFAULT_INCLUDE_TYPE_NAME_POLICY);
-        if (request.hasParam(INCLUDE_TYPE_NAME_PARAMETER)) {
-            deprecationLogger.deprecate("index_rollover_with_types", TYPES_DEPRECATION_MESSAGE);
-        }
         RolloverRequest rolloverIndexRequest = new RolloverRequest(request.param("index"), request.param("new_index"));
-        request.applyContentParser(parser -> rolloverIndexRequest.fromXContent(includeTypeName, parser));
+        request.applyContentParser(rolloverIndexRequest::fromXContent);
         rolloverIndexRequest.dryRun(request.paramAsBoolean("dry_run", false));
         rolloverIndexRequest.timeout(request.paramAsTime("timeout", rolloverIndexRequest.timeout()));
         rolloverIndexRequest.masterNodeTimeout(request.paramAsTime("master_timeout", rolloverIndexRequest.masterNodeTimeout()));

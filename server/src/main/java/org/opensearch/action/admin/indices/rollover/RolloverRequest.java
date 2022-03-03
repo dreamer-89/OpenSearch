@@ -62,7 +62,7 @@ import static org.opensearch.action.ValidateActions.addValidationError;
  */
 public class RolloverRequest extends AcknowledgedRequest<RolloverRequest> implements IndicesRequest, ToXContentObject {
 
-    private static final ObjectParser<RolloverRequest, Boolean> PARSER = new ObjectParser<>("rollover");
+    private static final ObjectParser<RolloverRequest, Void> PARSER = new ObjectParser<>("rollover");
     private static final ObjectParser<Map<String, Condition<?>>, Void> CONDITION_PARSER = new ObjectParser<>("conditions");
 
     private static final ParseField CONDITIONS = new ParseField("conditions");
@@ -97,24 +97,13 @@ public class RolloverRequest extends AcknowledgedRequest<RolloverRequest> implem
             CreateIndexRequest.SETTINGS,
             ObjectParser.ValueType.OBJECT
         );
-        PARSER.declareField((parser, request, includeTypeName) -> {
-            if (includeTypeName) {
-                for (Map.Entry<String, Object> mappingsEntry : parser.map().entrySet()) {
-                    request.createIndexRequest.mapping(mappingsEntry.getKey(), (Map<String, Object>) mappingsEntry.getValue());
-                }
-            } else {
-                // a type is not included, add a dummy _doc type
-                Map<String, Object> mappings = parser.map();
-                if (MapperService.isMappingSourceTyped(MapperService.SINGLE_MAPPING_NAME, mappings)) {
-                    throw new IllegalArgumentException(
-                        "The mapping definition cannot be nested under a type "
-                            + "["
-                            + MapperService.SINGLE_MAPPING_NAME
-                            + "] unless include_type_name is set to true."
-                    );
-                }
-                request.createIndexRequest.mapping(MapperService.SINGLE_MAPPING_NAME, mappings);
+        PARSER.declareField((parser, request, context) -> {
+            // a type is not included, add a dummy _doc type
+            Map<String, Object> mappings = parser.map();
+            if (MapperService.isMappingSourceTyped(MapperService.SINGLE_MAPPING_NAME, mappings)) {
+                throw new IllegalArgumentException("The mapping definition cannot be nested under a type");
             }
+            request.createIndexRequest.mapping(MapperService.SINGLE_MAPPING_NAME, mappings);
         }, CreateIndexRequest.MAPPINGS, ObjectParser.ValueType.OBJECT);
         PARSER.declareField(
             (parser, request, context) -> request.createIndexRequest.aliases(parser.map()),
@@ -288,8 +277,7 @@ public class RolloverRequest extends AcknowledgedRequest<RolloverRequest> implem
         return builder;
     }
 
-    // param isTypeIncluded decides how mappings should be parsed from XContent
-    public void fromXContent(boolean isTypeIncluded, XContentParser parser) throws IOException {
-        PARSER.parse(parser, this, isTypeIncluded);
+    public void fromXContent(XContentParser parser) throws IOException {
+        PARSER.parse(parser, this, null);
     }
 }

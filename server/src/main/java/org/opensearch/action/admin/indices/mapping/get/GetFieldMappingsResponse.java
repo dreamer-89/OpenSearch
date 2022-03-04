@@ -47,7 +47,6 @@ import org.opensearch.common.xcontent.XContentHelper;
 import org.opensearch.common.xcontent.XContentParser;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.index.mapper.Mapper;
-import org.opensearch.rest.BaseRestHandler;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -58,7 +57,6 @@ import java.util.Objects;
 import static java.util.Collections.unmodifiableMap;
 import static org.opensearch.common.xcontent.ConstructingObjectParser.optionalConstructorArg;
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
-import static org.opensearch.common.xcontent.XContentParserUtils.ensureExpectedToken;
 
 /**
  * Response object for {@link GetFieldMappingsRequest} API
@@ -98,7 +96,6 @@ public class GetFieldMappingsResponse extends ActionResponse implements ToXConte
             }
         }, MAPPINGS, ObjectParser.ValueType.OBJECT);
     }
-
 
     // TODO remove the middle `type` level of this
     private final Map<String, Map<String, Map<String, FieldMappingMetadata>>> mappings;

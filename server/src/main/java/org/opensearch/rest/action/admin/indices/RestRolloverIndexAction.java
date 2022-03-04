@@ -50,6 +50,7 @@ import static org.opensearch.rest.RestRequest.Method.POST;
 public class RestRolloverIndexAction extends BaseRestHandler {
 
     private static final DeprecationLogger deprecationLogger = DeprecationLogger.getLogger(RestRolloverIndexAction.class);
+
     @Override
     public List<Route> routes() {
         return unmodifiableList(asList(new Route(POST, "/{index}/_rollover"), new Route(POST, "/{index}/_rollover/{new_index}")));

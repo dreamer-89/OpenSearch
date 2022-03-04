@@ -1,0 +1,41 @@
+curl -X POST http://localhost:9200/_bulk -H 'Content-Type: application/json' -d '
+{ "index" : { "_index" : "test", "_id" : "1" } }
+{ "field1" : "value1", "field2": 1.2 }
+{ "index" : { "_index" : "test", "_id" : "2" } }
+{ "field1" : "value2", "field2": 1.1 }
+{ "index" : { "_index" : "test", "_id" : "3" } }
+{ "field1" : "value3", "field2": 5 }
+'
+
+curl -X PUT "localhost:9200/testing?pretty" -H 'Content-Type: application/json' -d'
+{
+  "settings": {
+    "number_of_shards": 0
+  },
+  "aliases": {
+    "alias1": {
+      "filter": { "match_all" : {} }
+    }
+  }
+}
+'
+
+
+curl -X POST "localhost:9200/_cluster/reroute?pretty" -H 'Content-Type: application/json' -d'
+{
+  "commands": [
+    {
+      "move": {
+        "index": "test", "shard": 0,
+        "from_node": "node1", "to_node": "node2"
+      }
+    },
+    {
+      "allocate_replica": {
+        "index": "test", "shard": 1,
+        "node": "node3"
+      }
+    }
+  ]
+}
+'

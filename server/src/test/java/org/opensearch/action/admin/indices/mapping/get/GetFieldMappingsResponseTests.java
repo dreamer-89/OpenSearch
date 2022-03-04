@@ -37,21 +37,12 @@ import org.opensearch.common.bytes.BytesArray;
 import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.Writeable;
-import org.opensearch.common.xcontent.LoggingDeprecationHandler;
-import org.opensearch.common.xcontent.ToXContent;
-import org.opensearch.common.xcontent.XContentParser;
-import org.opensearch.common.xcontent.XContentType;
-import org.opensearch.test.AbstractSerializingTestCase;
 import org.opensearch.test.AbstractWireSerializingTestCase;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Predicate;
-
-import static org.opensearch.rest.BaseRestHandler.INCLUDE_TYPE_NAME_PARAMETER;
-import static org.hamcrest.CoreMatchers.equalTo;
 
 public class GetFieldMappingsResponseTests extends AbstractWireSerializingTestCase<GetFieldMappingsResponse> {
 

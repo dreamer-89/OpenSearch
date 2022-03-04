@@ -54,8 +54,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.opensearch.rest.BaseRestHandler.INCLUDE_TYPE_NAME_PARAMETER;
-
 /**
  * Execution context passed across the REST tests.
  * Holds the REST client used to communicate with opensearch.
@@ -65,6 +63,8 @@ import static org.opensearch.rest.BaseRestHandler.INCLUDE_TYPE_NAME_PARAMETER;
 public class ClientYamlTestExecutionContext {
 
     private static final Logger logger = LogManager.getLogger(ClientYamlTestExecutionContext.class);
+
+    private static final String INCLUDE_TYPE_NAME_PARAMETER = "include_type_name";
 
     private static final XContentType[] STREAMING_CONTENT_TYPES = new XContentType[] { XContentType.JSON, XContentType.SMILE };
 

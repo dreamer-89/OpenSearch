@@ -35,7 +35,6 @@ package org.opensearch.rest.action.admin.indices;
 import org.opensearch.action.admin.indices.create.CreateIndexRequest;
 import org.opensearch.action.support.ActiveShardCount;
 import org.opensearch.client.node.NodeClient;
-import org.opensearch.common.logging.DeprecationLogger;
 import org.opensearch.common.xcontent.LoggingDeprecationHandler;
 import org.opensearch.common.xcontent.XContentHelper;
 import org.opensearch.index.mapper.MapperService;
@@ -90,9 +89,7 @@ public class RestCreateIndexAction extends BaseRestHandler {
         @SuppressWarnings("unchecked")
         Map<String, Object> mappings = (Map<String, Object>) source.get("mappings");
         if (MapperService.isMappingSourceTyped(MapperService.SINGLE_MAPPING_NAME, mappings)) {
-            throw new IllegalArgumentException(
-                "The mapping definition cannot be nested under a type"
-            );
+            throw new IllegalArgumentException("The mapping definition cannot be nested under a type");
         }
 
         newSource.put("mappings", singletonMap(MapperService.SINGLE_MAPPING_NAME, mappings));

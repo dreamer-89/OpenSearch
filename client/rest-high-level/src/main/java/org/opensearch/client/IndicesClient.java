@@ -946,53 +946,6 @@ public final class IndicesClient {
     }
 
     /**
-     * Checks if the index (indices) exists or not.
-     *
-     * @param request the request
-     * @param options the request options (e.g. headers), use {@link RequestOptions#DEFAULT} if nothing needs to be customized
-     * @return the response
-     * @throws IOException in case there is a problem sending the request
-     * @deprecated This method uses an old request object which still refers to types, a deprecated feature. The method
-     * {@link #exists(GetIndexRequest, RequestOptions)} should be used instead, which accepts a new request object.
-     */
-    @Deprecated
-    public boolean exists(org.opensearch.action.admin.indices.get.GetIndexRequest request, RequestOptions options) throws IOException {
-        return restHighLevelClient.performRequest(
-            request,
-            IndicesRequestConverters::indicesExist,
-            options,
-            RestHighLevelClient::convertExistsResponse,
-            Collections.emptySet()
-        );
-    }
-
-    /**
-     * Asynchronously checks if the index (indices) exists or not.
-     *
-     * @param request the request
-     * @param options the request options (e.g. headers), use {@link RequestOptions#DEFAULT} if nothing needs to be customized
-     * @param listener the listener to be notified upon request completion
-     * @deprecated This method uses an old request object which still refers to types, a deprecated feature. The method
-     * {@link #existsAsync(GetIndexRequest, RequestOptions, ActionListener)} should be used instead, which accepts a new request object.
-     * @return cancellable that may be used to cancel the request
-     */
-    @Deprecated
-    public Cancellable existsAsync(
-        org.opensearch.action.admin.indices.get.GetIndexRequest request,
-        RequestOptions options,
-        ActionListener<Boolean> listener
-    ) {
-        return restHighLevelClient.performRequestAsync(
-            request,
-            IndicesRequestConverters::indicesExist,
-            options,
-            RestHighLevelClient::convertExistsResponse,
-            listener,
-            Collections.emptySet()
-        );
-    }
-
-    /**
      * Shrinks an index using the Shrink Index API.
      *
      * @param resizeRequest the request
@@ -1359,57 +1312,6 @@ public final class IndicesClient {
         return restHighLevelClient.performRequestAsyncAndParseEntity(
             updateSettingsRequest,
             IndicesRequestConverters::indexPutSettings,
-            options,
-            AcknowledgedResponse::fromXContent,
-            listener,
-            emptySet()
-        );
-    }
-
-    /**
-     * Puts an index template using the Index Templates API.
-     *
-     * @param putIndexTemplateRequest the request
-     * @param options the request options (e.g. headers), use {@link RequestOptions#DEFAULT} if nothing needs to be customized
-     * @return the response
-     * @throws IOException in case there is a problem sending the request or parsing back the response
-     * @deprecated This old form of request allows types in mappings. Use {@link #putTemplate(PutIndexTemplateRequest, RequestOptions)}
-     * instead which introduces a new request object without types.
-     */
-    @Deprecated
-    public AcknowledgedResponse putTemplate(
-        org.opensearch.action.admin.indices.template.put.PutIndexTemplateRequest putIndexTemplateRequest,
-        RequestOptions options
-    ) throws IOException {
-        return restHighLevelClient.performRequestAndParseEntity(
-            putIndexTemplateRequest,
-            IndicesRequestConverters::putTemplate,
-            options,
-            AcknowledgedResponse::fromXContent,
-            emptySet()
-        );
-    }
-
-    /**
-     * Asynchronously puts an index template using the Index Templates API.
-     *
-     * @param putIndexTemplateRequest the request
-     * @param options the request options (e.g. headers), use {@link RequestOptions#DEFAULT} if nothing needs to be customized
-     * @param listener the listener to be notified upon request completion
-     * @deprecated This old form of request allows types in mappings.
-     * Use {@link #putTemplateAsync(PutIndexTemplateRequest, RequestOptions, ActionListener)}
-     * instead which introduces a new request object without types.
-     * @return cancellable that may be used to cancel the request
-     */
-    @Deprecated
-    public Cancellable putTemplateAsync(
-        org.opensearch.action.admin.indices.template.put.PutIndexTemplateRequest putIndexTemplateRequest,
-        RequestOptions options,
-        ActionListener<AcknowledgedResponse> listener
-    ) {
-        return restHighLevelClient.performRequestAsyncAndParseEntity(
-            putIndexTemplateRequest,
-            IndicesRequestConverters::putTemplate,
             options,
             AcknowledgedResponse::fromXContent,
             listener,

@@ -78,7 +78,6 @@ import org.opensearch.common.Strings;
 import java.io.IOException;
 import java.util.Locale;
 
-
 final class IndicesRequestConverters {
 
     private IndicesRequestConverters() {}
@@ -408,28 +407,6 @@ final class IndicesRequestConverters {
         return request;
     }
 
-    /**
-     * converter for the legacy server-side {@link org.opensearch.action.admin.indices.get.GetIndexRequest} that
-     * still supports types
-     */
-    @Deprecated
-    static Request indicesExist(org.opensearch.action.admin.indices.get.GetIndexRequest getIndexRequest) {
-        if (getIndexRequest.indices() == null || getIndexRequest.indices().length == 0) {
-            throw new IllegalArgumentException("indices are mandatory");
-        }
-        String endpoint = RequestConverters.endpoint(getIndexRequest.indices(), "");
-        Request request = new Request(HttpHead.METHOD_NAME, endpoint);
-
-        RequestConverters.Params params = new RequestConverters.Params();
-        params.withLocal(getIndexRequest.local());
-        params.withHuman(getIndexRequest.humanReadable());
-        params.withIndicesOptions(getIndexRequest.indicesOptions());
-        params.withIncludeDefaults(getIndexRequest.includeDefaults());
-//        params.putParam(INCLUDE_TYPE_NAME_PARAMETER, "true");
-        request.addParameters(params.asMap());
-        return request;
-    }
-
     static Request indicesExist(GetIndexRequest getIndexRequest) {
         if (getIndexRequest.indices() == null || getIndexRequest.indices().length == 0) {
             throw new IllegalArgumentException("indices are mandatory");
@@ -457,31 +434,6 @@ final class IndicesRequestConverters {
         parameters.withPreserveExisting(updateSettingsRequest.isPreserveExisting());
         request.addParameters(parameters.asMap());
         request.setEntity(RequestConverters.createEntity(updateSettingsRequest, RequestConverters.REQUEST_BODY_CONTENT_TYPE));
-        return request;
-    }
-
-    /**
-     * @deprecated This uses the old form of PutIndexTemplateRequest which uses types.
-     * Use (@link {@link #putTemplate(PutIndexTemplateRequest)} instead
-     */
-    @Deprecated
-    static Request putTemplate(org.opensearch.action.admin.indices.template.put.PutIndexTemplateRequest putIndexTemplateRequest)
-        throws IOException {
-        String endpoint = new RequestConverters.EndpointBuilder().addPathPartAsIs("_template")
-            .addPathPart(putIndexTemplateRequest.name())
-            .build();
-        Request request = new Request(HttpPut.METHOD_NAME, endpoint);
-        RequestConverters.Params params = new RequestConverters.Params();
-        params.withMasterTimeout(putIndexTemplateRequest.masterNodeTimeout());
-        if (putIndexTemplateRequest.create()) {
-            params.putParam("create", Boolean.TRUE.toString());
-        }
-        if (Strings.hasText(putIndexTemplateRequest.cause())) {
-            params.putParam("cause", putIndexTemplateRequest.cause());
-        }
-//        params.putParam(INCLUDE_TYPE_NAME_PARAMETER, "true");
-        request.addParameters(params.asMap());
-        request.setEntity(RequestConverters.createEntity(putIndexTemplateRequest, RequestConverters.REQUEST_BODY_CONTENT_TYPE));
         return request;
     }
 
@@ -570,16 +522,7 @@ final class IndicesRequestConverters {
         return request;
     }
 
-    @Deprecated
-    static Request getTemplatesWithDocumentTypes(GetIndexTemplatesRequest getIndexTemplatesRequest) {
-        return getTemplates(getIndexTemplatesRequest, true);
-    }
-
     static Request getTemplates(GetIndexTemplatesRequest getIndexTemplatesRequest) {
-        return getTemplates(getIndexTemplatesRequest, false);
-    }
-
-    private static Request getTemplates(GetIndexTemplatesRequest getIndexTemplatesRequest, boolean includeTypeName) {
         final String endpoint = new RequestConverters.EndpointBuilder().addPathPartAsIs("_template")
             .addCommaSeparatedPathParts(getIndexTemplatesRequest.names())
             .build();
@@ -587,9 +530,6 @@ final class IndicesRequestConverters {
         final RequestConverters.Params params = new RequestConverters.Params();
         params.withLocal(getIndexTemplatesRequest.isLocal());
         params.withMasterTimeout(getIndexTemplatesRequest.getMasterNodeTimeout());
-        if (includeTypeName) {
-//            params.putParam(INCLUDE_TYPE_NAME_PARAMETER, "true");
-        }
         request.addParameters(params.asMap());
         return request;
     }

@@ -89,12 +89,6 @@ public class TermsLookup implements Writeable, ToXContentFragment {
      * Read from a stream.
      */
     public TermsLookup(StreamInput in) throws IOException {
-        if (in.getVersion().onOrAfter(LegacyESVersion.V_7_0_0)) {
-            type = in.readOptionalString();
-        } else {
-            // Before 7.0, the type parameter was always non-null and serialized as a (non-optional) string.
-            type = in.readString();
-        }
         id = in.readString();
         path = in.readString();
         index = in.readString();

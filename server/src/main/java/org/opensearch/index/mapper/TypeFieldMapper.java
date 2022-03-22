@@ -68,6 +68,7 @@ public class TypeFieldMapper extends MetadataFieldMapper {
 
     public static final String NAME = "_type";
 
+
     public static final String CONTENT_TYPE = "_type";
 
     public static final TypeParser PARSER = new FixedTypeParser(c -> new TypeFieldMapper());

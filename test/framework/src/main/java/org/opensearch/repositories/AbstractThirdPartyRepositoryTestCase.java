@@ -85,7 +85,6 @@ public abstract class AbstractThirdPartyRepositoryTestCase extends OpenSearchSin
     @Override
     public void tearDown() throws Exception {
         deleteAndAssertEmpty(getRepository().basePath());
-//        client().admin().cluster().prepareDeleteRepository("test-repo").get();
         super.tearDown();
     }
 

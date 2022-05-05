@@ -135,7 +135,6 @@ public abstract class AbstractThirdPartyRepositoryTestCase extends OpenSearchSin
             equalTo(SnapshotState.SUCCESS)
         );
 
-        assertTrue(client().admin().cluster().prepareDeleteSnapshot("test-repo", snapshotName).get().isAcknowledged());
     }
 
     public void testListChildren() throws Exception {

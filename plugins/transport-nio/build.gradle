@@ -46,7 +46,7 @@ dependencies {
   api "io.netty:netty-buffer:${versions.netty}"
   api "io.netty:netty-codec:${versions.netty}"
   api "io.netty:netty-codec-http:${versions.netty}"
-  api "io.netty:netty-common:${versions.netty}"
+  api "io.netty:netty-common:${versions.netty_common}"
   api "io.netty:netty-handler:${versions.netty}"
   api "io.netty:netty-resolver:${versions.netty}"
   api "io.netty:netty-transport:${versions.netty}"
@@ -64,7 +64,7 @@ thirdPartyAudit {
     'com.aayushatharva.brotli4j.encoder.Encoder',
     'com.aayushatharva.brotli4j.encoder.Encoder$Mode',
     'com.aayushatharva.brotli4j.encoder.Encoder$Parameters',
-    
+
     // from io.netty.handler.codec.protobuf.ProtobufDecoder (netty)
     'com.google.protobuf.ExtensionRegistry',
     'com.google.protobuf.MessageLite$Builder',

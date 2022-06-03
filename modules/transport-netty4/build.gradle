@@ -55,7 +55,7 @@ dependencies {
   api "io.netty:netty-buffer:${versions.netty}"
   api "io.netty:netty-codec:${versions.netty}"
   api "io.netty:netty-codec-http:${versions.netty}"
-  api "io.netty:netty-common:${versions.netty}"
+  api "io.netty:netty-common:${versions.netty_common}"
   api "io.netty:netty-handler:${versions.netty}"
   api "io.netty:netty-resolver:${versions.netty}"
   api "io.netty:netty-transport:${versions.netty}"

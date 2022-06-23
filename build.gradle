@@ -52,6 +52,8 @@ plugins {
   id "org.gradle.test-retry" version "1.4.0" apply false
   id "test-report-aggregation"
   id 'jacoco-report-aggregation'
+//  id "com.dorongold.task-tree" version "2.1.0"
+  id 'cz.malohlava.visteg' version '1.0.5'
 }
 
 apply from: 'gradle/build-complete.gradle'
@@ -70,6 +72,18 @@ allprojects {
   group = 'org.opensearch'
   version = VersionProperties.getOpenSearch()
   description = "OpenSearch subproject ${project.path}"
+}
+
+visteg {
+  enabled        = true
+  colouredNodes  = true
+  colouredEdges  = true
+  destination    = 'build/reports/visteg.dot'
+  exporter       = 'dot'
+  colorscheme    = 'spectral11'
+  nodeShape      = 'box'
+  startNodeShape = 'hexagon'
+  endNodeShape   = 'doubleoctagon'
 }
 
 configure(allprojects - project(':distribution:archives:integ-test-zip')) {

@@ -161,9 +161,9 @@ import org.opensearch.indices.recovery.RecoveryFailedException;
 import org.opensearch.indices.recovery.RecoveryListener;
 import org.opensearch.indices.recovery.RecoveryState;
 import org.opensearch.indices.recovery.RecoveryTarget;
+import org.opensearch.indices.replication.SegmentReplicationTargetService;
 import org.opensearch.indices.replication.checkpoint.SegmentReplicationCheckpointPublisher;
 import org.opensearch.indices.replication.checkpoint.ReplicationCheckpoint;
-import org.opensearch.indices.replication.checkpoint.SegmentReplicationCheckpointPublisher;
 import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.repositories.Repository;
 import org.opensearch.rest.RestStatus;
@@ -1396,6 +1396,15 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
      * Returns the lastest Replication Checkpoint that shard received
      */
     public ReplicationCheckpoint getLatestReplicationCheckpoint() {
+        if (isActive() == false) {
+            return new ReplicationCheckpoint(
+                shardId,
+                getOperationPrimaryTerm(),
+                SequenceNumbers.NO_OPS_PERFORMED,
+                SequenceNumbers.NO_OPS_PERFORMED,
+                SequenceNumbers.NO_OPS_PERFORMED
+            );
+        }
         try (final GatedCloseable<SegmentInfos> snapshot = getSegmentInfosSnapshot()) {
             return Optional.ofNullable(snapshot.get())
                 .map(
@@ -1944,7 +1953,12 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
      */
     public void openEngineAndSkipTranslogRecovery() throws IOException {
         assert routingEntry().recoverySource().getType() == RecoverySource.Type.PEER : "not a peer recovery [" + routingEntry() + "]";
-        recoveryState.validateCurrentStage(RecoveryState.Stage.TRANSLOG);
+        if (indexSettings.isSegRepEnabled() == false) {
+            recoveryState.validateCurrentStage(RecoveryState.Stage.TRANSLOG);
+        } else {
+            recoveryState.setStage(RecoveryState.Stage.VERIFY_INDEX);
+            recoveryState.setStage(RecoveryState.Stage.TRANSLOG);
+        }
         loadGlobalCheckpointToReplicationTracker();
         innerOpenEngineAndTranslog(replicationTracker);
         getEngine().skipTranslogRecovery();
@@ -1970,6 +1984,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
             assert currentEngineReference.get() == null : "engine is running";
             verifyNotClosed();
             // we must create a new engine under mutex (see IndexShard#snapshotStoreMetadata).
+            logger.info("ENGINE FACTORY TYPE {}", engineFactory.getClass());
             final Engine newEngine = engineFactory.newReadWriteEngine(config);
             onNewEngine(newEngine);
             currentEngineReference.set(newEngine);
@@ -2975,6 +2990,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
         RecoveryState recoveryState,
         PeerRecoveryTargetService recoveryTargetService,
         RecoveryListener recoveryListener,
+        SegmentReplicationTargetService segmentReplicationTargetService,
         RepositoriesService repositoriesService,
         Consumer<MappingMetadata> mappingUpdateConsumer,
         IndicesService indicesService
@@ -3004,7 +3020,16 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
             case PEER:
                 try {
                     markAsRecovering("from " + recoveryState.getSourceNode(), recoveryState);
-                    recoveryTargetService.startRecovery(this, recoveryState.getSourceNode(), recoveryListener);
+                    if (indexSettings.isSegRepEnabled()) {
+                        // Start a "Recovery" using segment replication. This ensures the shard is tracked by the primary
+                        // and started with the latest set of segments.
+                        segmentReplicationTargetService.recoverShard(
+                            this,
+                            recoveryListener
+                        );
+                    } else {
+                        recoveryTargetService.startRecovery(this, recoveryState.getSourceNode(), recoveryListener);
+                    }
                 } catch (Exception e) {
                     failShard("corrupted preexisting index", e);
                     recoveryListener.onFailure(recoveryState, new RecoveryFailedException(recoveryState, null, e), true);

@@ -24,9 +24,12 @@ import org.opensearch.common.UUIDs;
 import org.opensearch.common.bytes.BytesReference;
 import org.opensearch.common.lucene.Lucene;
 import org.opensearch.common.util.CancellableThreads;
+import org.opensearch.index.seqno.SequenceNumbers;
 import org.opensearch.index.shard.IndexShard;
+import org.opensearch.index.shard.IndexShardState;
 import org.opensearch.index.store.Store;
 import org.opensearch.index.store.StoreFileMetadata;
+import org.opensearch.index.translog.Translog;
 import org.opensearch.indices.recovery.MultiFileWriter;
 import org.opensearch.indices.replication.checkpoint.ReplicationCheckpoint;
 import org.opensearch.indices.replication.common.ReplicationFailedException;
@@ -36,12 +39,15 @@ import org.opensearch.indices.replication.common.ReplicationTarget;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import static org.opensearch.index.translog.Translog.TRANSLOG_UUID_KEY;
 
 /**
  * Represents the target of a replication event.
@@ -53,6 +59,7 @@ public class SegmentReplicationTarget extends ReplicationTarget {
     private final ReplicationCheckpoint checkpoint;
     private final SegmentReplicationSource source;
     private final SegmentReplicationState state;
+    private final boolean isEmptyShard;
     protected final MultiFileWriter multiFileWriter;
 
     public SegmentReplicationTarget(
@@ -62,10 +69,18 @@ public class SegmentReplicationTarget extends ReplicationTarget {
         ReplicationListener listener
     ) {
         super("replication_target", indexShard, new ReplicationLuceneIndex(), listener);
+        boolean isEmptyShard1;
         this.checkpoint = checkpoint;
         this.source = source;
         this.state = new SegmentReplicationState(stateIndex);
         this.multiFileWriter = new MultiFileWriter(indexShard.store(), stateIndex, getPrefix(), logger, this::ensureRefCount);
+        try {
+            isEmptyShard1 = store.directory().listAll().length == 0;
+        } catch (IOException e) {
+            fail(new OpenSearchException("Unable to read directory", e), true);
+            isEmptyShard1 = true;
+        }
+        this.isEmptyShard = isEmptyShard1;
     }
 
     @Override
@@ -163,7 +178,7 @@ public class SegmentReplicationTarget extends ReplicationTarget {
         if (diff.different.isEmpty() == false) {
             getFilesListener.onFailure(
                 new IllegalStateException(
-                    new ParameterizedMessage("Shard {} has local copies of segments that differ from the primary", indexShard.shardId())
+                    new ParameterizedMessage("Shard {} has local copies of segments that differ from the primary {}", indexShard.shardId(), diff.different)
                         .getFormattedMessage()
                 )
             );
@@ -188,7 +203,7 @@ public class SegmentReplicationTarget extends ReplicationTarget {
         }
     }
 
-    private void finalizeReplication(CheckpointInfoResponse checkpointInfoResponse, ActionListener<Void> listener) {
+    private synchronized void finalizeReplication(CheckpointInfoResponse checkpointInfoResponse, ActionListener<Void> listener) {
         ActionListener.completeWith(listener, () -> {
             multiFileWriter.renameAllTempFiles();
             final Store store = store();
@@ -201,6 +216,24 @@ public class SegmentReplicationTarget extends ReplicationTarget {
                     toIndexInput(checkpointInfoResponse.getInfosBytes()),
                     responseCheckpoint.getSegmentsGen()
                 );
+                if (isEmptyShard) {
+                    final SegmentInfos lastCommitted = store.readLastCommittedSegmentsInfo();
+                    final long localCheckpoint = Long.parseLong(lastCommitted.userData.get(SequenceNumbers.LOCAL_CHECKPOINT_KEY));
+                    final String uuid = lastCommitted.userData.get(TRANSLOG_UUID_KEY);
+                    Translog.createEmptyTranslog(
+                        indexShard.shardPath().resolveTranslog(),
+                        shardId(),
+                        localCheckpoint,
+                        indexShard.getPendingPrimaryTerm(),
+                        uuid,
+                        FileChannel::open
+                    );
+                }
+                if (indexShard.state() != IndexShardState.STARTED) {
+                    indexShard.persistRetentionLeases();
+                    indexShard.openEngineAndSkipTranslogRecovery();
+                }
+                logger.info("AFTER COPY {}", Arrays.asList(store.directory().listAll()));
                 indexShard.finalizeReplication(infos, responseCheckpoint.getSeqNo());
                 store.cleanupAndPreserveLatestCommitPoint("finalize - clean with in memory infos", store.getMetadata(infos));
             } catch (CorruptIndexException | IndexFormatTooNewException | IndexFormatTooOldException ex) {
@@ -252,7 +285,7 @@ public class SegmentReplicationTarget extends ReplicationTarget {
     }
 
     Store.MetadataSnapshot getMetadataSnapshot() throws IOException {
-        if (indexShard.getSegmentInfosSnapshot() == null) {
+        if (isEmptyShard) {
             return Store.MetadataSnapshot.EMPTY;
         }
         return store.getMetadata(indexShard.getSegmentInfosSnapshot().get());

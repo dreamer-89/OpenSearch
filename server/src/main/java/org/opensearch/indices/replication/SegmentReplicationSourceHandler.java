@@ -12,6 +12,8 @@ import org.apache.logging.log4j.Logger;
 import org.opensearch.OpenSearchException;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.StepListener;
+import org.opensearch.action.support.ThreadedActionListener;
+import org.opensearch.action.support.replication.ReplicationResponse;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.routing.IndexShardRoutingTable;
 import org.opensearch.cluster.routing.ShardRouting;
@@ -20,6 +22,7 @@ import org.opensearch.common.util.CancellableThreads;
 import org.opensearch.common.util.concurrent.ListenableFuture;
 import org.opensearch.common.util.concurrent.OpenSearchExecutors;
 import org.opensearch.core.internal.io.IOUtils;
+import org.opensearch.index.seqno.SequenceNumbers;
 import org.opensearch.index.shard.IndexShard;
 import org.opensearch.index.store.StoreFileMetadata;
 import org.opensearch.indices.RunUnderPrimaryPermit;
@@ -38,6 +41,8 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+
+import static org.opensearch.index.seqno.ReplicationTracker.getPeerRecoveryRetentionLeaseId;
 
 /**
  * Orchestrates sending requested segment files to a target shard.
@@ -112,17 +117,17 @@ class SegmentReplicationSourceHandler {
             };
 
             RunUnderPrimaryPermit.run(() -> {
-                final IndexShardRoutingTable routingTable = shard.getReplicationGroup().getRoutingTable();
-                ShardRouting targetShardRouting = routingTable.getByAllocationId(request.getTargetAllocationId());
-                if (targetShardRouting == null) {
-                    logger.debug(
-                        "delaying replication of {} as it is not listed as assigned to target node {}",
-                        shard.shardId(),
-                        request.getTargetNode()
-                    );
-                    throw new DelayRecoveryException("source node does not have the shard listed in its state as allocated on the node");
-                }
-            },
+                    final IndexShardRoutingTable routingTable = shard.getReplicationGroup().getRoutingTable();
+                    ShardRouting targetShardRouting = routingTable.getByAllocationId(request.getTargetAllocationId());
+                    if (targetShardRouting == null) {
+                        logger.debug(
+                            "delaying replication of {} as it is not listed as assigned to target node {}",
+                            shard.shardId(),
+                            request.getTargetNode()
+                        );
+                        throw new DelayRecoveryException("source node does not have the shard listed in its state as allocated on the node");
+                    }
+                },
                 shard.shardId() + " validating recovery target [" + request.getTargetAllocationId() + "] registered ",
                 shard,
                 cancellableThreads,
@@ -141,16 +146,64 @@ class SegmentReplicationSourceHandler {
             resources.add(transfer);
             transfer.start();
 
+            final StepListener<ReplicationResponse> addRetentionLeaseStep = new StepListener<>();
+            final String targetAllocationId = request.getTargetAllocationId();
             sendFileStep.whenComplete(r -> {
+                final boolean contains = shard.getRetentionLeases().contains(getPeerRecoveryRetentionLeaseId(request.getTargetNode().getId()));
+                if (contains == false) {
+                    RunUnderPrimaryPermit.run(
+                        () -> shard.cloneLocalPeerRecoveryRetentionLease(
+                            request.getTargetNode().getId(),
+                            new ThreadedActionListener<>(logger, shard.getThreadPool(), ThreadPool.Names.GENERIC, addRetentionLeaseStep, false)
+                        ),
+                        "Add retention lease step",
+                        shard,
+                        new CancellableThreads(),
+                        logger
+                    );
+                } else {
+                    addRetentionLeaseStep.onResponse(new ReplicationResponse());
+                }
+            }, onFailure);
+            final StepListener<Void> lastStep = new StepListener<>();
+
+            addRetentionLeaseStep.whenComplete(r -> {
+                    RunUnderPrimaryPermit.run(
+                        () -> shard.initiateTracking(targetAllocationId),
+                        shard.shardId() + " initiating tracking of " + targetAllocationId,
+                        shard,
+                        new CancellableThreads(),
+                        logger
+                    );
+                    RunUnderPrimaryPermit.run(
+                        () -> shard.updateLocalCheckpointForShard(targetAllocationId, SequenceNumbers.NO_OPS_PERFORMED),
+                        shard.shardId() + " marking " + targetAllocationId + " as in sync",
+                        shard,
+                        new CancellableThreads(),
+                        logger
+                    );
+                RunUnderPrimaryPermit.run(
+                    () -> shard.markAllocationIdAsInSync(targetAllocationId, request.getCheckpoint().getSeqNo()),
+                    shard.shardId() + " marking " + targetAllocationId + " as in sync",
+                    shard,
+                    cancellableThreads,
+                    logger
+                );
+                lastStep.onResponse(null);
+            }, onFailure);
+            lastStep.whenComplete(r -> {
                 try {
                     future.onResponse(new GetSegmentFilesResponse(List.of(storeFileMetadata)));
                 } finally {
                     IOUtils.close(resources);
                 }
             }, onFailure);
-        } catch (Exception e) {
+
+        } catch (
+            Exception e) {
             IOUtils.closeWhileHandlingException(releaseResources, () -> future.onFailure(e));
         }
+
     }
 
     /**

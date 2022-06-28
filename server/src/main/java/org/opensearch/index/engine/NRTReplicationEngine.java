@@ -59,10 +59,13 @@ public class NRTReplicationEngine extends Engine {
 
     public NRTReplicationEngine(EngineConfig engineConfig) {
         super(engineConfig);
+        logger.info("Creating NRTReplicationEngine");
         store.incRef();
         NRTReplicationReaderManager readerManager = null;
         try {
+            logger.info("NRTEngine dir files {}", Arrays.asList(store.directory().listAll()));
             lastCommittedSegmentInfos = store.readLastCommittedSegmentsInfo();
+            logger.info("NRTEngine files {}", lastCommittedSegmentInfos.files(true));
             readerManager = new NRTReplicationReaderManager(OpenSearchDirectoryReader.wrap(getDirectoryReader(), shardId));
             final SequenceNumbers.CommitInfo commitInfo = SequenceNumbers.loadSeqNoInfoFromLuceneCommit(
                 this.lastCommittedSegmentInfos.getUserData().entrySet()
@@ -93,6 +96,8 @@ public class NRTReplicationEngine extends Engine {
             this.lastCommittedSegmentInfos = infos;
             rollTranslogGeneration();
         }
+        logger.info("ADVANCING PROCESSED SEQ NO TO {}", seqNo);
+        logger.info("persisted seq no {}", localCheckpointTracker.getPersistedCheckpoint());
         localCheckpointTracker.fastForwardProcessedSeqNo(seqNo);
     }
 

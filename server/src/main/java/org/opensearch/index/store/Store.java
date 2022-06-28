@@ -105,6 +105,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -1003,7 +1004,7 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
                     // version is written since 3.1+: we should have already hit IndexFormatTooOld.
                     throw new IllegalArgumentException("expected valid version value: " + info.info.toString());
                 }
-                if (version.onOrAfter(maxVersion)) {
+                if (maxVersion == null || version.onOrAfter(maxVersion)) {
                     maxVersion = version;
                 }
                 for (String file : info.files()) {

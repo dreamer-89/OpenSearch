@@ -219,6 +219,7 @@ public class RecoverySourceHandler {
                 && shard.hasCompleteHistoryOperations(PEER_RECOVERY_NAME, request.startingSeqNo())
                 && ((retentionLeaseRef.get() == null && shard.useRetentionLeasesInPeerRecovery() == false)
                     || (retentionLeaseRef.get() != null && retentionLeaseRef.get().retainingSequenceNumber() <= request.startingSeqNo()));
+            logger.info("isSequenceNoBased {}", isSequenceNumberBasedRecovery);
             // NB check hasCompleteHistoryOperations when computing isSequenceNumberBasedRecovery, even if there is a retention lease,
             // because when doing a rolling upgrade from earlier than 7.4 we may create some leases that are initially unsatisfied. It's
             // possible there are other cases where we cannot satisfy all leases, because that's not a property we currently expect to hold.

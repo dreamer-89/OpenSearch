@@ -755,7 +755,7 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
 
     // pkg private for testing
     final void verifyAfterCleanup(MetadataSnapshot sourceMetadata, MetadataSnapshot targetMetadata) {
-        final RecoveryDiff recoveryDiff = targetMetadata.recoveryDiff(sourceMetadata);
+        final RecoveryDiff recoveryDiff = targetMetadata.recoveryDiff(sourceMetadata, false);
         if (recoveryDiff.identical.size() != recoveryDiff.size()) {
             if (recoveryDiff.missing.isEmpty()) {
                 for (StoreFileMetadata meta : recoveryDiff.different) {
@@ -1131,7 +1131,7 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
          * <p>
          * NOTE: this diff will not contain the {@code segments.gen} file. This file is omitted on recovery.
          */
-        public RecoveryDiff recoveryDiff(MetadataSnapshot recoveryTargetSnapshot) {
+        public RecoveryDiff recoveryDiff(MetadataSnapshot recoveryTargetSnapshot, boolean segmentReplicationGetFiles) {
             final List<StoreFileMetadata> identical = new ArrayList<>();
             final List<StoreFileMetadata> different = new ArrayList<>();
             final List<StoreFileMetadata> missing = new ArrayList<>();
@@ -1170,7 +1170,8 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
                     identical.addAll(identicalFiles);
                 } else {
                     // make sure all files are added - this can happen if only the deletes are different
-                    different.addAll(identicalFiles);
+                    if (!segmentReplicationGetFiles)
+                        different.addAll(identicalFiles);
                 }
             }
             RecoveryDiff recoveryDiff = new RecoveryDiff(
@@ -1178,11 +1179,13 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
                 Collections.unmodifiableList(different),
                 Collections.unmodifiableList(missing)
             );
-            assert recoveryDiff.size() == this.metadata.size() : "some files are missing recoveryDiff size: ["
-                + recoveryDiff.size()
-                + "] metadata size: ["
-                + this.metadata.size()
-                + "]";
+            if (!segmentReplicationGetFiles) {
+                assert recoveryDiff.size() == this.metadata.size() : "some files are missing recoveryDiff size: ["
+                    + recoveryDiff.size()
+                    + "] metadata size: ["
+                    + this.metadata.size()
+                    + "]";
+            }
             return recoveryDiff;
         }
 
@@ -1247,7 +1250,7 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
     /**
      * A class representing the diff between a recovery source and recovery target
      *
-     * @see MetadataSnapshot#recoveryDiff(org.opensearch.index.store.Store.MetadataSnapshot)
+     * @see MetadataSnapshot#recoveryDiff(org.opensearch.index.store.Store.MetadataSnapshot, boolean)
      *
      * @opensearch.internal
      */

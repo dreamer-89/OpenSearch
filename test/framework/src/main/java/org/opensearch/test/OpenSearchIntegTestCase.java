@@ -906,7 +906,7 @@ public abstract class OpenSearchIntegTestCase extends OpenSearchTestCase {
      * are now allocated and started.
      */
     public ClusterHealthStatus ensureGreen(String... indices) {
-        return ensureGreen(TimeValue.timeValueSeconds(30), indices);
+        return ensureGreen(TimeValue.timeValueSeconds(900), indices);
     }
 
     /**

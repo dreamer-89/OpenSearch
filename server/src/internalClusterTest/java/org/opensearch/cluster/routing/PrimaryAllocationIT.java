@@ -237,6 +237,8 @@ public class PrimaryAllocationIT extends OpenSearchIntegTestCase {
                 .setSettings(Settings.builder().put("index.number_of_shards", 1).put("index.number_of_replicas", 0))
                 .get()
         );
+
+
         ensureGreen("test");
 
         String dataNodeWithNoShardCopy = internalCluster().startNode();
@@ -244,6 +246,7 @@ public class PrimaryAllocationIT extends OpenSearchIntegTestCase {
 
         internalCluster().stopRandomNode(InternalTestCluster.nameFilter(dataNodeWithShardCopy));
         ensureStableCluster(1);
+        ClusterState state = client().admin().cluster().prepareState().all().get().getState();
         assertThat(
             client().admin()
                 .cluster()

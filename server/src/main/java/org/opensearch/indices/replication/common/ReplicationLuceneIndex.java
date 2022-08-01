@@ -371,7 +371,7 @@ public final class ReplicationLuceneIndex extends ReplicationTimer implements To
 
         public void addFileDetails(String name, long length, boolean reused) {
             // if set of files contains a segments file, it represents an incoming commit point
-            if(name.startsWith(IndexFileNames.SEGMENTS)) {
+            if (name.startsWith(IndexFileNames.SEGMENTS)) {
                 this.incomingCommitPoint = true;
             }
             assert complete == false : "addFileDetail for [" + name + "] when file details are already complete";

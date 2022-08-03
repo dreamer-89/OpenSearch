@@ -31,6 +31,7 @@
 
 package org.opensearch.indices.recovery;
 
+import org.apache.lucene.index.IndexFileNames;
 import org.opensearch.Version;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.routing.RecoverySource;
@@ -221,7 +222,7 @@ public class RecoveryTargetTests extends OpenSearchTestCase {
         // add a segments file as the last file in order to check if incoming commit point is set
         final int segmentFileLength = randomIntBetween(1, 1000);
         totalFileBytes += segmentFileLength;
-        files[files.length - 1] = new FileMetadata("segments_" + randomInt(), segmentFileLength, false);
+        files[files.length - 1] = new FileMetadata(IndexFileNames.SEGMENTS + randomInt(), segmentFileLength, false);
         filesToRecover.add(files[files.length - 1]);
 
         Collections.shuffle(Arrays.asList(files), random());
@@ -254,7 +255,7 @@ public class RecoveryTargetTests extends OpenSearchTestCase {
         assertThat(index.recoveredBytesPercent(), equalTo((float) 0.0));
         assertThat(index.sourceThrottling().nanos(), equalTo(ReplicationLuceneIndex.UNKNOWN));
         assertThat(index.targetThrottling().nanos(), equalTo(ReplicationLuceneIndex.UNKNOWN));
-        assertFalse(index.getIncomingCommitPoint());
+        assertFalse(index.hasIncomingCommitPoint());
 
         index.start();
         for (FileMetadata file : files) {
@@ -273,7 +274,7 @@ public class RecoveryTargetTests extends OpenSearchTestCase {
         assertThat(index.recoveredFilesPercent(), equalTo(filesToRecover.size() == 0 ? 100.0f : 0.0f));
         assertThat(index.recoveredBytesPercent(), equalTo(filesToRecover.size() == 0 ? 100.0f : 0.0f));
         assertThat(index.bytesStillToRecover(), equalTo(-1L));
-        assertTrue(index.getIncomingCommitPoint());
+        assertTrue(index.hasIncomingCommitPoint());
 
         index.setFileDetailsComplete();
         assertThat(index.bytesStillToRecover(), equalTo(totalFileBytes - totalReusedBytes));

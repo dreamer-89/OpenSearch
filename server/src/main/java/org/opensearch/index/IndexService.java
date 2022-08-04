@@ -547,7 +547,7 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
                 () -> globalCheckpointSyncer.accept(shardId),
                 retentionLeaseSyncer,
                 circuitBreakerService,
-                this.indexSettings.isSegRepEnabled() && routing.primary() ? checkpointPublisher : null,
+                this.indexSettings.isSegRepEnabled() ? checkpointPublisher : null,
                 remoteStore
             );
             eventListener.indexShardStateChanged(indexShard, null, indexShard.state(), "shard created");

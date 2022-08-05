@@ -157,7 +157,7 @@ public class MultiFileWriter extends AbstractRefCounted implements Releasable {
                 + "] in "
                 + Arrays.toString(store.directory().listAll());
             // In the case of segment replication, we want files to be synced only when they're part of a greater incoming commit point
-            if (!store.indexSettings().isSegRepEnabled() || indexState.hasIncomingCommitPoint()) {
+            if (store.indexSettings().isSegRepEnabled() == false || indexState.hasIncomingCommitPoint()) {
                 store.directory().sync(Collections.singleton(temporaryFileName));
             }
             IndexOutput remove = removeOpenIndexOutputs(name);

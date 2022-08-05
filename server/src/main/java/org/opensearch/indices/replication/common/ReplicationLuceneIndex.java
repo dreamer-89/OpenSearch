@@ -123,7 +123,7 @@ public final class ReplicationLuceneIndex extends ReplicationTimer implements To
     }
 
     /**
-     * Returns true if set of files represent an incoming greater commit point
+     * Returns true if set of files represent an incoming commit point
      */
     public synchronized boolean hasIncomingCommitPoint() {
         return filesDetails.hasIncomingCommitPoint;

@@ -40,7 +40,8 @@ public class CheckpointRefreshListener implements ReferenceManager.RefreshListen
 
     @Override
     public void afterRefresh(boolean didRefresh) throws IOException {
-        if (didRefresh) {
+        // Ignore checkpoints if the shard is closed. This happens on a flush before close.
+        if (didRefresh && shard.state() != IndexShardState.CLOSED) {
             publisher.publish(shard);
         }
     }

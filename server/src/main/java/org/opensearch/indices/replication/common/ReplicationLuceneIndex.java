@@ -404,6 +404,7 @@ public final class ReplicationLuceneIndex extends ReplicationTimer implements To
         public void clear() {
             fileMetadataMap.clear();
             complete = false;
+            hasIncomingCommitPoint = false;
         }
 
         public Collection<FileMetadata> values() {

@@ -8,22 +8,29 @@
 
 package org.opensearch.indices.replication.common;
 
+import org.apache.commons.codec.binary.StringUtils;
 import org.apache.lucene.index.IndexFileNames;
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.IndexOutput;
-import org.apache.lucene.util.BytesRefIterator;
+import org.apache.lucene.store.NIOFSDirectory;
 import org.apache.lucene.util.Version;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.common.bytes.BytesReference;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.index.IndexSettings;
+import org.opensearch.index.shard.ShardId;
 import org.opensearch.index.store.Store;
 import org.opensearch.index.store.StoreFileMetadata;
+import org.opensearch.index.store.StoreTests;
 import org.opensearch.indices.recovery.MultiFileWriter;
+import org.opensearch.test.DummyShardLock;
 import org.opensearch.test.IndexSettingsModule;
 import org.opensearch.test.OpenSearchTestCase;
+import org.opensearch.common.bytes.BytesArray;
 
 import java.io.IOException;
+import java.nio.file.Files;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -38,7 +45,6 @@ public class MultiFileWriterTests extends OpenSearchTestCase {
     private ReplicationLuceneIndex indexState;
     private MultiFileWriter multiFileWriter;
     private BytesReference bytesReference;
-    private BytesRefIterator bytesRefIterator;
 
     final IndexSettings SEGREP_INDEX_SETTINGS = IndexSettingsModule.newIndexSettings(
         "index",
@@ -68,10 +74,7 @@ public class MultiFileWriterTests extends OpenSearchTestCase {
         when(store.createVerifyingOutput(any(), any(), any())).thenReturn(mock(IndexOutput.class));
         indexState = new ReplicationLuceneIndex();
         multiFileWriter = new MultiFileWriter(store, indexState, "", logger, () -> {});
-        bytesReference = mock(BytesReference.class);
-        bytesRefIterator = mock(BytesRefIterator.class);
-        when(bytesReference.iterator()).thenReturn(bytesRefIterator);
-        when(bytesRefIterator.next()).thenReturn(null);
+        bytesReference =  new BytesArray("test string");
     }
 
     public void testMultiFileWriterSegrepCallsFsyncSuccessful() throws IOException {

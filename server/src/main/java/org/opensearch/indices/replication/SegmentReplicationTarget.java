@@ -155,7 +155,7 @@ public class SegmentReplicationTarget extends ReplicationTarget {
         final Store.MetadataSnapshot snapshot = checkpointInfo.getSnapshot();
         Store.MetadataSnapshot localMetadata = getMetadataSnapshot();
         final Store.RecoveryDiff diff = snapshot.segmentReplicationDiff(localMetadata);
-        logger.debug("Replication diff {}", diff);
+        logger.trace("Replication diff {}", diff);
         // Segments are immutable. So if the replica has any segments with the same name that differ from the one in the incoming snapshot
         // from
         // source that means the local copy of the segment has been corrupted/changed in some way and we throw an IllegalStateException to
@@ -198,6 +198,8 @@ public class SegmentReplicationTarget extends ReplicationTarget {
                     toIndexInput(checkpointInfoResponse.getInfosBytes()),
                     responseCheckpoint.getSegmentsGen()
                 );
+                logger.info("--> Got responseCheckpoint {}", responseCheckpoint);
+                logger.info("--> finalizing replication with responseCheckpoint.getSeqNo() => {}", responseCheckpoint.getSeqNo());
                 indexShard.finalizeReplication(infos, responseCheckpoint.getSeqNo());
                 store.cleanupAndPreserveLatestCommitPoint("finalize - clean with in memory infos", store.getMetadata(infos));
             } catch (CorruptIndexException | IndexFormatTooNewException | IndexFormatTooOldException ex) {
@@ -213,7 +215,7 @@ public class SegmentReplicationTarget extends ReplicationTarget {
                         Lucene.cleanLuceneIndex(store.directory()); // clean up and delete all files
                     }
                 } catch (Exception e) {
-                    logger.debug("Failed to clean lucene index", e);
+                    logger.info("Failed to clean lucene index", e);
                     ex.addSuppressed(e);
                 }
                 ReplicationFailedException rfe = new ReplicationFailedException(

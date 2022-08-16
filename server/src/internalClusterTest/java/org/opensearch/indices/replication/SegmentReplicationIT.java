@@ -24,7 +24,6 @@ import org.opensearch.cluster.routing.ShardRouting;
 import org.opensearch.cluster.routing.allocation.command.CancelAllocationCommand;
 import org.opensearch.common.Nullable;
 import org.opensearch.common.settings.Settings;
-import org.opensearch.common.util.FeatureFlags;
 import org.opensearch.index.Index;
 import org.opensearch.index.IndexModule;
 import org.opensearch.index.IndexService;
@@ -57,7 +56,8 @@ public class SegmentReplicationIT extends OpenSearchIntegTestCase {
 
     @BeforeClass
     public static void assumeFeatureFlag() {
-        assumeTrue("Segment replication Feature flag is enabled", Boolean.parseBoolean(System.getProperty(FeatureFlags.REPLICATION_TYPE)));
+        // assumeTrue("Segment replication Feature flag is enabled",
+        // Boolean.parseBoolean(System.getProperty(FeatureFlags.REPLICATION_TYPE)));
     }
 
     @Override
@@ -357,10 +357,10 @@ public class SegmentReplicationIT extends OpenSearchIntegTestCase {
 
     public void testDeleteOperations() throws Exception {
         final String nodeA = internalCluster().startNode();
-        final String nodeB = internalCluster().startNode();
 
         createIndex(INDEX_NAME);
-        ensureGreen(INDEX_NAME);
+        ensureYellow(INDEX_NAME);
+        final String nodeB = internalCluster().startNode();
         final int initialDocCount = scaledRandomIntBetween(0, 200);
         try (
             BackgroundIndexer indexer = new BackgroundIndexer(
@@ -400,9 +400,108 @@ public class SegmentReplicationIT extends OpenSearchIntegTestCase {
             refresh(INDEX_NAME);
             waitForReplicaUpdate();
 
+//            Thread.sleep(10000);
             assertHitCount(client(nodeA).prepareSearch(INDEX_NAME).setSize(0).setPreference("_only_local").get(), expectedHitCount - 1);
             assertHitCount(client(nodeB).prepareSearch(INDEX_NAME).setSize(0).setPreference("_only_local").get(), expectedHitCount - 1);
+            final IndexShard primaryShard = getIndexShard(nodeA);
+            final IndexShard replicaShard = getIndexShard(nodeB);
+            for(String fileName: primaryShard.store().directory().listAll()) {
+                logger.info("{}", fileName);
+            }
+            for(String fileName: replicaShard.store().directory().listAll()) {
+                logger.info("{}", fileName);
+            }
         }
+    }
+
+    private void indexDocs(int docCount) throws Exception {
+        try (
+            BackgroundIndexer indexer = new BackgroundIndexer(
+                INDEX_NAME,
+                "_doc",
+                client(),
+                -1,
+                RandomizedTest.scaledRandomIntBetween(2, 5),
+                false,
+                random()
+            )
+        ) {
+            indexer.start(docCount);
+            waitForDocs(docCount, indexer);
+            refresh(INDEX_NAME);
+        }
+    }
+
+    private void indexDocsAndRefresh(int docCount) {
+        Runnable asyncIndexer = () -> {
+            try {
+                indexDocs(docCount);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        };
+        asyncIndexer.run();
+    }
+
+    private void restartNode(String nodeName) {
+        Runnable t1 = () -> {
+            try {
+                internalCluster().restartNode(nodeName);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        };
+        t1.run();
+    }
+
+    /**
+     * Tests whether primary shard allocation via PrimaryShardAllocation chooses the replica with further ahead
+     * ReplicationCheckpoint
+     */
+    public void testPrimaryShardAllocatorUsesFurthestAheadReplica() throws Exception {
+        final Settings settings = Settings.builder()
+            .put(indexSettings())
+            .put(IndexMetadata.SETTING_NUMBER_OF_REPLICAS, 6)
+            .put(IndexMetadata.SETTING_REPLICATION_TYPE, ReplicationType.SEGMENT)
+            .build();
+        final String clusterManagerNode = internalCluster().startClusterManagerOnlyNode(Settings.EMPTY);
+        final String primaryNode = internalCluster().startDataOnlyNode(Settings.EMPTY);
+        createIndex(INDEX_NAME, settings);
+
+        final String firstReplica = internalCluster().startDataOnlyNode(Settings.EMPTY);
+//        final String secondReplica = internalCluster().startDataOnlyNode(Settings.EMPTY);
+
+        // Index docs & refresh to bring all replicas to initial checkpoint
+        indexDocs(scaledRandomIntBetween(100, 200));
+        flushAndRefresh(INDEX_NAME);
+
+        final String thirdReplica = internalCluster().startDataOnlyNode(Settings.EMPTY);
+        final String fourthReplica = internalCluster().startDataOnlyNode(Settings.EMPTY);
+//        final String fifthReplica = internalCluster().startDataOnlyNode(Settings.EMPTY);
+//        final String sixthReplica = internalCluster().startDataOnlyNode(Settings.EMPTY);
+
+        for (int i = 0; i < 10; i++) {
+            logger.info("Iteration {} --> ", i);
+            indexDocsAndRefresh(scaledRandomIntBetween(100, 200));
+        }
+
+        final Index index = resolveIndex(INDEX_NAME);
+        logger.info("--> primaryShard RC {}", getIndexShard(primaryNode).getLatestReplicationCheckpoint());
+        internalCluster().stopRandomNode(InternalTestCluster.nameFilter(primaryNode));
+
+        logger.info("Cluster state => {}", client().admin().cluster().prepareState().setLocal(true).execute().actionGet().getState());
+        for (int i = 0; i < 5; i++) {
+            logger.info("Iteration {} --> ", i);
+            indexDocsAndRefresh(scaledRandomIntBetween(100, 200));
+        }
+
+        ensureYellow(INDEX_NAME);
+        // logger.info("--> cluster state {}", client().admin().cluster().prepareState().get().getState());
+//        logger.info("--> firstReplica RC {}", getIndexShard(firstReplica).getLatestReplicationCheckpoint());
+//        logger.info("--> secondReplica RC {}", getIndexShard(secondReplica).getLatestReplicationCheckpoint());
+//        logger.info("--> thirdReplica RC {}", getIndexShard(thirdReplica).getLatestReplicationCheckpoint());
+//        logger.info("--> fourthReplica RC {}", getIndexShard(fourthReplica).getLatestReplicationCheckpoint());
+
     }
 
     private void assertSegmentStats(int numberOfReplicas) throws IOException {
@@ -476,6 +575,9 @@ public class SegmentReplicationIT extends OpenSearchIntegTestCase {
                         final boolean isReplicaCaughtUpToPrimary = shardSegments.getSegments()
                             .stream()
                             .anyMatch(segment -> segment.getGeneration() == latestPrimaryGen);
+                        if (isReplicaCaughtUpToPrimary) {
+                            logger.info("isReplicaCaughtUpToPrimary is true for primaryGen {}", latestPrimaryGen);
+                        }
                         assertTrue(isReplicaCaughtUpToPrimary);
                     }
                 }

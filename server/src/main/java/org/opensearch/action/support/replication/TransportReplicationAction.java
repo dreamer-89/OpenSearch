@@ -802,6 +802,7 @@ public abstract class TransportReplicationAction<
                     actualAllocationId
                 );
             }
+            logger.info("TransportReplicationAction received replica request {}", replicaRequest);
             acquireReplicaOperationPermit(
                 replica,
                 replicaRequest.getRequest(),

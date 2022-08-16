@@ -104,14 +104,13 @@ public final class SegmentFileTransferHandler {
             protected void onNewResource(StoreFileMetadata md) throws IOException {
                 offset = 0;
                 IOUtils.close(currentInput, () -> currentInput = null);
-                try(final IndexInput indexInput = store.directory().openInput(md.name(), IOContext.READONCE)) {
-                    currentInput = new InputStreamIndexInput(indexInput, md.length()) {
-                        @Override
-                        public void close() throws IOException {
-                            IOUtils.close(indexInput, super::close); // InputStreamIndexInput's close is a noop
-                        }
-                    };
-                }
+                final IndexInput indexInput = store.directory().openInput(md.name(), IOContext.READONCE);
+                currentInput = new InputStreamIndexInput(indexInput, md.length()) {
+                    @Override
+                    public void close() throws IOException {
+                        IOUtils.close(indexInput, super::close); // InputStreamIndexInput's close is a noop
+                    }
+                };
             }
 
             private byte[] acquireBuffer() {

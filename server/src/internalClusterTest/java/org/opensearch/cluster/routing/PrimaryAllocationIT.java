@@ -33,6 +33,7 @@
 package org.opensearch.cluster.routing;
 
 import com.carrotsearch.hppc.cursors.IntObjectCursor;
+import com.carrotsearch.randomizedtesting.RandomizedTest;
 import org.opensearch.action.DocWriteResponse;
 import org.opensearch.action.admin.cluster.reroute.ClusterRerouteRequestBuilder;
 import org.opensearch.action.admin.indices.shards.IndicesShardStoresResponse;
@@ -52,6 +53,7 @@ import org.opensearch.common.collect.ImmutableOpenIntMap;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.util.set.Sets;
 import org.opensearch.gateway.GatewayAllocator;
+import org.opensearch.index.Index;
 import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.index.engine.Engine;
 import org.opensearch.index.engine.EngineTestCase;
@@ -59,7 +61,9 @@ import org.opensearch.index.shard.IndexShard;
 import org.opensearch.index.shard.IndexShardTestCase;
 import org.opensearch.index.shard.ShardId;
 import org.opensearch.indices.IndicesService;
+import org.opensearch.indices.replication.common.ReplicationType;
 import org.opensearch.plugins.Plugin;
+import org.opensearch.test.BackgroundIndexer;
 import org.opensearch.test.OpenSearchIntegTestCase;
 import org.opensearch.test.InternalSettingsPlugin;
 import org.opensearch.test.InternalTestCluster;
@@ -97,6 +101,7 @@ import static org.hamcrest.Matchers.not;
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, numDataNodes = 0)
 public class PrimaryAllocationIT extends OpenSearchIntegTestCase {
 
+    private static final String INDEX_NAME = "test-idx-1";
     @Override
     protected Collection<Class<? extends Plugin>> nodePlugins() {
         // disruption tests need MockTransportService
@@ -291,6 +296,86 @@ public class PrimaryAllocationIT extends OpenSearchIntegTestCase {
                 .getReason(),
             equalTo(UnassignedInfo.Reason.NODE_LEFT)
         );
+    }
+
+    private void indexDocs(int docCount) throws Exception {
+        try (
+            BackgroundIndexer indexer = new BackgroundIndexer(
+                INDEX_NAME,
+                "_doc",
+                client(),
+                -1,
+                RandomizedTest.scaledRandomIntBetween(2, 5),
+                false,
+                random()
+            )
+        ) {
+            indexer.start(docCount);
+            waitForDocs(docCount, indexer);
+            refresh(INDEX_NAME);
+        }
+    }
+
+    private void indexDocsAndRefresh(int docCount) {
+        Runnable asyncIndexer = () -> {
+            try {
+                indexDocs(docCount);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        };
+        asyncIndexer.run();
+    }
+
+    private void restartNode(String nodeName) {
+        Runnable t1 = () -> {
+            try {
+                internalCluster().restartNode(nodeName);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        };
+        t1.run();
+    }
+
+    public void testPrimaryShardAllocatorUsesFurthestAheadReplica() throws Exception {
+        final Settings settings = Settings.builder()
+            .put(indexSettings())
+            .put(IndexMetadata.SETTING_NUMBER_OF_REPLICAS, 4)
+            .build();
+        final String clusterManagerNode = internalCluster().startClusterManagerOnlyNode(Settings.EMPTY);
+        final String primaryNode = internalCluster().startDataOnlyNode(Settings.EMPTY);
+        createIndex(INDEX_NAME, settings);
+
+        final String firstReplica = internalCluster().startDataOnlyNode(Settings.EMPTY);
+        final String secondReplica = internalCluster().startDataOnlyNode(Settings.EMPTY);
+
+        // Index docs & refresh to bring all replicas to initial checkpoint
+        indexDocs(scaledRandomIntBetween(10, 100));
+        flushAndRefresh(INDEX_NAME);
+
+        final String thirdReplica = internalCluster().startDataOnlyNode(Settings.EMPTY);
+        final String fourthReplica = internalCluster().startDataOnlyNode(Settings.EMPTY);
+//        final String fifthReplica = internalCluster().startDataOnlyNode(Settings.EMPTY);
+//        final String sixthReplica = internalCluster().startDataOnlyNode(Settings.EMPTY);
+
+        for (int i = 0; i < 10; i++) {
+            logger.info("Iteration {} --> ", i);
+            indexDocsAndRefresh(scaledRandomIntBetween(10, 100));
+        }
+
+        final Index index = resolveIndex(INDEX_NAME);
+//        logger.info("--> primaryShard RC {}", getIndexShard(primaryNode).getLatestReplicationCheckpoint());
+        internalCluster().stopRandomNode(InternalTestCluster.nameFilter(primaryNode));
+
+        logger.info("Cluster state => {}", client().admin().cluster().prepareState().setLocal(true).execute().actionGet().getState());
+        for (int i = 0; i < 10; i++) {
+            logger.info("Iteration {} --> ", i);
+            indexDocsAndRefresh(scaledRandomIntBetween(10, 100));
+        }
+
+        ensureYellow(INDEX_NAME);
+
     }
 
     public void testForceStaleReplicaToBePromotedToPrimary() throws Exception {

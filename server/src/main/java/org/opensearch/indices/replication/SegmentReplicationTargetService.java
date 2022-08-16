@@ -126,7 +126,7 @@ public class SegmentReplicationTargetService implements IndexEventListener {
             latestReceivedCheckpoint.put(replicaShard.shardId(), receivedCheckpoint);
         }
         if (onGoingReplications.isShardReplicating(replicaShard.shardId())) {
-            logger.trace(
+            logger.info(
                 () -> new ParameterizedMessage(
                     "Ignoring new replication checkpoint - shard is currently replicating to checkpoint {}",
                     replicaShard.getLatestReplicationCheckpoint()
@@ -174,7 +174,7 @@ public class SegmentReplicationTargetService implements IndexEventListener {
 
     public void startReplication(final SegmentReplicationTarget target) {
         final long replicationId = onGoingReplications.start(target, recoverySettings.activityTimeout());
-        logger.trace(() -> new ParameterizedMessage("Starting replication {}", replicationId));
+        logger.info(() -> new ParameterizedMessage("Starting replication {}", replicationId));
         threadPool.generic().execute(new ReplicationRunner(replicationId));
     }
 

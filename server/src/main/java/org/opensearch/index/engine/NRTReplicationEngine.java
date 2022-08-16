@@ -125,6 +125,7 @@ public class NRTReplicationEngine extends Engine {
             this.lastCommittedSegmentInfos = infos;
             translogManager.rollTranslogGeneration();
         }
+        logger.info("---> fastForwardProcessedSeqNo to {}", seqNo);
         localCheckpointTracker.fastForwardProcessedSeqNo(seqNo);
     }
 
@@ -177,6 +178,7 @@ public class NRTReplicationEngine extends Engine {
         indexResult.setTranslogLocation(location);
         indexResult.setTook(System.nanoTime() - index.startTime());
         indexResult.freeze();
+        logger.info("--> advancing on index {}", index.seqNo());
         localCheckpointTracker.advanceMaxSeqNo(index.seqNo());
         return indexResult;
     }
@@ -189,6 +191,7 @@ public class NRTReplicationEngine extends Engine {
         deleteResult.setTranslogLocation(location);
         deleteResult.setTook(System.nanoTime() - delete.startTime());
         deleteResult.freeze();
+        logger.info("--> advancing on delete {}", delete.seqNo());
         localCheckpointTracker.advanceMaxSeqNo(delete.seqNo());
         return deleteResult;
     }
@@ -201,6 +204,7 @@ public class NRTReplicationEngine extends Engine {
         noOpResult.setTranslogLocation(location);
         noOpResult.setTook(System.nanoTime() - noOp.startTime());
         noOpResult.freeze();
+        logger.info("--> advancing on noOp {}", noOp.seqNo());
         localCheckpointTracker.advanceMaxSeqNo(noOp.seqNo());
         return noOpResult;
     }

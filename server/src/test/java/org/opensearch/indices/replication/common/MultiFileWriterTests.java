@@ -11,22 +11,28 @@ package org.opensearch.indices.replication.common;
 import org.apache.lucene.index.IndexFileNames;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.IndexOutput;
+import org.apache.lucene.store.NIOFSDirectory;
 import org.apache.lucene.util.Version;
 import org.opensearch.cluster.metadata.IndexMetadata;
+import org.opensearch.common.UUIDs;
 import org.opensearch.common.bytes.BytesReference;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.index.IndexSettings;
+import org.opensearch.index.shard.ShardId;
 import org.opensearch.index.store.Store;
 import org.opensearch.index.store.StoreFileMetadata;
 import org.opensearch.indices.recovery.MultiFileWriter;
+import org.opensearch.test.DummyShardLock;
 import org.opensearch.test.IndexSettingsModule;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.common.bytes.BytesArray;
 
 import java.io.IOException;
+import java.nio.file.Files;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,10 +40,11 @@ import static org.mockito.Mockito.when;
 public class MultiFileWriterTests extends OpenSearchTestCase {
 
     private Store store;
-    private Directory directory;
+    private Directory directory, spyDir;
     private ReplicationLuceneIndex indexState;
     private MultiFileWriter multiFileWriter;
     private BytesReference bytesReference;
+    private ShardId shardId;
 
     final IndexSettings SEGREP_INDEX_SETTINGS = IndexSettingsModule.newIndexSettings(
         "index",
@@ -61,21 +68,24 @@ public class MultiFileWriterTests extends OpenSearchTestCase {
     @Override
     public void setUp() throws Exception {
         super.setUp();
-        store = mock(Store.class);
-        directory = mock(Directory.class);
-        when(store.directory()).thenReturn(directory);
-        when(store.createVerifyingOutput(any(), any(), any())).thenReturn(mock(IndexOutput.class));
+        shardId = new ShardId("index", UUIDs.randomBase64UUID(), 0);
+        directory = new NIOFSDirectory(Files.createTempDirectory(""));//mock(Directory.class);
+        spyDir = spy(directory);
+        store = new Store(shardId, SEGREP_INDEX_SETTINGS,spyDir, new DummyShardLock(shardId)); //mock(Store.class);
+        Store spyStore = spy(store);
+        //when(store.directory()).thenReturn(directory);
+        //when(store.createVerifyingOutput(any(), any(), any())).thenReturn(mock(IndexOutput.class));
         indexState = new ReplicationLuceneIndex();
-        multiFileWriter = new MultiFileWriter(store, indexState, "", logger, () -> {});
+        multiFileWriter = new MultiFileWriter(spyStore, indexState, "", logger, () -> {});
         bytesReference = new BytesArray("test string");
     }
 
     public void testMultiFileWriterSegrepCallsFsyncSuccessful() throws IOException {
-        when(store.indexSettings()).thenReturn(SEGREP_INDEX_SETTINGS);
-        when(directory.listAll()).thenReturn(new String[] { SEGMENTS_FILE.name() });
+        //when(store.indexSettings()).thenReturn(SEGREP_INDEX_SETTINGS);
+        //when(directory.listAll()).thenReturn(new String[] { SEGMENTS_FILE.name() });
         indexState.addFileDetail(SEGMENTS_FILE.name(), SEGMENTS_FILE.length(), false);
         multiFileWriter.writeFileChunk(SEGMENTS_FILE, 0, bytesReference, true);
-        verify(directory, times(1)).sync(any());
+        verify(spyDir, times(1)).sync(any());
     }
 
     public void testMultiFileWriterDocrepCallsFsyncSuccessful() throws IOException {

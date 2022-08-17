@@ -8,14 +8,18 @@
 
 package org.opensearch.indices.replication.common;
 
+import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.index.IndexFileNames;
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.store.NIOFSDirectory;
+import org.apache.lucene.store.IndexInput;
+
+import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.Version;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.common.UUIDs;
-import org.opensearch.common.bytes.BytesReference;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.index.IndexSettings;
 import org.opensearch.index.shard.ShardId;
@@ -31,19 +35,15 @@ import java.io.IOException;
 import java.nio.file.Files;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 public class MultiFileWriterTests extends OpenSearchTestCase {
-
-    private Store store;
-    private Directory directory, spyDir;
+    private Store segRepEnabledStore, docRepEnabledStore;
+    private Directory dir, spyDir;
     private ReplicationLuceneIndex indexState;
     private MultiFileWriter multiFileWriter;
-    private BytesReference bytesReference;
     private ShardId shardId;
 
     final IndexSettings SEGREP_INDEX_SETTINGS = IndexSettingsModule.newIndexSettings(
@@ -62,46 +62,115 @@ public class MultiFileWriterTests extends OpenSearchTestCase {
             .build()
     );
 
-    final StoreFileMetadata SEGMENTS_FILE = new StoreFileMetadata(IndexFileNames.SEGMENTS, 1L, "0", Version.LATEST);
-    final StoreFileMetadata TEST_FILE = new StoreFileMetadata("testFile", 1L, "0", Version.LATEST);
-
     @Override
     public void setUp() throws Exception {
         super.setUp();
+        dir = new NIOFSDirectory(Files.createTempDirectory(""));
         shardId = new ShardId("index", UUIDs.randomBase64UUID(), 0);
-        directory = new NIOFSDirectory(Files.createTempDirectory(""));//mock(Directory.class);
-        spyDir = spy(directory);
-        store = new Store(shardId, SEGREP_INDEX_SETTINGS,spyDir, new DummyShardLock(shardId)); //mock(Store.class);
-        Store spyStore = spy(store);
-        //when(store.directory()).thenReturn(directory);
-        //when(store.createVerifyingOutput(any(), any(), any())).thenReturn(mock(IndexOutput.class));
+        spyDir = spy(dir);
+        segRepEnabledStore = new Store(shardId, SEGREP_INDEX_SETTINGS, spyDir, new DummyShardLock(shardId)); // mock(Store.class);
+        docRepEnabledStore = new Store(shardId, DOCREP_INDEX_SETTINGS, spyDir, new DummyShardLock(shardId)); // mock(Store.class);
         indexState = new ReplicationLuceneIndex();
-        multiFileWriter = new MultiFileWriter(spyStore, indexState, "", logger, () -> {});
-        bytesReference = new BytesArray("test string");
     }
 
-    public void testMultiFileWriterSegrepCallsFsyncSuccessful() throws IOException {
-        //when(store.indexSettings()).thenReturn(SEGREP_INDEX_SETTINGS);
-        //when(directory.listAll()).thenReturn(new String[] { SEGMENTS_FILE.name() });
-        indexState.addFileDetail(SEGMENTS_FILE.name(), SEGMENTS_FILE.length(), false);
-        multiFileWriter.writeFileChunk(SEGMENTS_FILE, 0, bytesReference, true);
+    public void afterClass() throws IOException {
+        dir.close();
+    }
+
+    private void createFileWithChecksum(String fileName, BytesRef data) throws IOException {
+        final IndexOutput output = dir.createOutput(fileName, IOContext.DEFAULT);
+        output.writeBytes(data.bytes, data.length);
+        CodecUtil.writeFooter(output);
+        output.close();
+    }
+
+    // Read file's length and checksum, needed to build StoreFileMetadata for MFW constructor
+    private BytesRef readFileBytes(String fileName, IndexInput indexInput) throws IOException {
+        indexInput.seek(0);
+        long fileLen = indexInput.length();
+        final BytesRef fileBytes = new BytesRef((int) fileLen);
+        indexInput.readBytes(fileBytes.bytes, 0, (int) fileLen);
+        // delete file as MFW creates it for writing
+        dir.deleteFile(fileName);
+        return fileBytes;
+    }
+
+    public void testMFWSegrepCallsFsyncForIncomingCommitPoint() throws IOException {
+        // Generate a file with random text and appending the checksum
+        final String fileName = IndexFileNames.SEGMENTS;
+        createFileWithChecksum(fileName, new BytesRef("random text"));
+
+        final IndexInput indexInput = dir.openInput(fileName, IOContext.DEFAULT);
+        final String checksum = Store.digestToString(CodecUtil.retrieveChecksum(indexInput));
+        long fileLen = indexInput.length();
+        final BytesRef fileBytes = readFileBytes(fileName, indexInput);
+        indexInput.close();
+
+        final StoreFileMetadata fileMetadata = new StoreFileMetadata(fileName, fileLen, checksum, Version.LATEST);
+        indexState.addFileDetail(fileName, fileLen, false);
+        multiFileWriter = new MultiFileWriter(segRepEnabledStore, indexState, "", logger, () -> {});
+        multiFileWriter.writeFileChunk(fileMetadata, 0, new BytesArray(fileBytes.bytes), true);
+        // file name here "segments" represents incoming commit point and should result in sync call
         verify(spyDir, times(1)).sync(any());
     }
 
-    public void testMultiFileWriterDocrepCallsFsyncSuccessful() throws IOException {
-        when(store.indexSettings()).thenReturn(DOCREP_INDEX_SETTINGS);
-        when(directory.listAll()).thenReturn(new String[] { TEST_FILE.name() });
-        indexState.addFileDetail(TEST_FILE.name(), TEST_FILE.length(), false);
-        multiFileWriter.writeFileChunk(TEST_FILE, 0, bytesReference, true);
-        verify(directory, times(1)).sync(any());
+    public void testMFWSegrepSkipsFsyncForRandomFiles() throws IOException {
+        // Generate a file with random text and appending the checksum
+        final String fileName = "random_file";
+        createFileWithChecksum(fileName, new BytesRef("random text"));
+
+        // Read file's length and checksum, needed to build StoreFileMetadata for MFW constructor
+        final IndexInput indexInput = dir.openInput(fileName, IOContext.DEFAULT);
+        final String checksum = Store.digestToString(CodecUtil.retrieveChecksum(indexInput));
+        long fileLen = indexInput.length();
+        final BytesRef fileBytes = readFileBytes(fileName, indexInput);
+        indexInput.close();
+
+        final StoreFileMetadata fileMetadata = new StoreFileMetadata(fileName, fileLen, checksum, Version.LATEST);
+        indexState.addFileDetail(fileName, fileLen, false);
+        multiFileWriter = new MultiFileWriter(segRepEnabledStore, indexState, "", logger, () -> {});
+        multiFileWriter.writeFileChunk(fileMetadata, 0, new BytesArray(fileBytes.bytes), true);
+        // A random file should not result in sync call
+        verify(spyDir, times(0)).sync(any());
     }
 
-    public void testMultiFileWriterSegrepCallsFsyncSkipped() throws IOException {
-        when(store.indexSettings()).thenReturn(SEGREP_INDEX_SETTINGS);
-        when(directory.listAll()).thenReturn(new String[] { TEST_FILE.name() });
-        indexState.addFileDetail(TEST_FILE.name(), TEST_FILE.length(), false);
-        multiFileWriter.writeFileChunk(TEST_FILE, 0, bytesReference, true);
-        verify(directory, times(0)).sync(any());
+    public void testMFWDocrepCallsFsyncForIncomingCommitPoint() throws IOException {
+        // Generate a file with random text and appending the checksum
+        final String fileName = IndexFileNames.SEGMENTS;
+        final BytesRef fileText = new BytesRef("random text");
+        createFileWithChecksum(fileName, fileText);
+
+        // Read file's length and checksum, needed to build StoreFileMetadata for MFW constructor
+        final IndexInput indexInput = dir.openInput(fileName, IOContext.DEFAULT);
+        final String checksum = Store.digestToString(CodecUtil.retrieveChecksum(indexInput));
+        long fileLen = indexInput.length();
+        final BytesRef fileBytes = readFileBytes(fileName, indexInput);
+        indexInput.close();
+
+        final StoreFileMetadata fileMetadata = new StoreFileMetadata(fileName, fileLen, checksum, Version.LATEST);
+        indexState.addFileDetail(fileName, fileLen, false);
+        multiFileWriter = new MultiFileWriter(docRepEnabledStore, indexState, "", logger, () -> {});
+        multiFileWriter.writeFileChunk(fileMetadata, 0, new BytesArray(fileBytes.bytes), true);
+        verify(spyDir, times(1)).sync(any());
     }
 
+    public void testMFWDocrepCallsFsyncForRandomFile() throws IOException {
+        // Generate a file with random text and appending the checksum
+        final String fileName = "random_file";
+        final BytesRef fileText = new BytesRef("random text");
+        createFileWithChecksum(fileName, fileText);
+
+        // Read file's length and checksum, needed to build StoreFileMetadata for MFW constructor
+        final IndexInput indexInput = dir.openInput(fileName, IOContext.DEFAULT);
+        final String checksum = Store.digestToString(CodecUtil.retrieveChecksum(indexInput));
+        long fileLen = indexInput.length();
+        final BytesRef fileBytes = readFileBytes(fileName, indexInput);
+        indexInput.close();
+
+        final StoreFileMetadata fileMetadata = new StoreFileMetadata(fileName, fileLen, checksum, Version.LATEST);
+        indexState.addFileDetail(fileName, fileLen, false);
+        multiFileWriter = new MultiFileWriter(docRepEnabledStore, indexState, "", logger, () -> {});
+        multiFileWriter.writeFileChunk(fileMetadata, 0, new BytesArray(fileBytes.bytes), true);
+        verify(spyDir, times(1)).sync(any());
+    }
 }

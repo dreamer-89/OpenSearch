@@ -202,6 +202,7 @@ public class SegmentReplicationTarget extends ReplicationTarget {
     }
 
     private void finalizeReplication(CheckpointInfoResponse checkpointInfoResponse, ActionListener<Void> listener) {
+        logger.info("--> finalizeReplication {}", this.indexShard.getEngine().getClass());
         ActionListener.completeWith(listener, () -> {
             cancellableThreads.checkForCancel();
             state.setStage(SegmentReplicationState.Stage.FINALIZE_REPLICATION);

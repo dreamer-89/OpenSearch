@@ -1978,6 +1978,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
             // we can flush if we go idle after some time and become inactive.
             active.set(true);
         }
+
         // time elapses after the engine is created above (pulling the config settings) until we set the engine reference, during
         // which settings changes could possibly have happened, so here we forcefully push any config changes to the new engine.
         onSettingsChanged();
@@ -2987,7 +2988,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
         recoveryState.getVerifyIndex().checkIndexTime(Math.max(0, TimeValue.nsecToMSec(System.nanoTime() - timeNS)));
     }
 
-    Engine getEngine() {
+    public Engine getEngine() {
         Engine engine = getEngineOrNull();
         if (engine == null) {
             throw new AlreadyClosedException("engine is closed");

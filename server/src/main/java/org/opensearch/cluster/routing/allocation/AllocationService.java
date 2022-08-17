@@ -166,6 +166,8 @@ public class AllocationService {
     protected ClusterState buildResultAndLogHealthChange(ClusterState oldState, RoutingAllocation allocation, String reason) {
         ClusterState newState = buildResult(oldState, allocation);
 
+//        logger.info("--> new cluster state {}", newState);
+
         logClusterHealthStateChange(new ClusterStateHealth(oldState), new ClusterStateHealth(newState), reason);
 
         return newState;
@@ -241,7 +243,7 @@ public class AllocationService {
             ShardRouting failedShard = routingNodes.getByAllocationId(shardToFail.shardId(), shardToFail.allocationId().getId());
             if (failedShard != null) {
                 if (failedShard != shardToFail) {
-                    logger.trace(
+                    logger.info(
                         "{} shard routing modified in an earlier iteration (previous: {}, current: {})",
                         shardToFail.shardId(),
                         shardToFail,
@@ -275,7 +277,7 @@ public class AllocationService {
                 logger.warn(new ParameterizedMessage("failing shard [{}]", failedShardEntry), failedShardEntry.getFailure());
                 routingNodes.failShard(logger, failedShard, unassignedInfo, indexMetadata, allocation.changes());
             } else {
-                logger.trace("{} shard routing failed in an earlier iteration (routing: {})", shardToFail.shardId(), shardToFail);
+                logger.info("{} shard routing failed in an earlier iteration (routing: {})", shardToFail.shardId(), shardToFail);
             }
         }
         for (final ExistingShardsAllocator allocator : existingShardsAllocators.values()) {

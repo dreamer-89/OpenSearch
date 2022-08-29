@@ -931,14 +931,19 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
         }
 
         MetadataSnapshot(SegmentInfos segmentInfos, Directory directory, Logger logger) throws IOException {
-            this(loadMetadata(segmentInfos, directory, logger));
+            this(loadMetadata(segmentInfos, directory, logger, true), true);
         }
 
-        private MetadataSnapshot(LoadedMetadata loadedMetadata) {
+        private MetadataSnapshot(LoadedMetadata loadedMetadata, boolean ignoreSegmentGenFile) {
             metadata = loadedMetadata.fileMetadata;
             commitUserData = loadedMetadata.userData;
             numDocs = loadedMetadata.numDocs;
-            assert metadata.isEmpty() || numSegmentFiles() == 1 : "numSegmentFiles: " + numSegmentFiles();
+            if (ignoreSegmentGenFile == false)
+                assert metadata.isEmpty() || numSegmentFiles() == 1 : "numSegmentFiles: " + numSegmentFiles();
+        }
+
+        private MetadataSnapshot(LoadedMetadata loadedMetadata) {
+            this(loadedMetadata, false);
         }
 
         /**
@@ -960,7 +965,7 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
             this.metadata = unmodifiableMap(metadata);
             this.commitUserData = unmodifiableMap(commitUserData);
             this.numDocs = in.readLong();
-            assert metadata.isEmpty() || numSegmentFiles() == 1 : "numSegmentFiles: " + numSegmentFiles();
+//            assert metadata.isEmpty() || numSegmentFiles() == 1 : "numSegmentFiles: " + numSegmentFiles();
         }
 
         @Override
@@ -1033,6 +1038,10 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
         }
 
         static LoadedMetadata loadMetadata(SegmentInfos segmentInfos, Directory directory, Logger logger) throws IOException {
+            return loadMetadata(segmentInfos, directory, logger, false);
+        }
+
+        static LoadedMetadata loadMetadata(SegmentInfos segmentInfos, Directory directory, Logger logger, boolean ignoreSegmentGenerationFile) throws IOException {
             long numDocs = Lucene.getNumDocs(segmentInfos);
             Map<String, String> commitUserDataBuilder = new HashMap<>();
             commitUserDataBuilder.putAll(segmentInfos.getUserData());
@@ -1068,7 +1077,9 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
                 maxVersion = org.opensearch.Version.CURRENT.minimumIndexCompatibilityVersion().luceneVersion;
             }
             final String segmentsFile = segmentInfos.getSegmentsFileName();
-            checksumFromLuceneFile(directory, segmentsFile, builder, logger, maxVersion, true);
+            if (ignoreSegmentGenerationFile == false) {
+                checksumFromLuceneFile(directory, segmentsFile, builder, logger, maxVersion, true);
+            }
             return new LoadedMetadata(unmodifiableMap(builder), unmodifiableMap(commitUserDataBuilder), numDocs);
         }
 

@@ -15,6 +15,7 @@ import org.opensearch.OpenSearchException;
 import org.opensearch.action.ActionListener;
 import org.opensearch.common.Nullable;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.common.util.concurrent.ConcurrentCollections;
 import org.opensearch.index.shard.IndexEventListener;
 import org.opensearch.index.shard.IndexShard;
 import org.opensearch.index.shard.ShardId;
@@ -33,6 +34,8 @@ import org.opensearch.transport.TransportService;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.opensearch.index.seqno.SequenceNumbers.UNASSIGNED_PRIMARY_TERM;
@@ -53,10 +56,10 @@ public class SegmentReplicationTargetService implements IndexEventListener {
 
     private final SegmentReplicationSourceFactory sourceFactory;
 
-    private final Map<ShardId, ReplicationCheckpoint> latestReceivedCheckpoint = new HashMap<>();
+    private final ConcurrentMap<ShardId, ReplicationCheckpoint> latestReceivedCheckpoint = ConcurrentCollections.newConcurrentMap();
 
-    // Captures the primary term which was received for copying existing files
-    private long pTermLinkedToCopiedFiles;
+    // Captures the primary term which was received for copying existing files from last replication
+    private final ConcurrentMap<ShardId, Long> pTermLinkedToCopiedFiles = ConcurrentCollections.newConcurrentMap();
 
     // Empty Implementation, only required while Segment Replication is under feature flag.
     public static final SegmentReplicationTargetService NO_OP = new SegmentReplicationTargetService() {
@@ -98,7 +101,6 @@ public class SegmentReplicationTargetService implements IndexEventListener {
         this.recoverySettings = recoverySettings;
         this.onGoingReplications = new ReplicationCollection<>(logger, threadPool);
         this.sourceFactory = sourceFactory;
-        this.pTermLinkedToCopiedFiles = UNASSIGNED_PRIMARY_TERM;
 
         transportService.registerRequestHandler(
             Actions.FILE_CHUNK,
@@ -141,14 +143,15 @@ public class SegmentReplicationTargetService implements IndexEventListener {
             return;
         }
         boolean checkpointFromNewPrimary = false;
-
-        if (receivedCheckpoint.getPrimaryTerm() > pTermLinkedToCopiedFiles) {
+        pTermLinkedToCopiedFiles.putIfAbsent(replicaShard.shardId(), receivedCheckpoint.getPrimaryTerm());
+//        logger.info("--> local pTerm {}, checkpoint pTerm {}", pTermLinkedToCopiedFiles.get(replicaShard.shardId()), receivedCheckpoint.getPrimaryTerm());
+        if (receivedCheckpoint.getPrimaryTerm() > pTermLinkedToCopiedFiles.get(replicaShard.shardId())) {
             logger.info(
-                "Incoming checkpoint primary term {} higher compared to existing primary term {}",
+                "--> Incoming checkpoint primary term {} higher compared to existing primary term {}",
                 receivedCheckpoint.getPrimaryTerm(),
                 pTermLinkedToCopiedFiles
             );
-            pTermLinkedToCopiedFiles = receivedCheckpoint.getPrimaryTerm();
+            pTermLinkedToCopiedFiles.put(replicaShard.shardId(), receivedCheckpoint.getPrimaryTerm());
             checkpointFromNewPrimary = true;
         }
         final Thread thread = Thread.currentThread();
@@ -284,6 +287,7 @@ public class SegmentReplicationTargetService implements IndexEventListener {
             try (ReplicationRef<SegmentReplicationTarget> ref = onGoingReplications.getSafe(request.recoveryId(), request.shardId())) {
                 final SegmentReplicationTarget target = ref.get();
                 final ActionListener<Void> listener = target.createOrFinishListener(channel, Actions.FILE_CHUNK, request);
+                logger.info("--> filechunk request {}", request);
                 target.handleFileChunk(request, target, bytesSinceLastPause, recoverySettings.rateLimiter(), listener);
             }
         }

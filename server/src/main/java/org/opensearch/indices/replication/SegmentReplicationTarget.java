@@ -164,6 +164,7 @@ public class SegmentReplicationTarget extends ReplicationTarget {
         Store.MetadataSnapshot localMetadata = getMetadataSnapshot();
         final Store.RecoveryDiff diff = snapshot.segmentReplicationDiff(localMetadata);
         logger.trace("Replication diff {}", diff);
+        logger.info("--> {}", checkpointFromNewPrimary);
         /*
          * Segments are immutable. So if the replica has any segments with the same name that differ from the one in the incoming
          * snapshot from source that means the local copy of the segment has been corrupted/changed in some way and we throw an
@@ -201,6 +202,7 @@ public class SegmentReplicationTarget extends ReplicationTarget {
         }
         // always send a req even if not fetching files so the primary can clear the copyState for this shard.
         state.setStage(SegmentReplicationState.Stage.GET_FILES);
+        logger.info("--> requesting files {}", Arrays.toString(filesToFetch.toArray()));
         source.getSegmentFiles(getId(), checkpointInfo.getCheckpoint(), filesToFetch, store, getFilesListener);
     }
 
@@ -220,6 +222,7 @@ public class SegmentReplicationTarget extends ReplicationTarget {
                 );
                 indexShard.finalizeReplication(infos, responseCheckpoint.getSeqNo());
                 store.cleanupAndPreserveLatestCommitPoint("finalize - clean with in memory infos", store.getMetadata(infos));
+                logger.info("--> finalize replication");
             } catch (CorruptIndexException | IndexFormatTooNewException | IndexFormatTooOldException ex) {
                 // this is a fatal exception at this stage.
                 // this means we transferred files from the remote that have not be checksummed and they are
@@ -269,7 +272,7 @@ public class SegmentReplicationTarget extends ReplicationTarget {
     }
 
     Store.MetadataSnapshot getMetadataSnapshot() throws IOException {
-        if (indexShard.getSegmentInfosSnapshot() == null) {
+        if (indexShard.getSegmentInfosSnapshot().get() == null) {
             return Store.MetadataSnapshot.EMPTY;
         }
         return store.getMetadata(indexShard.getSegmentInfosSnapshot().get());

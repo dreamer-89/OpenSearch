@@ -16,8 +16,6 @@ import org.opensearch.action.admin.indices.segments.IndicesSegmentResponse;
 import org.opensearch.action.admin.indices.segments.IndicesSegmentsRequest;
 import org.opensearch.action.admin.indices.segments.ShardSegments;
 import org.opensearch.action.support.WriteRequest;
-import org.opensearch.action.update.UpdateResponse;
-import org.opensearch.client.Requests;
 import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.node.DiscoveryNode;
@@ -48,10 +46,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static org.opensearch.index.query.QueryBuilders.matchQuery;
-import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertHitCount;
 import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertAcked;
-import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertSearchHits;
+import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertHitCount;
 
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, numDataNodes = 0)
 public class SegmentReplicationIT extends OpenSearchIntegTestCase {
@@ -62,7 +58,7 @@ public class SegmentReplicationIT extends OpenSearchIntegTestCase {
 
     @BeforeClass
     public static void assumeFeatureFlag() {
-        assumeTrue("Segment replication Feature flag is enabled", Boolean.parseBoolean(System.getProperty(FeatureFlags.REPLICATION_TYPE)));
+//        assumeTrue("Segment replication Feature flag is enabled", Boolean.parseBoolean(System.getProperty(FeatureFlags.REPLICATION_TYPE)));
     }
 
     @Override
@@ -423,13 +419,18 @@ public class SegmentReplicationIT extends OpenSearchIntegTestCase {
         }
     }
 
-    public void testUpdateOperations() throws Exception {
-        final String primary = internalCluster().startNode();
-        createIndex(INDEX_NAME);
-        ensureYellow(INDEX_NAME);
-        final String replica = internalCluster().startNode();
+    public void testDropPrimaryDuringReplication() throws Exception {
+        final Settings settings = Settings.builder()
+            .put(indexSettings())
+            .put(IndexMetadata.SETTING_NUMBER_OF_REPLICAS, 6)
+            .put(IndexMetadata.SETTING_REPLICATION_TYPE, ReplicationType.SEGMENT)
+            .build();
+        final String clusterManagerNode = internalCluster().startClusterManagerOnlyNode();
+        final String primaryNode = internalCluster().startDataOnlyNode(Settings.EMPTY);
+        createIndex(INDEX_NAME, settings);
+        internalCluster().startDataOnlyNodes(6);
 
-        final int initialDocCount = scaledRandomIntBetween(0, 200);
+        int initialDocCount = scaledRandomIntBetween(100, 200);
         try (
             BackgroundIndexer indexer = new BackgroundIndexer(
                 INDEX_NAME,
@@ -444,36 +445,20 @@ public class SegmentReplicationIT extends OpenSearchIntegTestCase {
             indexer.start(initialDocCount);
             waitForDocs(initialDocCount, indexer);
             refresh(INDEX_NAME);
+            // don't wait for replication to complete, stop the primary immediately.
+            internalCluster().stopRandomNode(InternalTestCluster.nameFilter(primaryNode));
+            ensureYellow(INDEX_NAME);
+
+            // start another replica.
+            internalCluster().startDataOnlyNode();
+            ensureGreen(INDEX_NAME);
+
+            // index another doc and refresh - without this the new replica won't catch up.
+            client().prepareIndex(INDEX_NAME).setId("1").setSource("foo", "bar").get();
+
+            flushAndRefresh(INDEX_NAME);
             waitForReplicaUpdate();
-
-            // wait a short amount of time to give replication a chance to complete.
-            assertHitCount(client(primary).prepareSearch(INDEX_NAME).setSize(0).setPreference("_only_local").get(), initialDocCount);
-            assertHitCount(client(replica).prepareSearch(INDEX_NAME).setSize(0).setPreference("_only_local").get(), initialDocCount);
-
-            final int additionalDocCount = scaledRandomIntBetween(0, 200);
-            final int expectedHitCount = initialDocCount + additionalDocCount;
-            indexer.start(additionalDocCount);
-            waitForDocs(expectedHitCount, indexer);
-            waitForReplicaUpdate();
-
-            assertHitCount(client(primary).prepareSearch(INDEX_NAME).setSize(0).setPreference("_only_local").get(), expectedHitCount);
-            assertHitCount(client(replica).prepareSearch(INDEX_NAME).setSize(0).setPreference("_only_local").get(), expectedHitCount);
-
-            Set<String> ids = indexer.getIds();
-            String id = ids.toArray()[0].toString();
-            UpdateResponse updateResponse = client(primary).prepareUpdate(INDEX_NAME, id)
-                .setDoc(Requests.INDEX_CONTENT_TYPE, "foo", "baz")
-                .setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL)
-                .get();
-            assertFalse("request shouldn't have forced a refresh", updateResponse.forcedRefresh());
-            assertEquals(2, updateResponse.getVersion());
-
-            refresh(INDEX_NAME);
-            waitForReplicaUpdate();
-
-            assertSearchHits(client(primary).prepareSearch(INDEX_NAME).setQuery(matchQuery("foo", "baz")).get(), id);
-            assertSearchHits(client(replica).prepareSearch(INDEX_NAME).setQuery(matchQuery("foo", "baz")).get(), id);
-
+            assertSegmentStats(6);
         }
     }
 
@@ -516,9 +501,9 @@ public class SegmentReplicationIT extends OpenSearchIntegTestCase {
                 ClusterState state = client(internalCluster().getMasterName()).admin().cluster().prepareState().get().getState();
                 final DiscoveryNode replicaNode = state.nodes().resolveNode(replicaShardRouting.currentNodeId());
                 IndexShard indexShard = getIndexShard(replicaNode.getName());
-                final String lastCommitSegmentsFileName = SegmentInfos.getLastCommitSegmentsFileName(indexShard.store().directory());
-                // calls to readCommit will fail if a valid commit point and all its segments are not in the store.
-                SegmentInfos.readCommit(indexShard.store().directory(), lastCommitSegmentsFileName);
+//                final String lastCommitSegmentsFileName = SegmentInfos.getLastCommitSegmentsFileName(indexShard.store().directory());
+//                // calls to readCommit will fail if a valid commit point and all its segments are not in the store.
+//                SegmentInfos.readCommit(indexShard.store().directory(), lastCommitSegmentsFileName);
             }
         }
     }

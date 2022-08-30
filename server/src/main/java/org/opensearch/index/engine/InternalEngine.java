@@ -357,6 +357,11 @@ public class InternalEngine extends Engine {
                 }
             }
         }
+        try {
+            logger.info("--> Opened IE with infos {} - disk {}", getLatestSegmentInfos().files(true), Arrays.asList(store.directory().listAll()));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         logger.trace("created new InternalEngine");
     }
 
@@ -2139,6 +2144,11 @@ public class InternalEngine extends Engine {
     public GatedCloseable<SegmentInfos> getSegmentInfosSnapshot() {
         final SegmentInfos segmentInfos = getLatestSegmentInfos();
         try {
+            try {
+                logger.info("--> IE.getSegmentInfosSnapshot with infos {} - disk {}", getLatestSegmentInfos().files(true), Arrays.asList(store.directory().listAll()));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
             indexWriter.incRefDeleter(segmentInfos);
         } catch (IOException e) {
             throw new EngineException(shardId, e.getMessage(), e);

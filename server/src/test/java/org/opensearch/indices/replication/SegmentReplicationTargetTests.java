@@ -26,6 +26,7 @@ import org.apache.lucene.tests.analysis.MockAnalyzer;
 import org.apache.lucene.tests.util.TestUtil;
 import org.apache.lucene.util.Version;
 import org.junit.Assert;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.opensearch.ExceptionsHelper;
 import org.opensearch.OpenSearchException;
@@ -48,12 +49,7 @@ import org.opensearch.test.IndexSettingsModule;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.NoSuchFileException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.Random;
-import java.util.Arrays;
+import java.util.*;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -394,6 +390,53 @@ public class SegmentReplicationTargetTests extends IndexShardTestCase {
             }
         });
     }
+
+    public void testFailure_differentSegmentFiles_NewPrimary() throws IOException {
+
+        SegmentReplicationSource segrepSource = new SegmentReplicationSource() {
+            @Override
+            public void getCheckpointMetadata(
+                long replicationId,
+                ReplicationCheckpoint checkpoint,
+                ActionListener<CheckpointInfoResponse> listener
+            ) {
+                listener.onResponse(new CheckpointInfoResponse(checkpoint, SI_SNAPSHOT, buffer.toArrayCopy(), Collections.emptySet()));
+            }
+
+            @Override
+            public void getSegmentFiles(
+                long replicationId,
+                ReplicationCheckpoint checkpoint,
+                List<StoreFileMetadata> filesToFetch,
+                Store store,
+                ActionListener<GetSegmentFilesResponse> listener
+            ) {
+                listener.onResponse(new GetSegmentFilesResponse(filesToFetch));
+            }
+        };
+        SegmentReplicationSource segrepSourceSpy = spy(segrepSource);
+        SegmentReplicationTargetService.SegmentReplicationListener segRepListener = mock(
+            SegmentReplicationTargetService.SegmentReplicationListener.class
+        );
+        segrepTarget = spy(new SegmentReplicationTarget(repCheckpoint, indexShard, segrepSourceSpy, true, segRepListener));
+        when(segrepTarget.getMetadataSnapshot()).thenReturn(SI_SNAPSHOT_DIFFERENT);
+        ArgumentCaptor<List<StoreFileMetadata>> captor = ArgumentCaptor.forClass((Class) List.class);
+        segrepTarget.startReplication(new ActionListener<Void>() {
+            @Override
+            public void onResponse(Void replicationResponse) {
+                segrepTarget.markAsDone();
+            }
+            @Override
+            public void onFailure(Exception e) {
+                logger.error("Unexpected onFailure", e);
+                Assert.fail();
+            }
+        });
+        verify(segrepSourceSpy, times(1)).getSegmentFiles(anyLong(), any(), captor.capture(), any(), any());
+        assertEquals(captor.getValue().size(), 1);
+        assertTrue(captor.getValue().get(0).equals(SI_SNAPSHOT_DIFFERENT.getSegmentsFile()));
+    }
+
 
     /**
      * This tests ensures that new files generated on primary (due to delete operation) are not considered missing on replica

@@ -49,6 +49,8 @@ public class SegmentReplicationTargetServiceTests extends IndexShardTestCase {
     private ReplicationCheckpoint initialCheckpoint;
     private ReplicationCheckpoint aheadCheckpoint;
 
+    private ReplicationCheckpoint checkpointFromNewPrimary;
+
     @Override
     public void setUp() throws Exception {
         super.setUp();
@@ -70,6 +72,13 @@ public class SegmentReplicationTargetServiceTests extends IndexShardTestCase {
         aheadCheckpoint = new ReplicationCheckpoint(
             initialCheckpoint.getShardId(),
             initialCheckpoint.getPrimaryTerm(),
+            initialCheckpoint.getSegmentsGen(),
+            initialCheckpoint.getSeqNo(),
+            initialCheckpoint.getSegmentInfosVersion() + 1
+        );
+        checkpointFromNewPrimary = new ReplicationCheckpoint(
+            initialCheckpoint.getShardId(),
+            initialCheckpoint.getPrimaryTerm() + 1,
             initialCheckpoint.getSegmentsGen(),
             initialCheckpoint.getSeqNo(),
             initialCheckpoint.getSegmentInfosVersion() + 1
@@ -207,6 +216,22 @@ public class SegmentReplicationTargetServiceTests extends IndexShardTestCase {
         SegmentReplicationTargetService.SegmentReplicationListener listener = captor.getValue();
         listener.onFailure(new SegmentReplicationState(new ReplicationLuceneIndex()), new OpenSearchException("testing"), true);
         verify(spyShard).failShard(any(), any());
+        closeShard(indexShard, false);
+    }
+
+    public void testOnNewCheckpointCorrectBuildsTarget() throws IOException {
+        SegmentReplicationTargetService spy = spy(sut);
+        ArgumentCaptor<SegmentReplicationTarget> captor = ArgumentCaptor.forClass(
+            SegmentReplicationTarget.class
+        );
+        doNothing().when(spy).startReplication(any());
+        spy.onNewCheckpoint(aheadCheckpoint, indexShard);
+        verify(spy, times(1)).startReplication(captor.capture());
+        assertFalse(captor.getValue().checkpointFromNewPrimary);
+        spy.onNewCheckpoint(checkpointFromNewPrimary, indexShard);
+        verify(spy, times(2)).startReplication(captor.capture());
+        assertTrue(captor.getValue().checkpointFromNewPrimary);
+        indexShard.store().close();
         closeShard(indexShard, false);
     }
 

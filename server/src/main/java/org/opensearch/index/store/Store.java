@@ -32,6 +32,7 @@
 
 package org.opensearch.index.store;
 
+import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.ParameterizedMessage;
 import org.apache.lucene.codecs.CodecUtil;
@@ -1132,6 +1133,8 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
             return metadata.values().iterator();
         }
 
+        Logger logger = LogManager.getLogger();
+
         public StoreFileMetadata get(String name) {
             return metadata.get(name);
         }
@@ -1266,8 +1269,10 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
                         // documents and generate new files specific to a segment
                         missing.add(meta);
                     } else if (storeFileMetadata.isSame(meta) == false) {
+                        logger.info("--> Different file {}", storeFileMetadata);
+                        logger.info("--> Local Copy {}", meta);
                         consistent = false;
-                        different.add(meta);
+                        different.add(storeFileMetadata);
                     } else {
                         identicalFiles.add(meta);
                     }
@@ -1412,9 +1417,12 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
         private String actualChecksum;
         private final byte[] footerChecksum = new byte[8]; // this holds the actual footer checksum data written by to this output
 
+        private final Logger logger = LogManager.getLogger();
+
         LuceneVerifyingIndexOutput(StoreFileMetadata metadata, IndexOutput out) {
             super(out);
             this.metadata = metadata;
+            logger.info("--> LuceneVerifyingIndexOutput ctor metadata {}", metadata);
             checksumPosition = metadata.length() - 8; // the last 8 bytes are the checksum - we store it in footerChecksum
         }
 
@@ -1469,6 +1477,7 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
 
         private void readAndCompareChecksum() throws IOException {
             actualChecksum = digestToString(getChecksum());
+            logger.info("--> metadata file {}", metadata);
             if (!metadata.checksum().equals(actualChecksum)) {
                 throw new CorruptIndexException(
                     "checksum failed (hardware problem?) : expected="

@@ -707,7 +707,7 @@ public class IndicesService extends AbstractLifecycleComponent
         }
         // we ignore private settings since they are not registered settings
         indexScopedSettings.validate(indexMetadata.getSettings(), true, true, true);
-        logger.debug(
+        logger.info(
             "creating Index [{}], shards [{}]/[{}] - reason [{}]",
             indexMetadata.getIndex(),
             idxSettings.getNumberOfShards(),
@@ -761,6 +761,7 @@ public class IndicesService extends AbstractLifecycleComponent
         final IndexMetadata indexMetadata = idxSettings.getIndexMetadata();
         if (indexMetadata != null && indexMetadata.getState() == IndexMetadata.State.CLOSE) {
             // NoOpEngine takes precedence as long as the index is closed
+            logger.info("--> Returning NoOpEngine as index is closed");
             return NoOpEngine::new;
         }
 
@@ -770,8 +771,10 @@ public class IndicesService extends AbstractLifecycleComponent
             .collect(Collectors.toList());
         if (engineFactories.isEmpty()) {
             if (idxSettings.isSegRepEnabled()) {
+                logger.info("--> SegRep enabled settings");
                 return new NRTReplicationEngineFactory();
             }
+            logger.info("--> SegRep disabled settings");
             return new InternalEngineFactory();
         } else if (engineFactories.size() == 1) {
             assert engineFactories.get(0).isPresent();
@@ -889,7 +892,7 @@ public class IndicesService extends AbstractLifecycleComponent
                     return;
                 }
 
-                logger.debug("[{}] closing ... (reason [{}])", indexName, reason);
+                logger.info("[{}] closing ... (reason [{}])", indexName, reason);
                 Map<String, IndexService> newIndices = new HashMap<>(indices);
                 indexService = newIndices.remove(index.getUUID());
                 assert indexService != null : "IndexService is null for index: " + index;
@@ -898,9 +901,9 @@ public class IndicesService extends AbstractLifecycleComponent
             }
 
             listener.beforeIndexRemoved(indexService, reason);
-            logger.debug("{} closing index service (reason [{}][{}])", index, reason, extraInfo);
+            logger.info("{} closing index service (reason [{}][{}])", index, reason, extraInfo);
             indexService.close(extraInfo, reason == IndexRemovalReason.DELETED);
-            logger.debug("{} closed... (reason [{}][{}])", index, reason, extraInfo);
+            logger.info("{} closed... (reason [{}][{}])", index, reason, extraInfo);
             final IndexSettings indexSettings = indexService.getIndexSettings();
             listener.afterIndexRemoved(indexService.index(), indexSettings, reason);
             if (reason == IndexRemovalReason.DELETED) {
@@ -1029,14 +1032,14 @@ public class IndicesService extends AbstractLifecycleComponent
             // we are trying to delete the index store here - not a big deal if the lock can't be obtained
             // the store metadata gets wiped anyway even without the lock this is just best effort since
             // every shards deletes its content under the shard lock it owns.
-            logger.debug("{} deleting index store reason [{}]", index, reason);
+            logger.info("{} deleting index store reason [{}]", index, reason);
             if (predicate.apply(index, indexSettings)) {
                 // its safe to delete all index metadata and shard data
                 nodeEnv.deleteIndexDirectorySafe(index, 0, indexSettings);
             }
             success = true;
         } catch (ShardLockObtainFailedException ex) {
-            logger.debug(
+            logger.info(
                 () -> new ParameterizedMessage("{} failed to delete index store - at least one shards is still locked", index),
                 ex
             );
@@ -1089,7 +1092,7 @@ public class IndicesService extends AbstractLifecycleComponent
             throw new IllegalStateException("Can't delete shard " + shardId + " (cause: " + shardDeletionCheckResult + ")");
         }
         nodeEnv.deleteShardDirectorySafe(shardId, indexSettings);
-        logger.debug("{} deleted shard reason [{}]", shardId, reason);
+        logger.info("{} deleted shard reason [{}]", shardId, reason);
 
         if (canDeleteIndexContents(shardId.getIndex(), indexSettings)) {
             if (nodeEnv.findAllShardIds(shardId.getIndex()).isEmpty()) {
@@ -1311,7 +1314,7 @@ public class IndicesService extends AbstractLifecycleComponent
     @Override
     public void processPendingDeletes(Index index, IndexSettings indexSettings, TimeValue timeout) throws IOException, InterruptedException,
         ShardLockObtainFailedException {
-        logger.debug("{} processing pending deletes", index);
+        logger.info("{} processing pending deletes", index);
         final long startTimeNS = System.nanoTime();
         final List<ShardLock> shardLocks = nodeEnv.lockAllForIndex(index, indexSettings, "process pending deletes", timeout.millis());
         int numRemoved = 0;
@@ -1339,12 +1342,12 @@ public class IndicesService extends AbstractLifecycleComponent
 
                         if (delete.deleteIndex) {
                             assert delete.shardId == -1;
-                            logger.debug("{} deleting index store reason [{}]", index, "pending delete");
+                            logger.info("{} deleting index store reason [{}]", index, "pending delete");
                             try {
                                 nodeEnv.deleteIndexDirectoryUnderLock(index, indexSettings);
                                 iterator.remove();
                             } catch (IOException ex) {
-                                logger.debug(() -> new ParameterizedMessage("{} retry pending delete", index), ex);
+                                logger.info(() -> new ParameterizedMessage("{} retry pending delete", index), ex);
                             }
                         } else {
                             assert delete.shardId != -1;
@@ -1354,7 +1357,7 @@ public class IndicesService extends AbstractLifecycleComponent
                                     deleteShardStore("pending delete", shardLock, delete.settings);
                                     iterator.remove();
                                 } catch (IOException ex) {
-                                    logger.debug(() -> new ParameterizedMessage("{} retry pending delete", shardLock.getShardId()), ex);
+                                    logger.info(() -> new ParameterizedMessage("{} retry pending delete", shardLock.getShardId()), ex);
                                 }
                             } else {
                                 logger.warn("{} no shard lock for pending delete", delete.shardId);
@@ -1366,7 +1369,7 @@ public class IndicesService extends AbstractLifecycleComponent
                         logger.warn("{} still pending deletes present for shards {} - retrying", index, remove.toString());
                         Thread.sleep(sleepTime);
                         sleepTime = Math.min(maxSleepTimeMs, sleepTime * 2); // increase the sleep time gradually
-                        logger.debug("{} schedule pending delete retry after {} ms", index, sleepTime);
+                        logger.info("{} schedule pending delete retry after {} ms", index, sleepTime);
                     }
                 } while ((System.nanoTime() - startTimeNS) < timeout.nanos());
             }

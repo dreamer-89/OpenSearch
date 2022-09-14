@@ -166,7 +166,7 @@ public class AllocationService {
     protected ClusterState buildResultAndLogHealthChange(ClusterState oldState, RoutingAllocation allocation, String reason) {
         ClusterState newState = buildResult(oldState, allocation);
 
-//        logger.info("--> new cluster state {}", newState);
+        logger.info("--> new cluster state {}", newState);
 
         logClusterHealthStateChange(new ClusterStateHealth(oldState), new ClusterStateHealth(newState), reason);
 

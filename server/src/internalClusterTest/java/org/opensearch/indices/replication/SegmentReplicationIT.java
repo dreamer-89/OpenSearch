@@ -63,7 +63,7 @@ public class SegmentReplicationIT extends OpenSearchIntegTestCase {
 
     @BeforeClass
     public static void assumeFeatureFlag() {
-        assumeTrue("Segment replication Feature flag is enabled", Boolean.parseBoolean(System.getProperty(FeatureFlags.REPLICATION_TYPE)));
+//        assumeTrue("Segment replication Feature flag is enabled", Boolean.parseBoolean(System.getProperty(FeatureFlags.REPLICATION_TYPE)));
     }
 
     @Override
@@ -188,6 +188,60 @@ public class SegmentReplicationIT extends OpenSearchIntegTestCase {
 
         assertDocCounts(initialDocCount, replica, primary);
         assertSegmentStats(REPLICA_COUNT);
+    }
+
+    public void testIndexReopenClose() throws Exception {
+        final String primary = internalCluster().startNode();
+        createIndex(INDEX_NAME);
+        ensureYellowAndNoInitializingShards(INDEX_NAME);
+        final String replica = internalCluster().startNode();
+        ensureGreen(INDEX_NAME);
+
+        int initialDocCount = 1;
+
+        client().prepareIndex(INDEX_NAME).setId("1").setSource("foo", "bar").setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE).get();
+        refresh(INDEX_NAME);
+
+        waitForReplicaUpdate();
+        assertDocCounts(initialDocCount, replica, primary);
+
+        flushAndRefresh(INDEX_NAME);
+        waitForReplicaUpdate();
+
+        logger.info("--> Closing the index ");
+        client().admin().indices().prepareClose(INDEX_NAME).get();
+
+        final String replica2 = internalCluster().startNode();
+
+        logger.info("--> Opening the index");
+        client().admin().indices().prepareOpen(INDEX_NAME).get();
+
+
+        initialDocCount = scaledRandomIntBetween(1000, 20000);
+        try (
+            BackgroundIndexer indexer = new BackgroundIndexer(
+                INDEX_NAME,
+                "_doc",
+                client(),
+                -1,
+                RandomizedTest.scaledRandomIntBetween(2, 5),
+                false,
+                random()
+            )
+        ) {
+            indexer.start(initialDocCount);
+            waitForDocs(initialDocCount, indexer);
+            refresh(INDEX_NAME);
+        }
+
+
+        waitForReplicaUpdate();
+
+        client().prepareIndex(INDEX_NAME).setId("1").setSource("foo", "baz").setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE).get();
+        refresh(INDEX_NAME);
+
+        assertDocCounts(initialDocCount, replica, primary);
+//        assertSegmentStats(REPLICA_COUNT);
     }
 
     public void testReplicationAfterPrimaryRefreshAndFlush() throws Exception {
@@ -348,7 +402,7 @@ public class SegmentReplicationIT extends OpenSearchIntegTestCase {
             (connection, requestId, action, request, options) -> {
                 if (action.equals(SegmentReplicationTargetService.Actions.FILE_CHUNK)) {
                     FileChunkRequest req = (FileChunkRequest) request;
-                    logger.debug("file chunk [{}] lastChunk: {}", req, req.lastChunk());
+                    logger.info("file chunk [{}] lastChunk: {}", req, req.lastChunk());
                     if (req.name().endsWith("cfs") && req.lastChunk()) {
                         try {
                             latch.await();
@@ -595,12 +649,12 @@ public class SegmentReplicationIT extends OpenSearchIntegTestCase {
                 final List<ShardSegments> replicaShardSegments = segmentListMap.get(false);
                 // if we don't have any segments yet, proceed.
                 final ShardSegments primaryShardSegments = primaryShardSegmentsList.stream().findFirst().get();
-                logger.debug("Primary Segments: {}", primaryShardSegments.getSegments());
+                logger.info("Primary Segments: {}", primaryShardSegments.getSegments());
                 if (primaryShardSegments.getSegments().isEmpty() == false) {
                     final Map<String, Segment> latestPrimarySegments = getLatestSegments(primaryShardSegments);
                     final Long latestPrimaryGen = latestPrimarySegments.values().stream().findFirst().map(Segment::getGeneration).get();
                     for (ShardSegments shardSegments : replicaShardSegments) {
-                        logger.debug("Replica {} Segments: {}", shardSegments.getShardRouting(), shardSegments.getSegments());
+                        logger.info("Replica {} Segments: {}", shardSegments.getShardRouting(), shardSegments.getSegments());
                         final boolean isReplicaCaughtUpToPrimary = shardSegments.getSegments()
                             .stream()
                             .anyMatch(segment -> segment.getGeneration() == latestPrimaryGen);

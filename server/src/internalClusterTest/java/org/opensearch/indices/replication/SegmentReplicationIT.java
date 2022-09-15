@@ -197,13 +197,8 @@ public class SegmentReplicationIT extends OpenSearchIntegTestCase {
         final String replica = internalCluster().startNode();
         ensureGreen(INDEX_NAME);
 
-        int initialDocCount = 1;
-
         client().prepareIndex(INDEX_NAME).setId("1").setSource("foo", "bar").setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE).get();
         refresh(INDEX_NAME);
-
-        waitForReplicaUpdate();
-        assertDocCounts(initialDocCount, replica, primary);
 
         flushAndRefresh(INDEX_NAME);
         waitForReplicaUpdate();
@@ -211,37 +206,11 @@ public class SegmentReplicationIT extends OpenSearchIntegTestCase {
         logger.info("--> Closing the index ");
         client().admin().indices().prepareClose(INDEX_NAME).get();
 
+        // Add another node to kick off TransportNodesListGatewayStartedShards which fetches latestReplicationCheckpoint for SegRep enabled indices
         final String replica2 = internalCluster().startNode();
 
         logger.info("--> Opening the index");
         client().admin().indices().prepareOpen(INDEX_NAME).get();
-
-
-        initialDocCount = scaledRandomIntBetween(1000, 20000);
-        try (
-            BackgroundIndexer indexer = new BackgroundIndexer(
-                INDEX_NAME,
-                "_doc",
-                client(),
-                -1,
-                RandomizedTest.scaledRandomIntBetween(2, 5),
-                false,
-                random()
-            )
-        ) {
-            indexer.start(initialDocCount);
-            waitForDocs(initialDocCount, indexer);
-            refresh(INDEX_NAME);
-        }
-
-
-        waitForReplicaUpdate();
-
-        client().prepareIndex(INDEX_NAME).setId("1").setSource("foo", "baz").setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE).get();
-        refresh(INDEX_NAME);
-
-        assertDocCounts(initialDocCount, replica, primary);
-//        assertSegmentStats(REPLICA_COUNT);
     }
 
     public void testReplicationAfterPrimaryRefreshAndFlush() throws Exception {

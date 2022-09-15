@@ -111,6 +111,7 @@ import org.opensearch.index.engine.EngineException;
 import org.opensearch.index.engine.EngineFactory;
 import org.opensearch.index.engine.NRTReplicationEngine;
 import org.opensearch.index.engine.InternalEngine;
+import org.opensearch.index.engine.NoOpEngine;
 import org.opensearch.index.engine.ReadOnlyEngine;
 import org.opensearch.index.engine.RefreshFailedEngineException;
 import org.opensearch.index.engine.SafeCommitInfo;
@@ -1397,7 +1398,8 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
         if (indexSettings.isSegRepEnabled() == false) {
             return null;
         }
-        if (getEngineOrNull() == null) {
+        final IndexMetadata indexMetadata = indexSettings.getIndexMetadata();
+        if (getEngineOrNull() == null || (indexMetadata != null && indexMetadata.getState() == IndexMetadata.State.CLOSE)) {
             return ReplicationCheckpoint.empty(shardId);
         }
         try (final GatedCloseable<SegmentInfos> snapshot = getSegmentInfosSnapshot()) {
@@ -2728,7 +2730,6 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
      */
     public long getProcessedLocalCheckpoint() {
         // Returns checkpoint only if the current engine is an instance of NRTReplicationEngine or InternalEngine
-        logger.info("--> getProcessedLocalCheckpoint {}", this.getEngine().getClass());
         return getReplicationEngine().map(NRTReplicationEngine::getProcessedLocalCheckpoint).orElseGet(() -> {
             final Engine engine = getEngine();
             assert engine instanceof InternalEngine;
@@ -2737,7 +2738,6 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
     }
 
     private Optional<NRTReplicationEngine> getReplicationEngine() {
-        logger.info("--> getEngine() instanceof NRTReplicationEngine {}", getEngine() instanceof NRTReplicationEngine);
         if (getEngine() instanceof NRTReplicationEngine) {
             return Optional.of((NRTReplicationEngine) getEngine());
         } else {

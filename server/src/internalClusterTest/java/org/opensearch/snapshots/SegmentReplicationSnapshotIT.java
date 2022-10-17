@@ -20,6 +20,7 @@ import org.opensearch.action.search.SearchResponse;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.util.FeatureFlags;
+import org.opensearch.index.IndexModule;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.indices.replication.common.ReplicationType;
 import org.opensearch.rest.RestStatus;
@@ -63,7 +64,10 @@ public class SegmentReplicationSnapshotIT extends AbstractSnapshotIntegTestCase 
         return Settings.builder()
             .put(super.indexSettings())
             .put(IndexMetadata.SETTING_NUMBER_OF_SHARDS, SHARD_COUNT)
-            .put(IndexMetadata.SETTING_NUMBER_OF_REPLICAS, REPLICA_COUNT);
+            .put(IndexMetadata.SETTING_NUMBER_OF_REPLICAS, REPLICA_COUNT)
+            .put(IndexModule.INDEX_QUERY_CACHE_ENABLED_SETTING.getKey(), false)
+            .put(IndexMetadata.SETTING_REPLICATION_TYPE, ReplicationType.SEGMENT)
+            .put(IndexMetadata.SETTING_REMOTE_STORE_ENABLED, true);
     }
 
     public Settings restoreIndexSegRepSettings() {

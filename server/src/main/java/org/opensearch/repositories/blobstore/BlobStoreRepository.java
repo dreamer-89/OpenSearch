@@ -639,12 +639,17 @@ public abstract class BlobStoreRepository extends AbstractLifecycleComponent imp
         return blobContainer;
     }
 
+    public BlobStore blobStore() {
+        return blobStore(true);
+    }
+
     /**
      * Maintains single lazy instance of {@link BlobStore}.
      * Public for testing.
      */
-    public BlobStore blobStore() {
-        assertSnapshotOrGenericThread();
+    public BlobStore blobStore(boolean checkThread) {
+        if (checkThread == true)
+            assertSnapshotOrGenericThread();
 
         BlobStore store = blobStore.get();
         if (store == null) {

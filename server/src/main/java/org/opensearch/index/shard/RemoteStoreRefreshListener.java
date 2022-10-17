@@ -80,6 +80,7 @@ public final class RemoteStoreRefreshListener implements ReferenceManager.Refres
      */
     @Override
     public void afterRefresh(boolean didRefresh) {
+        logger.info("--> remote store shard refresh");
         synchronized (this) {
             try {
                 if (indexShard.shardRouting.primary()) {

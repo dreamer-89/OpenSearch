@@ -91,7 +91,7 @@ public class SegmentReplicationIT extends OpenSearchIntegTestCase {
         return false;
     }
 
-    public void testPrimaryStopped_ReplicaPromoted() throws Exception {
+    public void SetestPrimaryStopped_ReplicaPromoted() throws Exception {
         final String primary = internalCluster().startNode();
         createIndex(INDEX_NAME);
         ensureYellowAndNoInitializingShards(INDEX_NAME);

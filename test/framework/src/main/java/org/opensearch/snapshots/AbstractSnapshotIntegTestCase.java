@@ -153,7 +153,7 @@ public abstract class AbstractSnapshotIntegTestCase extends OpenSearchIntegTestC
                     clusterAdmin().prepareDeleteSnapshot(name, OLD_VERSION_SNAPSHOT_PREFIX + "*").get();
                     clusterAdmin().prepareCleanupRepository(name).get();
                 }
-                BlobStoreTestUtil.assertRepoConsistency(internalCluster(), name);
+//                BlobStoreTestUtil.assertRepoConsistency(internalCluster(), name);
             });
         } else {
             logger.info("--> skipped repo consistency checks because [{}]", skipRepoConsistencyCheckReason);

@@ -145,6 +145,8 @@ public class IndicesClusterStateService extends AbstractLifecycleComponent imple
 
     private final SegmentReplicationCheckpointPublisher checkpointPublisher;
 
+    private final SegmentReplicationTargetService segmentReplicationTargetService;
+
     @Inject
     public IndicesClusterStateService(
         final Settings settings,
@@ -229,6 +231,7 @@ public class IndicesClusterStateService extends AbstractLifecycleComponent imple
         this.globalCheckpointSyncer = globalCheckpointSyncer;
         this.retentionLeaseSyncer = Objects.requireNonNull(retentionLeaseSyncer);
         this.sendRefreshMapping = settings.getAsBoolean("indices.cluster.send_refresh_mapping", true);
+        this.segmentReplicationTargetService = segmentReplicationTargetService;
     }
 
     @Override
@@ -658,7 +661,8 @@ public class IndicesClusterStateService extends AbstractLifecycleComponent imple
                 globalCheckpointSyncer,
                 retentionLeaseSyncer,
                 nodes.getLocalNode(),
-                sourceNode
+                sourceNode,
+                segmentReplicationTargetService
             );
         } catch (Exception e) {
             failAndRemoveShard(shardRouting, true, "failed to create shard", e, state);
@@ -1016,7 +1020,8 @@ public class IndicesClusterStateService extends AbstractLifecycleComponent imple
             Consumer<ShardId> globalCheckpointSyncer,
             RetentionLeaseSyncer retentionLeaseSyncer,
             DiscoveryNode targetNode,
-            @Nullable DiscoveryNode sourceNode
+            @Nullable DiscoveryNode sourceNode,
+            @Nullable SegmentReplicationTargetService segmentReplicationTargetService
         ) throws IOException;
 
         /**

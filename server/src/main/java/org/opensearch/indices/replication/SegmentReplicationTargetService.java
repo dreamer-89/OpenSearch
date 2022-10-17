@@ -36,6 +36,9 @@ import org.opensearch.transport.TransportRequestHandler;
 import org.opensearch.transport.TransportService;
 
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -55,6 +58,9 @@ public class SegmentReplicationTargetService implements IndexEventListener {
     private final SegmentReplicationSourceFactory sourceFactory;
 
     private final Map<ShardId, ReplicationCheckpoint> latestReceivedCheckpoint = ConcurrentCollections.newConcurrentMap();
+
+    private ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    private Runnable storePoller;
 
     // Empty Implementation, only required while Segment Replication is under feature flag.
     public static final SegmentReplicationTargetService NO_OP = new SegmentReplicationTargetService() {
@@ -80,6 +86,7 @@ public class SegmentReplicationTargetService implements IndexEventListener {
         recoverySettings = null;
         onGoingReplications = null;
         sourceFactory = null;
+        storePoller = null;
     }
 
     public ReplicationRef<SegmentReplicationTarget> get(long replicationId) {
@@ -132,6 +139,10 @@ public class SegmentReplicationTargetService implements IndexEventListener {
         if (oldRouting != null && oldRouting.primary() == false && newRouting.primary()) {
             onGoingReplications.cancelForShard(indexShard.shardId(), "shard has been promoted to primary");
         }
+    }
+
+    public void startReplication() {
+
     }
 
     /**

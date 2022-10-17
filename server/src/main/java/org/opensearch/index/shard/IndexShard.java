@@ -188,6 +188,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -3298,6 +3300,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
 
         final List<ReferenceManager.RefreshListener> internalRefreshListener = new ArrayList<>();
         internalRefreshListener.add(new RefreshMetricUpdater(refreshMetric));
+
         if (isRemoteStoreEnabled()) {
             internalRefreshListener.add(new RemoteStoreRefreshListener(this));
         }

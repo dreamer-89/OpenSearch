@@ -81,6 +81,7 @@ import org.opensearch.index.shard.IndexEventListener;
 import org.opensearch.index.shard.IndexShard;
 import org.opensearch.index.shard.IndexShardClosedException;
 import org.opensearch.index.shard.IndexingOperationListener;
+import org.opensearch.index.shard.RemoteStorePoller;
 import org.opensearch.index.shard.SearchOperationListener;
 import org.opensearch.index.shard.ShardId;
 import org.opensearch.index.shard.ShardNotFoundException;
@@ -95,6 +96,7 @@ import org.opensearch.indices.cluster.IndicesClusterStateService;
 import org.opensearch.indices.fielddata.cache.IndicesFieldDataCache;
 import org.opensearch.indices.mapper.MapperRegistry;
 import org.opensearch.indices.recovery.RecoveryState;
+import org.opensearch.indices.replication.SegmentReplicationTargetService;
 import org.opensearch.indices.replication.checkpoint.SegmentReplicationCheckpointPublisher;
 import org.opensearch.plugins.IndexStorePlugin;
 import org.opensearch.script.ScriptService;
@@ -173,6 +175,8 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
     private final IndexNameExpressionResolver expressionResolver;
     private final Supplier<Sort> indexSortSupplier;
     private final ValuesSourceRegistry valuesSourceRegistry;
+
+    private RemoteStorePoller remoteStorePoller;
 
     public IndexService(
         IndexSettings indexSettings,
@@ -434,7 +438,8 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
         final ShardRouting routing,
         final Consumer<ShardId> globalCheckpointSyncer,
         final RetentionLeaseSyncer retentionLeaseSyncer,
-        final SegmentReplicationCheckpointPublisher checkpointPublisher
+        final SegmentReplicationCheckpointPublisher checkpointPublisher,
+        final SegmentReplicationTargetService segmentReplicationTargetService
     ) throws IOException {
         Objects.requireNonNull(retentionLeaseSyncer);
         /*
@@ -516,6 +521,7 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
                     path
                 );
                 remoteStore = new Store(shardId, this.indexSettings, remoteDirectory, lock, Store.OnClose.EMPTY);
+
             }
 
             Directory directory = directoryFactory.newDirectory(this.indexSettings, path);
@@ -557,6 +563,9 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
             eventListener.afterIndexShardCreated(indexShard);
             shards = newMapBuilder(shards).put(shardId.id(), indexShard).immutableMap();
             success = true;
+            if (this.indexSettings.isRemoteStoreEnabled()) {
+                remoteStorePoller = new RemoteStorePoller(indexShard, segmentReplicationTargetService);
+            }
             return indexShard;
         } catch (ShardLockObtainFailedException e) {
             throw new IOException("failed to obtain in-memory shard lock", e);
@@ -602,6 +611,7 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
                         // only flush if we are closed (closed index or shutdown) and if we are not deleted
                         final boolean flushEngine = deleted.get() == false && closed.get();
                         indexShard.close(reason, flushEngine);
+                        remoteStorePoller.shutdownPoller();
                     } catch (Exception e) {
                         logger.debug(() -> new ParameterizedMessage("[{}] failed to close index shard", shardId), e);
                         // ignore

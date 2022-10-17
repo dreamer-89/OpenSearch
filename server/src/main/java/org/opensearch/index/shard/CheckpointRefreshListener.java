@@ -40,8 +40,9 @@ public class CheckpointRefreshListener implements ReferenceManager.RefreshListen
 
     @Override
     public void afterRefresh(boolean didRefresh) throws IOException {
-        if (didRefresh && shard.state() != IndexShardState.CLOSED && shard.getReplicationTracker().isPrimaryMode()) {
-            publisher.publish(shard);
-        }
+        logger.info("--> skipping afterRefresh with remote store");
+//        if (didRefresh && shard.state() != IndexShardState.CLOSED && shard.getReplicationTracker().isPrimaryMode()) {
+//            publisher.publish(shard);
+//        }
     }
 }

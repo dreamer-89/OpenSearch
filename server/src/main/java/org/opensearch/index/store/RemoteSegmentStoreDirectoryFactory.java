@@ -55,7 +55,7 @@ public class RemoteSegmentStoreDirectoryFactory implements IndexStorePlugin.Remo
 
     private RemoteDirectory createRemoteDirectory(Repository repository, BlobPath commonBlobPath, String extention) {
         BlobPath extendedPath = commonBlobPath.add(extention);
-        BlobContainer dataBlobContainer = ((BlobStoreRepository) repository).blobStore().blobContainer(extendedPath);
+        BlobContainer dataBlobContainer = ((BlobStoreRepository) repository).blobStore(false).blobContainer(extendedPath);
         return new RemoteDirectory(dataBlobContainer);
     }
 }

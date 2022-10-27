@@ -109,6 +109,7 @@ import org.opensearch.common.transport.TransportAddress;
 import org.opensearch.common.unit.ByteSizeUnit;
 import org.opensearch.common.unit.ByteSizeValue;
 import org.opensearch.common.unit.TimeValue;
+import org.opensearch.common.util.FeatureFlags;
 import org.opensearch.common.util.concurrent.OpenSearchRejectedExecutionException;
 import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
@@ -761,6 +762,21 @@ public abstract class OpenSearchIntegTestCase extends OpenSearchTestCase {
             );
         }
         return builder.build();
+    }
+
+    /**
+     * Setting all feature flag settings at base IT, which can be overridden later by individual
+     * IT classes.
+     *
+     * @return Feature flag settings.
+     */
+    protected Settings featureFlagSettings() {
+        return Settings.builder()
+            .put(FeatureFlags.REPLICATION_TYPE, "true")
+            .put(FeatureFlags.REMOTE_STORE, "false")
+            .put(FeatureFlags.SEARCHABLE_SNAPSHOT, "false")
+            .put(FeatureFlags.EXTENSIONS, "false")
+            .build();
     }
 
     /**

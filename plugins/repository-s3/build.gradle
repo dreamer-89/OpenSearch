@@ -132,9 +132,16 @@ String s3EKSBasePath = System.getenv("amazon_s3_base_path_eks")
 
 boolean s3DisableChunkedEncoding = (new Random(Long.parseUnsignedLong(BuildParams.testSeed.tokenize(':').get(0), 16))).nextBoolean()
 
+// Generate random base path suffix to prevent concurrent test executions
+String allowedCharacters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+Random rnd = new Random();
+int len = 20;
+StringBuilder randomString = new StringBuilder(len);
+for(int i = 0; i < len; i++)
+  randomString.append(allowedCharacters.charAt(rnd.nextInt(allowedCharacters.length())));
+
 // If all these variables are missing then we are testing against the internal fixture instead, which has the following
 // credentials hard-coded in.
-
 if (!s3PermanentAccessKey && !s3PermanentSecretKey && !s3PermanentBucket && !s3PermanentBasePath) {
   s3PermanentAccessKey = 'access_key'
   s3PermanentSecretKey = 'secret_key'
@@ -173,9 +180,9 @@ if (!s3EC2Bucket && !s3EC2BasePath && !s3ECSBucket && !s3ECSBasePath && !s3EKSBu
 processYamlRestTestResources {
   Map<String, Object> expansions = [
     'permanent_bucket': s3PermanentBucket,
-    'permanent_base_path': s3PermanentBasePath + "_integration_tests",
+    'permanent_base_path': s3PermanentBasePath + "_integration_tests_" + randomString,
     'temporary_bucket': s3TemporaryBucket,
-    'temporary_base_path': s3TemporaryBasePath + "_integration_tests",
+    'temporary_base_path': s3TemporaryBasePath + "_integration_tests_" + randomString,
     'ec2_bucket': s3EC2Bucket,
     'ec2_base_path': s3EC2BasePath,
     'ecs_bucket': s3ECSBucket,

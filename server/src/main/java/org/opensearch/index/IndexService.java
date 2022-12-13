@@ -95,7 +95,6 @@ import org.opensearch.indices.cluster.IndicesClusterStateService;
 import org.opensearch.indices.fielddata.cache.IndicesFieldDataCache;
 import org.opensearch.indices.mapper.MapperRegistry;
 import org.opensearch.indices.recovery.RecoveryState;
-import org.opensearch.indices.replication.SegmentReplicationTargetService;
 import org.opensearch.indices.replication.checkpoint.SegmentReplicationCheckpointPublisher;
 import org.opensearch.plugins.IndexStorePlugin;
 import org.opensearch.script.ScriptService;
@@ -435,8 +434,7 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
         final ShardRouting routing,
         final Consumer<ShardId> globalCheckpointSyncer,
         final RetentionLeaseSyncer retentionLeaseSyncer,
-        final SegmentReplicationCheckpointPublisher checkpointPublisher,
-        final SegmentReplicationTargetService segmentReplicationTargetService
+        final SegmentReplicationCheckpointPublisher checkpointPublisher
     ) throws IOException {
         Objects.requireNonNull(retentionLeaseSyncer);
         /*
@@ -553,8 +551,7 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
                 // TODO Replace with remote translog factory in the follow up PR
                 this.indexSettings.isRemoteTranslogStoreEnabled() ? null : new InternalTranslogFactory(),
                 this.indexSettings.isSegRepEnabled() ? checkpointPublisher : null,
-                remoteStore,
-                segmentReplicationTargetService
+                remoteStore
             );
             eventListener.indexShardStateChanged(indexShard, null, indexShard.state(), "shard created");
             eventListener.afterIndexShardCreated(indexShard);

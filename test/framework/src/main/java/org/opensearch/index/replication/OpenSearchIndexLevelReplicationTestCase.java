@@ -242,16 +242,7 @@ public abstract class OpenSearchIndexLevelReplicationTestCase extends IndexShard
         protected ReplicationGroup(final IndexMetadata indexMetadata, final SegmentReplicationTargetService segmentReplicationTargetService)
             throws IOException {
             final ShardRouting primaryRouting = this.createShardRouting("s0", true);
-            primary = newShard(
-                primaryRouting,
-                indexMetadata,
-                null,
-                getEngineFactory(primaryRouting),
-                () -> {},
-                retentionLeaseSyncer,
-                null,
-                segmentReplicationTargetService
-            );
+            primary = newShard(primaryRouting, indexMetadata, null, getEngineFactory(primaryRouting), () -> {}, retentionLeaseSyncer, null);
             replicas = new CopyOnWriteArrayList<>();
             this.indexMetadata = indexMetadata;
             updateAllocationIDsOnPrimary();
@@ -378,8 +369,7 @@ public abstract class OpenSearchIndexLevelReplicationTestCase extends IndexShard
                 getEngineFactory(replicaRouting),
                 () -> {},
                 retentionLeaseSyncer,
-                null,
-                SegmentReplicationTargetService.NO_OP
+                null
             );
             if (addReplicaTracking) {
                 addReplica(replica);
@@ -400,8 +390,7 @@ public abstract class OpenSearchIndexLevelReplicationTestCase extends IndexShard
                 getEngineFactory(replicaRouting),
                 () -> {},
                 retentionLeaseSyncer,
-                null,
-                SegmentReplicationTargetService.NO_OP
+                null
             );
             addReplica(replica);
             return replica;
@@ -443,8 +432,7 @@ public abstract class OpenSearchIndexLevelReplicationTestCase extends IndexShard
                 () -> {},
                 retentionLeaseSyncer,
                 EMPTY_EVENT_LISTENER,
-                null,
-                SegmentReplicationTargetService.NO_OP
+                null
             );
             replicas.add(newReplica);
             if (replicationTargets != null) {
@@ -530,18 +518,39 @@ public abstract class OpenSearchIndexLevelReplicationTestCase extends IndexShard
         }
 
         public void recoverReplica(IndexShard replica) throws IOException {
-            recoverReplica(replica, (r, sourceNode) -> new RecoveryTarget(r, sourceNode, recoveryListener));
+            this.recoverReplica(replica, SegmentReplicationTargetService.NO_OP);
         }
 
         public void recoverReplica(IndexShard replica, BiFunction<IndexShard, DiscoveryNode, RecoveryTarget> targetSupplier)
             throws IOException {
-            recoverReplica(replica, targetSupplier, true);
+            recoverReplica(
+                replica,
+                targetSupplier,
+                SegmentReplicationTargetService.NO_OP
+            );
+        }
+
+        public void recoverReplica(IndexShard replica, SegmentReplicationTargetService segmentReplicationTargetService) throws IOException {
+            recoverReplica(
+                replica,
+                (r, sourceNode) -> new RecoveryTarget(r, sourceNode, recoveryListener, segmentReplicationTargetService),
+                segmentReplicationTargetService
+            );
         }
 
         public void recoverReplica(
             IndexShard replica,
             BiFunction<IndexShard, DiscoveryNode, RecoveryTarget> targetSupplier,
-            boolean markAsRecovering
+            SegmentReplicationTargetService segmentReplicationTargetService
+        ) throws IOException {
+            recoverReplica(replica, targetSupplier, true, segmentReplicationTargetService);
+        }
+
+        public void recoverReplica(
+            IndexShard replica,
+            BiFunction<IndexShard, DiscoveryNode, RecoveryTarget> targetSupplier,
+            boolean markAsRecovering,
+            SegmentReplicationTargetService segmentReplicationTargetService
         ) throws IOException {
             final IndexShardRoutingTable routingTable = routingTable(Function.identity());
             final Set<String> inSyncIds = activeIds();
@@ -551,7 +560,8 @@ public abstract class OpenSearchIndexLevelReplicationTestCase extends IndexShard
                 targetSupplier,
                 markAsRecovering,
                 inSyncIds,
-                routingTable
+                routingTable,
+                segmentReplicationTargetService
             );
             OpenSearchIndexLevelReplicationTestCase.this.startReplicaAfterRecovery(replica, primary, inSyncIds, routingTable);
             computeReplicationTargets();
@@ -566,7 +576,7 @@ public abstract class OpenSearchIndexLevelReplicationTestCase extends IndexShard
             final BiFunction<IndexShard, DiscoveryNode, RecoveryTarget> targetSupplier
         ) {
             final FutureTask<Void> task = new FutureTask<>(() -> {
-                recoverReplica(replica, targetSupplier);
+                recoverReplica(replica, targetSupplier, SegmentReplicationTargetService.NO_OP);
                 return null;
             });
             threadPool.generic().execute(task);

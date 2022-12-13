@@ -55,7 +55,6 @@ import org.opensearch.ExceptionsHelper;
 import org.opensearch.OpenSearchException;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.ActionRunnable;
-import org.opensearch.action.StepListener;
 import org.opensearch.action.admin.indices.flush.FlushRequest;
 import org.opensearch.action.admin.indices.forcemerge.ForceMergeRequest;
 import org.opensearch.action.admin.indices.upgrade.post.UpgradeRequest;
@@ -163,11 +162,8 @@ import org.opensearch.indices.recovery.RecoveryFailedException;
 import org.opensearch.indices.recovery.RecoveryListener;
 import org.opensearch.indices.recovery.RecoveryState;
 import org.opensearch.indices.recovery.RecoveryTarget;
-import org.opensearch.indices.replication.SegmentReplicationState;
-import org.opensearch.indices.replication.SegmentReplicationTargetService;
 import org.opensearch.indices.replication.checkpoint.ReplicationCheckpoint;
 import org.opensearch.indices.replication.checkpoint.SegmentReplicationCheckpointPublisher;
-import org.opensearch.indices.replication.common.ReplicationFailedException;
 import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.repositories.Repository;
 import org.opensearch.rest.RestStatus;
@@ -329,8 +325,6 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
      */
     private boolean blockInternalCheckPointRefresh;
 
-    private final SegmentReplicationTargetService segmentReplicationTargetService;
-
     public IndexShard(
         final ShardRouting shardRouting,
         final IndexSettings indexSettings,
@@ -354,8 +348,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
         final CircuitBreakerService circuitBreakerService,
         final TranslogFactory translogFactory,
         @Nullable final SegmentReplicationCheckpointPublisher checkpointPublisher,
-        @Nullable final Store remoteStore,
-        @Nullable final SegmentReplicationTargetService segmentReplicationTargetService
+        @Nullable final Store remoteStore
     ) throws IOException {
         super(shardRouting.shardId(), indexSettings);
         assert shardRouting.initializing();
@@ -441,43 +434,6 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
         this.checkpointPublisher = checkpointPublisher;
         this.remoteStore = remoteStore;
         this.translogFactory = translogFactory;
-
-        this.segmentReplicationTargetService = segmentReplicationTargetService;
-    }
-
-    /**
-     * Used with Segment replication only
-     *
-     * This function is used to force a sync target primary node with source (old primary). This is to avoid segment files
-     * conflict with replicas when target is promoted as primary.
-     * @param listener segment replication event listener
-     */
-    public void performSegmentReplicationRefresh(StepListener<Void> listener) {
-        this.segmentReplicationTargetService.startReplication(
-            ReplicationCheckpoint.empty(this.shardId()),
-            this,
-            new SegmentReplicationTargetService.SegmentReplicationListener() {
-                @Override
-                public void onReplicationDone(SegmentReplicationState state) {
-                    try {
-                        indexShardOperationPermits.blockOperations(30, TimeUnit.MINUTES, () -> { resetEngineToGlobalCheckpoint(); });
-                        listener.onResponse(null);
-                    } catch (InterruptedException | TimeoutException | IOException e) {
-                        listener.onFailure(e);
-                        throw new RuntimeException(e);
-                    }
-                }
-
-                @Override
-                public void onReplicationFailure(SegmentReplicationState state, ReplicationFailedException e, boolean sendShardFailure) {
-                    logger.error("segment replication failure post recovery", e);
-                    listener.onFailure(e);
-                    if (sendShardFailure == true) {
-                        failShard("segment replication failure post recovery", e);
-                    }
-                }
-            }
-        );
     }
 
     public ThreadPool getThreadPool() {
@@ -1664,6 +1620,10 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
                 )
             ); // this will run the closeable on the wrapped engine reader
         }
+    }
+
+    public void resetEngine() throws IOException, InterruptedException, TimeoutException {
+        indexShardOperationPermits.blockOperations(30, TimeUnit.MINUTES, () -> { resetEngineToGlobalCheckpoint(); });
     }
 
     /**
@@ -3348,6 +3308,10 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
     }
 
     private EngineConfig newEngineConfig(LongSupplier globalCheckpointSupplier) throws IOException {
+        return this.newEngineConfig(globalCheckpointSupplier, false);
+    }
+
+    private EngineConfig newEngineConfig(LongSupplier globalCheckpointSupplier, boolean forceReadWriteEngine) throws IOException {
         final Sort indexSort = indexSortSupplier.get();
         final Engine.Warmer warmer = reader -> {
             assert Thread.holdsLock(mutex) == false : "warming engine under mutex";
@@ -3365,16 +3329,12 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
         if (this.checkpointPublisher != null && indexSettings.isSegRepEnabled() && shardRouting.primary()) {
             internalRefreshListener.add(new CheckpointRefreshListener(this, this.checkpointPublisher));
         }
-
-        logger.info("--> recoveryState.getStage() {}", recoveryState.getStage());
         /**
          * With segment replication enabled, recover replica shard as read only and primary shard as writeable during
          * translog recovery state. This condition assumes this method is not called during finalize recovery state.
          */
         boolean isReadOnlyReplica = indexSettings.isSegRepEnabled()
-            && (shardRouting.primary() == false
-                || shardRouting.isRelocationTarget() && recoveryState.getStage() != RecoveryState.Stage.TRANSLOG);
-
+            && (shardRouting.primary() == false || (shardRouting.isRelocationTarget() && forceReadWriteEngine == false));
         return this.engineConfigFactory.newEngineConfig(
             shardId,
             threadPool,
@@ -4188,7 +4148,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
                 }
             };
             IOUtils.close(currentEngineReference.getAndSet(readOnlyEngine));
-            newEngineReference.set(engineFactory.newReadWriteEngine(newEngineConfig(replicationTracker)));
+            newEngineReference.set(engineFactory.newReadWriteEngine(newEngineConfig(replicationTracker, true)));
             onNewEngine(newEngineReference.get());
         }
         final TranslogRecoveryRunner translogRunner = (snapshot) -> runTranslogRecovery(

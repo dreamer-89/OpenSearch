@@ -49,6 +49,6 @@ public class FeatureFlags {
      * and false otherwise.
      */
     public static boolean isEnabled(String featureFlagName) {
-        return true;// "true".equalsIgnoreCase(System.getProperty(featureFlagName));
+        return "true".equalsIgnoreCase(System.getProperty(featureFlagName));
     }
 }

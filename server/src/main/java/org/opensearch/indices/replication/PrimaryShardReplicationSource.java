@@ -41,6 +41,12 @@ public class PrimaryShardReplicationSource implements SegmentReplicationSource {
     private final DiscoveryNode targetNode;
     private final String targetAllocationId;
 
+    public DiscoveryNode getSourceNode() {
+        return sourceNode;
+    }
+
+    private final DiscoveryNode sourceNode;
+
     public PrimaryShardReplicationSource(
         DiscoveryNode targetNode,
         String targetAllocationId,
@@ -56,6 +62,7 @@ public class PrimaryShardReplicationSource implements SegmentReplicationSource {
             logger
         );
         this.targetNode = targetNode;
+        this.sourceNode = sourceNode;
     }
 
     @Override

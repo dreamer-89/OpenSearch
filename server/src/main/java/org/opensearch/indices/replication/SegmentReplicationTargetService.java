@@ -50,6 +50,10 @@ public class SegmentReplicationTargetService implements IndexEventListener {
     private final ThreadPool threadPool;
     private final RecoverySettings recoverySettings;
 
+    public ReplicationCollection<SegmentReplicationTarget> getOnGoingReplications() {
+        return onGoingReplications;
+    }
+
     private final ReplicationCollection<SegmentReplicationTarget> onGoingReplications;
 
     private final SegmentReplicationSourceFactory sourceFactory;

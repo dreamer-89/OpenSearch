@@ -49,6 +49,11 @@ import java.util.Map;
 public class SegmentReplicationTarget extends ReplicationTarget {
 
     private final ReplicationCheckpoint checkpoint;
+
+    public SegmentReplicationSource getSource() {
+        return source;
+    }
+
     private final SegmentReplicationSource source;
     private final SegmentReplicationState state;
     protected final MultiFileWriter multiFileWriter;

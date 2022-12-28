@@ -523,11 +523,7 @@ public abstract class OpenSearchIndexLevelReplicationTestCase extends IndexShard
 
         public void recoverReplica(IndexShard replica, BiFunction<IndexShard, DiscoveryNode, RecoveryTarget> targetSupplier)
             throws IOException {
-            recoverReplica(
-                replica,
-                targetSupplier,
-                SegmentReplicationTargetService.NO_OP
-            );
+            recoverReplica(replica, targetSupplier, SegmentReplicationTargetService.NO_OP);
         }
 
         public void recoverReplica(IndexShard replica, SegmentReplicationTargetService segmentReplicationTargetService) throws IOException {

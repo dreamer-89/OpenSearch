@@ -829,9 +829,7 @@ public abstract class RecoverySourceHandler {
                 cancellableThreads.execute(
                     () -> shard.relocated(
                         request.targetAllocationId(),
-                        recoveryTarget::handoffPrimaryContext,
-                        forceSegRepConsumer,
-                        handoffListener
+                        recoveryTarget::handoffPrimaryContext
                     )
                 );
                 /*

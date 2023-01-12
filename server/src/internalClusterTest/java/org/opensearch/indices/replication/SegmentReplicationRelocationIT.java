@@ -16,6 +16,8 @@ import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.WriteRequest;
 import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.metadata.IndexMetadata;
+import org.opensearch.cluster.routing.RoutingNode;
+import org.opensearch.cluster.routing.ShardRouting;
 import org.opensearch.cluster.routing.ShardRoutingState;
 import org.opensearch.cluster.routing.allocation.command.MoveAllocationCommand;
 import org.opensearch.common.Priority;
@@ -29,6 +31,8 @@ import org.opensearch.transport.TransportService;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
 import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertHitCount;
@@ -49,6 +53,115 @@ public class SegmentReplicationRelocationIT extends SegmentReplicationIT {
                 .put(IndexMetadata.SETTING_REPLICATION_TYPE, ReplicationType.SEGMENT)
                 .put("index.number_of_replicas", 1)
         ).get();
+    }
+
+    private void createIndex(String idxName, int shardCount, int replicaCount) {
+        prepareCreate(
+            idxName,
+            Settings.builder()
+                .put("index.number_of_shards", shardCount)
+                .put(IndexModule.INDEX_QUERY_CACHE_ENABLED_SETTING.getKey(), false)
+                .put(IndexMetadata.SETTING_REPLICATION_TYPE, ReplicationType.SEGMENT)
+                .put("index.number_of_replicas", replicaCount)
+        ).get();
+    }
+
+    public void testShardAllocation() {
+        // Start 3 node cluster
+        internalCluster().startNodes(3, featureFlagSettings());
+        int numberOfIndices = 4;
+        ShardAllocations shardAllocations = new ShardAllocations();
+        ClusterState state;
+        for (int i = 0; i < numberOfIndices; i++) {
+            int shardCount = 5; // randomIntBetween(1, 5);
+            int replicaCount = 1; //randomIntBetween(0, 2);
+            createIndex("test" + i, shardCount, replicaCount);
+            state = client().admin().cluster().prepareState().execute().actionGet().getState();
+            shardAllocations.setState(state);
+            logger.info("{}", shardAllocations.toString());
+        }
+    }
+    /*
+    NODE_T0
+P: 4
+R: 7
+NODE_T1
+P: 8
+R: 4
+NODE_T2
+P: 8
+R: 4
+Unassigned
+P: 0
+R: 5
+     */
+
+    class ShardAllocations {
+        ClusterState state;
+
+        public static final String separator = "==============================";
+        public static final String ONE_LINE_RETURN = "\n";
+        public static final String TWO_LINE_RETURN = "\n\n";
+        public static final String THREE_LINE_RETURN = "\n\n\n";
+
+        // Use treemap so that each iteration shows same ordering of nodes
+        TreeMap<String, int[]> map;
+
+        TreeMap<String, String> nameToNodeId;
+
+        int[] unassigned;
+
+        int[] totalShards;
+
+        public final String printShardAllocationWithHeader(String header, int primary, int replica) {
+            StringBuffer sb = new StringBuffer();
+            sb.append(header + ONE_LINE_RETURN);
+            sb.append("P: " + primary + ONE_LINE_RETURN);
+            sb.append("R: " + replica + ONE_LINE_RETURN);
+            return sb.toString();
+        }
+
+        public void setState(ClusterState state) {
+            map = new TreeMap<>(); // clear state on new cluster state
+            nameToNodeId = new TreeMap<>();
+            totalShards = new int[]{0, 0};
+            unassigned = new int[]{0, 0};
+            this.state = state;
+            buildMap();
+        }
+
+        private void buildMap() {
+            for(RoutingNode node: state.getRoutingNodes()) {
+                nameToNodeId.putIfAbsent(node.node().getName(), node.nodeId());
+            }
+            for (ShardRouting shardRouting : state.routingTable().allShards()) {
+                int[] shard = shardRouting.assignedToNode()
+                    ? map.getOrDefault(shardRouting.currentNodeId(), new int[] { 0, 0 })
+                    : unassigned;
+                if (shardRouting.primary()) shard[0]++;
+                else shard[1]++;
+
+                if (shardRouting.assignedToNode()) map.put(shardRouting.currentNodeId(), shard);
+
+                if (shardRouting.primary()) totalShards[0]++; else totalShards[1]++;
+            }
+        }
+
+        @Override
+        public String toString() {
+            StringBuffer sb = new StringBuffer();
+            sb.append(TWO_LINE_RETURN + separator + ONE_LINE_RETURN);
+            sb.append(printShardAllocationWithHeader("Total Shards", totalShards[0], totalShards[1]) + ONE_LINE_RETURN);
+            for (Map.Entry<String, String> entry : nameToNodeId.entrySet()) {
+                String nodeId = nameToNodeId.get(entry.getKey());
+                int[] shard = map.get(nodeId);
+                if (shard == null) shard = new int[2];
+                sb.append(printShardAllocationWithHeader(entry.getKey().toUpperCase(), shard[0], shard[1]));
+            }
+            sb.append(printShardAllocationWithHeader("Unassigned", unassigned[0], unassigned[1]));
+            sb.append(ONE_LINE_RETURN);
+            return sb.toString();
+        }
     }
 
     /**

@@ -69,32 +69,23 @@ public class SegmentReplicationRelocationIT extends SegmentReplicationIT {
     public void testShardAllocation() {
         // Start 3 node cluster
         internalCluster().startNodes(3, featureFlagSettings());
-        int numberOfIndices = 4;
+        int numberOfIndices = 20;
         ShardAllocations shardAllocations = new ShardAllocations();
         ClusterState state;
         for (int i = 0; i < numberOfIndices; i++) {
-            int shardCount = 5; // randomIntBetween(1, 5);
-            int replicaCount = 1; //randomIntBetween(0, 2);
+            int shardCount = 10;//randomIntBetween(1, 5);
+            int replicaCount = 2;//randomIntBetween(0, 2);
             createIndex("test" + i, shardCount, replicaCount);
             state = client().admin().cluster().prepareState().execute().actionGet().getState();
             shardAllocations.setState(state);
             logger.info("{}", shardAllocations.toString());
         }
+        // Wait for all shards to be STARTED and evaluate final allocation.
+        ensureGreen();
+        state = client().admin().cluster().prepareState().execute().actionGet().getState();
+        shardAllocations.setState(state);
+        logger.info("{}", shardAllocations.toString());
     }
-    /*
-    NODE_T0
-P: 4
-R: 7
-NODE_T1
-P: 8
-R: 4
-NODE_T2
-P: 8
-R: 4
-Unassigned
-P: 0
-R: 5
-     */
 
     class ShardAllocations {
         ClusterState state;
@@ -104,11 +95,21 @@ R: 5
         public static final String TWO_LINE_RETURN = "\n\n";
         public static final String THREE_LINE_RETURN = "\n\n\n";
 
-        // Use treemap so that each iteration shows same ordering of nodes
+        /**
+         Use treemap so that each iteration shows same ordering of nodes.
+         String: NodeId
+         int[]: tuple storing primary shard count in 0 index and replica's in 1
+         */
         TreeMap<String, int[]> map;
 
+        /**
+         * Helper map containing NodeName to Node Id
+         */
         TreeMap<String, String> nameToNodeId;
 
+        /*
+        Unassigned array containing primary at 0, replica at 1
+         */
         int[] unassigned;
 
         int[] totalShards;
@@ -135,14 +136,18 @@ R: 5
                 nameToNodeId.putIfAbsent(node.node().getName(), node.nodeId());
             }
             for (ShardRouting shardRouting : state.routingTable().allShards()) {
+                // Fetch shard to update. Initialize local array
                 int[] shard = shardRouting.assignedToNode()
                     ? map.getOrDefault(shardRouting.currentNodeId(), new int[] { 0, 0 })
                     : unassigned;
+                // Update shard type count
                 if (shardRouting.primary()) shard[0]++;
                 else shard[1]++;
 
+                // For assigned shards, put back counter
                 if (shardRouting.assignedToNode()) map.put(shardRouting.currentNodeId(), shard);
 
+                // Update the total shard count
                 if (shardRouting.primary()) totalShards[0]++; else totalShards[1]++;
             }
         }

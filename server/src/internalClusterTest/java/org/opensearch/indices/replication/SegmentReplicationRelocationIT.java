@@ -16,6 +16,7 @@ import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.WriteRequest;
 import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.metadata.IndexMetadata;
+import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.routing.RoutingNode;
 import org.opensearch.cluster.routing.ShardRouting;
 import org.opensearch.cluster.routing.ShardRoutingState;
@@ -30,6 +31,7 @@ import org.opensearch.test.transport.MockTransportService;
 import org.opensearch.transport.TransportService;
 
 import java.util.ArrayList;
+import java.util.Formatter;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -55,27 +57,34 @@ public class SegmentReplicationRelocationIT extends SegmentReplicationIT {
         ).get();
     }
 
-    private void createIndex(String idxName, int shardCount, int replicaCount) {
+    private void createIndex(String idxName, int shardCount, int replicaCount, boolean isSegRep) {
+        Settings.Builder builder = Settings.builder()
+            .put("index.number_of_shards", shardCount)
+            .put(IndexModule.INDEX_QUERY_CACHE_ENABLED_SETTING.getKey(), false)
+            .put("index.number_of_replicas", replicaCount);
+        if (isSegRep) {
+            builder = builder.put(IndexMetadata.SETTING_REPLICATION_TYPE, ReplicationType.SEGMENT);
+        } else {
+            builder = builder.put(IndexMetadata.SETTING_REPLICATION_TYPE, ReplicationType.DOCUMENT);
+        }
         prepareCreate(
             idxName,
-            Settings.builder()
-                .put("index.number_of_shards", shardCount)
-                .put(IndexModule.INDEX_QUERY_CACHE_ENABLED_SETTING.getKey(), false)
-                .put(IndexMetadata.SETTING_REPLICATION_TYPE, ReplicationType.SEGMENT)
-                .put("index.number_of_replicas", replicaCount)
+            builder
         ).get();
     }
 
     public void testShardAllocation() {
         // Start 3 node cluster
-        internalCluster().startNodes(3, featureFlagSettings());
-        int numberOfIndices = 20;
+        internalCluster().startNodes(7, featureFlagSettings());
+        int numberOfIndices = 40;
         ShardAllocations shardAllocations = new ShardAllocations();
         ClusterState state;
+        int segrepCount =0;
         for (int i = 0; i < numberOfIndices; i++) {
-            int shardCount = 10;//randomIntBetween(1, 5);
-            int replicaCount = 2;//randomIntBetween(0, 2);
-            createIndex("test" + i, shardCount, replicaCount);
+            int shardCount = 5;//randomIntBetween(1, 5);
+            int replicaCount = 1;//randomIntBetween(0, 2);
+            createIndex("test" + i, shardCount, replicaCount, i%2 == 0);
+            ensureGreen();
             state = client().admin().cluster().prepareState().execute().actionGet().getState();
             shardAllocations.setState(state);
             logger.info("{}", shardAllocations.toString());
@@ -90,22 +99,23 @@ public class SegmentReplicationRelocationIT extends SegmentReplicationIT {
     class ShardAllocations {
         ClusterState state;
 
-        public static final String separator = "==============================";
+        public static final String separator = "===================================================";
         public static final String ONE_LINE_RETURN = "\n";
         public static final String TWO_LINE_RETURN = "\n\n";
-        public static final String THREE_LINE_RETURN = "\n\n\n";
 
         /**
          Use treemap so that each iteration shows same ordering of nodes.
          String: NodeId
-         int[]: tuple storing primary shard count in 0 index and replica's in 1
+         int[]: tuple storing primary shard count in 0 index and replica's in 1 for segrep enabled indices
          */
-        TreeMap<String, int[]> map;
+        TreeMap<String, int[]> nodeToSegRepCountMap = new TreeMap<>();
+
+        TreeMap<String, int[]> nodeToDocRepCountMap = new TreeMap<>();
 
         /**
          * Helper map containing NodeName to Node Id
          */
-        TreeMap<String, String> nameToNodeId;
+        TreeMap<String, String> nameToNodeId = new TreeMap<>();
 
         /*
         Unassigned array containing primary at 0, replica at 1
@@ -114,19 +124,25 @@ public class SegmentReplicationRelocationIT extends SegmentReplicationIT {
 
         int[] totalShards;
 
-        public final String printShardAllocationWithHeader(String header, int primary, int replica) {
+        public final String printShardAllocationWithHeader(String nodeName, int[] docrep, int[] segrep) {
             StringBuffer sb = new StringBuffer();
-            sb.append(header + ONE_LINE_RETURN);
-            sb.append("P: " + primary + ONE_LINE_RETURN);
-            sb.append("R: " + replica + ONE_LINE_RETURN);
+            Formatter formatter = new Formatter(sb);
+//            formatter.format("%-10s\n", nodeName);
+            formatter.format("%-20s %-20s %-20s\n", "P", docrep[0], segrep[0]);
+            formatter.format("%-20s %-20s %-20s\n", "R", docrep[1], segrep[1]);
+//            formatter.format("%-19s %-20s %-20s\n", "", "---", "---");
+//            formatter.format("%-20s %-20s %-20s\n", "", docrep[0] + docrep[1], segrep[1] + segrep[0]);
             return sb.toString();
         }
-
-        public void setState(ClusterState state) {
-            map = new TreeMap<>(); // clear state on new cluster state
+        public void reset() {
+            nodeToSegRepCountMap.clear();
+            nodeToDocRepCountMap.clear();
             nameToNodeId = new TreeMap<>();
             totalShards = new int[]{0, 0};
             unassigned = new int[]{0, 0};
+        }
+        public void setState(ClusterState state) {
+            this.reset();
             this.state = state;
             buildMap();
         }
@@ -134,37 +150,57 @@ public class SegmentReplicationRelocationIT extends SegmentReplicationIT {
         private void buildMap() {
             for(RoutingNode node: state.getRoutingNodes()) {
                 nameToNodeId.putIfAbsent(node.node().getName(), node.nodeId());
+                nodeToSegRepCountMap.putIfAbsent(node.nodeId(), new int[]{0, 0});
+                nodeToDocRepCountMap.putIfAbsent(node.nodeId(), new int[]{0, 0});
             }
             for (ShardRouting shardRouting : state.routingTable().allShards()) {
                 // Fetch shard to update. Initialize local array
-                int[] shard = shardRouting.assignedToNode()
-                    ? map.getOrDefault(shardRouting.currentNodeId(), new int[] { 0, 0 })
-                    : unassigned;
-                // Update shard type count
-                if (shardRouting.primary()) shard[0]++;
-                else shard[1]++;
-
-                // For assigned shards, put back counter
-                if (shardRouting.assignedToNode()) map.put(shardRouting.currentNodeId(), shard);
-
-                // Update the total shard count
-                if (shardRouting.primary()) totalShards[0]++; else totalShards[1]++;
+                if (isIndexSegRep(shardRouting.getIndexName())) {
+                    updateMap(nodeToSegRepCountMap, shardRouting);
+                } else {
+                    updateMap(nodeToDocRepCountMap, shardRouting);
+                }
             }
+        }
+
+        void updateMap(TreeMap<String, int[]> mapToUpdate, ShardRouting shardRouting) {
+            int[] shard;
+            shard = shardRouting.assignedToNode()
+                ? mapToUpdate.get(shardRouting.currentNodeId())
+                : unassigned;
+            // Update shard type count
+            if (shardRouting.primary()) {
+                shard[0]++;
+                totalShards[0]++;
+            } else {
+                shard[1]++;
+                totalShards[1]++;
+            }
+            // For assigned shards, put back counter
+            if (shardRouting.assignedToNode()) mapToUpdate.put(shardRouting.currentNodeId(), shard);
+        }
+
+        boolean isIndexSegRep(String indexName) {
+            return state.metadata().index(indexName)
+                .getSettings()
+                .get(IndexMetadata.INDEX_REPLICATION_TYPE_SETTING.getKey())
+                .equals(ReplicationType.SEGMENT.toString());
         }
 
         @Override
         public String toString() {
             StringBuffer sb = new StringBuffer();
             sb.append(TWO_LINE_RETURN + separator + ONE_LINE_RETURN);
-            sb.append(printShardAllocationWithHeader("Total Shards", totalShards[0], totalShards[1]) + ONE_LINE_RETURN);
+            Formatter formatter = new Formatter(sb);
+//            formatter.format("%-20s %-20s %-20s\n", "", "DOCREP", "SEGREP");
             for (Map.Entry<String, String> entry : nameToNodeId.entrySet()) {
                 String nodeId = nameToNodeId.get(entry.getKey());
-                int[] shard = map.get(nodeId);
-                if (shard == null) shard = new int[2];
-                sb.append(printShardAllocationWithHeader(entry.getKey().toUpperCase(), shard[0], shard[1]));
+                formatter.format("%-20s %-20s %-20s\n", entry.getKey().toUpperCase(), "DOCREP", "SEGREP");
+                sb.append(printShardAllocationWithHeader(entry.getKey().toUpperCase(), nodeToDocRepCountMap.get(nodeId), nodeToSegRepCountMap.get(nodeId)));
             }
-            sb.append(printShardAllocationWithHeader("Unassigned", unassigned[0], unassigned[1]));
             sb.append(ONE_LINE_RETURN);
+            formatter.format("%-20s %-20s %-20s\n\n", "Unassigned ", unassigned[0], unassigned[1]);
+            formatter.format("%-20s %-20s %-20s\n\n", "Total Shards", totalShards[0], totalShards[1]);
             return sb.toString();
         }
     }

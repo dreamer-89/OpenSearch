@@ -44,6 +44,7 @@ import org.opensearch.index.translog.Translog;
 
 import java.util.List;
 import java.util.concurrent.Executor;
+import java.util.function.Function;
 
 /**
  * Wraps a {@link RecoveryTarget} to make all remote calls to be executed asynchronously using the provided {@code executor}.
@@ -52,14 +53,42 @@ public class AsyncRecoveryTarget implements RecoveryTargetHandler {
     private final RecoveryTargetHandler target;
     private final Executor executor;
 
+    private final IndexShard primary;
+
+    private final IndexShard replica;
+
+    private final Function<List<IndexShard>, List<SegmentReplicationTarget>> replicatePrimaryFunction;
+
     public AsyncRecoveryTarget(RecoveryTargetHandler target, Executor executor) {
         this.executor = executor;
         this.target = target;
+        this.primary = null;
+        this.replica = null;
+        this.replicatePrimaryFunction = (a) -> null;
+    }
+
+    public AsyncRecoveryTarget(
+        RecoveryTargetHandler target,
+        Executor executor,
+        IndexShard primary,
+        IndexShard replica,
+        Function<List<IndexShard>, List<SegmentReplicationTarget>> replicatePrimaryFunction
+    ) {
+        this.executor = executor;
+        this.target = target;
+        this.primary = primary;
+        this.replica = replica;
+        this.replicatePrimaryFunction = replicatePrimaryFunction;
     }
 
     @Override
     public void prepareForTranslogOperations(int totalTranslogOps, ActionListener<Void> listener) {
         executor.execute(() -> target.prepareForTranslogOperations(totalTranslogOps, listener));
+    }
+
+    @Override
+    public void forceSegmentFileSync() {
+        this.replicatePrimaryFunction.apply(List.of(primary, replica));
     }
 
     @Override

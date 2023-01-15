@@ -67,6 +67,7 @@ import org.opensearch.common.blobstore.fs.FsBlobContainer;
 import org.opensearch.common.blobstore.fs.FsBlobStore;
 import org.opensearch.common.bytes.BytesArray;
 import org.opensearch.common.concurrent.GatedCloseable;
+import org.opensearch.common.lease.Releasable;
 import org.opensearch.common.lucene.uid.Versions;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Settings;
@@ -149,11 +150,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.hamcrest.Matchers.contains;
@@ -245,6 +248,12 @@ public abstract class IndexShardTestCase extends OpenSearchTestCase {
 
     protected Store createStore(ShardId shardId, IndexSettings indexSettings, Directory directory) throws IOException {
         return new Store(shardId, indexSettings, directory, new DummyShardLock(shardId));
+    }
+
+    protected Releasable acquirePrimaryOperationPermitBlockingly(IndexShard indexShard) throws ExecutionException, InterruptedException {
+        PlainActionFuture<Releasable> fut = new PlainActionFuture<>();
+        indexShard.acquirePrimaryOperationPermit(fut, ThreadPool.Names.WRITE, "");
+        return fut.get();
     }
 
     /**
@@ -836,7 +845,34 @@ public abstract class IndexShardTestCase extends OpenSearchTestCase {
 
     /** recovers a replica from the given primary **/
     protected void recoverReplica(IndexShard replica, IndexShard primary, boolean startReplica) throws IOException {
-        recoverReplica(replica, primary, (r, sourceNode) -> new RecoveryTarget(r, sourceNode, recoveryListener), true, startReplica);
+        recoverReplica(replica, primary, startReplica, (a) -> null);
+    }
+
+    /** recovers a replica from the given primary **/
+    protected void recoverReplica(
+        IndexShard replica,
+        IndexShard primary,
+        boolean startReplica,
+        Function<List<IndexShard>, List<SegmentReplicationTarget>> replicatePrimaryFunction
+    ) throws IOException {
+        recoverReplica(
+            replica,
+            primary,
+            (r, sourceNode) -> new RecoveryTarget(r, sourceNode, recoveryListener),
+            true,
+            startReplica,
+            replicatePrimaryFunction
+        );
+    }
+
+    protected void recoverReplica(
+        final IndexShard replica,
+        final IndexShard primary,
+        final BiFunction<IndexShard, DiscoveryNode, RecoveryTarget> targetSupplier,
+        final boolean markAsRecovering,
+        final boolean markAsStarted
+    ) throws IOException {
+        recoverReplica(replica, primary, targetSupplier, markAsRecovering, markAsStarted, (a) -> null);
     }
 
     /** recovers a replica from the given primary **/
@@ -845,7 +881,8 @@ public abstract class IndexShardTestCase extends OpenSearchTestCase {
         final IndexShard primary,
         final BiFunction<IndexShard, DiscoveryNode, RecoveryTarget> targetSupplier,
         final boolean markAsRecovering,
-        final boolean markAsStarted
+        final boolean markAsStarted,
+        final Function<List<IndexShard>, List<SegmentReplicationTarget>> replicatePrimaryFunction
     ) throws IOException {
         IndexShardRoutingTable.Builder newRoutingTable = new IndexShardRoutingTable.Builder(replica.shardId());
         newRoutingTable.addShard(primary.routingEntry());
@@ -854,7 +891,7 @@ public abstract class IndexShardTestCase extends OpenSearchTestCase {
         }
         final Set<String> inSyncIds = Collections.singleton(primary.routingEntry().allocationId().getId());
         final IndexShardRoutingTable routingTable = newRoutingTable.build();
-        recoverUnstartedReplica(replica, primary, targetSupplier, markAsRecovering, inSyncIds, routingTable);
+        recoverUnstartedReplica(replica, primary, targetSupplier, markAsRecovering, inSyncIds, replicatePrimaryFunction);
         if (markAsStarted) {
             startReplicaAfterRecovery(replica, primary, inSyncIds, routingTable);
         }
@@ -877,7 +914,8 @@ public abstract class IndexShardTestCase extends OpenSearchTestCase {
         final BiFunction<IndexShard, DiscoveryNode, RecoveryTarget> targetSupplier,
         final boolean markAsRecovering,
         final Set<String> inSyncIds,
-        final IndexShardRoutingTable routingTable
+        final IndexShardRoutingTable routingTable,
+        final Function<List<IndexShard>, List<SegmentReplicationTarget>> replicatePrimaryFunction
     ) throws IOException {
         final DiscoveryNode pNode = getFakeDiscoNode(primary.routingEntry().currentNodeId());
         final DiscoveryNode rNode = getFakeDiscoNode(replica.routingEntry().currentNodeId());

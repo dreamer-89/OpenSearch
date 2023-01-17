@@ -136,7 +136,7 @@ public class SegmentReplicationSourceService extends AbstractLifecycleComponent 
                 new CheckpointInfoResponse(copyState.getCheckpoint(), copyState.getMetadataMap(), copyState.getInfosBytes())
             );
             timer.stop();
-            logger.trace(
+            logger.info(
                 new ParameterizedMessage(
                     "[replication id {}] Source node sent checkpoint info [{}] to target node [{}], timing: {}",
                     request.getReplicationId(),
@@ -151,6 +151,7 @@ public class SegmentReplicationSourceService extends AbstractLifecycleComponent 
     private class GetSegmentFilesRequestHandler implements TransportRequestHandler<GetSegmentFilesRequest> {
         @Override
         public void messageReceived(GetSegmentFilesRequest request, TransportChannel channel, Task task) throws Exception {
+            logger.info("--> Received get segment files");
             ongoingSegmentReplications.startSegmentCopy(request, new ChannelActionListener<>(channel, Actions.GET_SEGMENT_FILES, request));
         }
     }

@@ -45,6 +45,7 @@ import org.opensearch.index.store.Store;
 import org.opensearch.index.store.StoreFileMetadata;
 import org.opensearch.index.translog.Translog;
 import org.opensearch.indices.replication.RemoteSegmentFileChunkWriter;
+import org.opensearch.indices.replication.SegmentReplicationTargetService;
 import org.opensearch.transport.EmptyTransportResponseHandler;
 import org.opensearch.transport.TransportRequestOptions;
 import org.opensearch.transport.TransportResponse;

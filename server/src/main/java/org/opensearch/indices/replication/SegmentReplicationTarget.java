@@ -159,7 +159,7 @@ public class SegmentReplicationTarget extends ReplicationTarget {
         final StepListener<Void> finalizeListener = new StepListener<>();
 
         cancellableThreads.checkForCancel();
-        logger.trace("[shardId {}] Replica starting replication [id {}]", shardId().getId(), getId());
+        logger.info("[shardId {}] Replica starting replication [id {}]", shardId().getId(), getId());
         // Get list of files to copy from this checkpoint.
         state.setStage(SegmentReplicationState.Stage.GET_CHECKPOINT_INFO);
         source.getCheckpointMetadata(getId(), checkpoint, checkpointInfoListener);
@@ -177,7 +177,7 @@ public class SegmentReplicationTarget extends ReplicationTarget {
         cancellableThreads.checkForCancel();
         state.setStage(SegmentReplicationState.Stage.FILE_DIFF);
         final Store.RecoveryDiff diff = Store.segmentReplicationDiff(checkpointInfo.getMetadataMap(), getMetadataMap());
-        logger.trace("Replication diff {}", diff);
+        logger.info("Replication diff {}", diff);
         /*
          * Segments are immutable. So if the replica has any segments with the same name that differ from the one in the incoming
          * snapshot from source that means the local copy of the segment has been corrupted/changed in some way and we throw an
@@ -217,6 +217,7 @@ public class SegmentReplicationTarget extends ReplicationTarget {
                     responseCheckpoint.getSegmentsGen()
                 );
                 cancellableThreads.checkForCancel();
+                logger.info("--> responseCheckpoint {}", responseCheckpoint);
                 indexShard.finalizeReplication(infos, responseCheckpoint.getSeqNo());
                 store.cleanupAndPreserveLatestCommitPoint("finalize - clean with in memory infos", infos);
             } catch (CorruptIndexException | IndexFormatTooNewException | IndexFormatTooOldException ex) {
@@ -232,7 +233,7 @@ public class SegmentReplicationTarget extends ReplicationTarget {
                         Lucene.cleanLuceneIndex(store.directory()); // clean up and delete all files
                     }
                 } catch (Exception e) {
-                    logger.debug("Failed to clean lucene index", e);
+                    logger.info("Failed to clean lucene index", e);
                     ex.addSuppressed(e);
                 }
                 ReplicationFailedException rfe = new ReplicationFailedException(

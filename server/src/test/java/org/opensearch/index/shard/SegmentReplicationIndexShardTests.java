@@ -11,6 +11,7 @@ package org.opensearch.index.shard;
 import org.apache.lucene.index.IndexCommit;
 import org.apache.lucene.index.SegmentInfos;
 import org.junit.Assert;
+import org.opensearch.ExceptionsHelper;
 import org.opensearch.OpenSearchException;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.delete.DeleteRequest;
@@ -36,6 +37,7 @@ import org.opensearch.index.replication.OpenSearchIndexLevelReplicationTestCase;
 import org.opensearch.index.store.Store;
 import org.opensearch.index.store.StoreFileMetadata;
 import org.opensearch.indices.recovery.RecoverySettings;
+import org.opensearch.indices.recovery.RecoveryTarget;
 import org.opensearch.indices.replication.CheckpointInfoResponse;
 import org.opensearch.indices.replication.GetSegmentFilesResponse;
 import org.opensearch.indices.replication.SegmentReplicationSource;
@@ -46,6 +48,8 @@ import org.opensearch.indices.replication.SegmentReplicationTargetService;
 import org.opensearch.indices.replication.checkpoint.SegmentReplicationCheckpointPublisher;
 import org.opensearch.indices.replication.checkpoint.ReplicationCheckpoint;
 import org.opensearch.indices.replication.common.CopyState;
+import org.opensearch.indices.replication.common.ReplicationListener;
+import org.opensearch.indices.replication.common.ReplicationState;
 import org.opensearch.indices.replication.common.ReplicationType;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
@@ -62,6 +66,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 import static java.util.Arrays.asList;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasToString;
 import static org.hamcrest.Matchers.instanceOf;
@@ -357,7 +362,7 @@ public class SegmentReplicationIndexShardTests extends OpenSearchIndexLevelRepli
                     }
 
                     @Override
-                    public void onFailure(ReplicationState state, ReplicationFailedException e, boolean sendShardFailure) {
+                    public void onFailure(ReplicationState state, OpenSearchException e, boolean sendShardFailure) {
                         assertEquals(ExceptionsHelper.unwrap(e, IOException.class).getMessage(), "Expected failure");
                     }
                 }),
@@ -941,7 +946,8 @@ public class SegmentReplicationIndexShardTests extends OpenSearchIndexLevelRepli
             threadPool,
             new RecoverySettings(Settings.EMPTY, new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)),
             mock(TransportService.class),
-            sourceFactory
+            sourceFactory,
+            null
         );
     }
 

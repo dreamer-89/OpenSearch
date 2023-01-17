@@ -1624,6 +1624,20 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
     }
 
     /**
+     * Used with segment replication during relocation handoff, this method updates current read only engine to global
+     * checkpoint followed by changing to writeable engine
+     *
+     * @throws IOException
+     * @throws InterruptedException
+     * @throws TimeoutException
+     *
+     * @opensearch.internal
+     */
+    public void resetToWriteableEngine() throws IOException, InterruptedException, TimeoutException {
+        indexShardOperationPermits.blockOperations(30, TimeUnit.MINUTES, () -> { resetEngineToGlobalCheckpoint(); });
+    }
+
+    /**
      * Wrapper for a non-closing reader
      *
      * @opensearch.internal

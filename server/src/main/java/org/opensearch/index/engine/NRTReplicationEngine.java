@@ -128,6 +128,8 @@ public class NRTReplicationEngine extends Engine implements LifecycleAware {
         try (ReleasableLock lock = writeLock.acquire()) {
             final long incomingGeneration = infos.getGeneration();
             readerManager.updateSegments(infos);
+            logger.info("--> infos.totalMaxDoc {}", infos.totalMaxDoc());
+            logger.info("--> Generation diff incoming {} lastReceivedGen {}", incomingGeneration, lastReceivedGen);
 
             // Commit and roll the translog when we receive a different generation than what was last received.
             // lower/higher gens are possible from a new primary that was just elected.
@@ -137,6 +139,7 @@ public class NRTReplicationEngine extends Engine implements LifecycleAware {
                 translogManager.rollTranslogGeneration();
             }
             lastReceivedGen = incomingGeneration;
+            logger.info("--> FastForwarding processed seq no current {} New {}", localCheckpointTracker.getProcessedCheckpoint(), seqNo);
             localCheckpointTracker.fastForwardProcessedSeqNo(seqNo);
         }
     }

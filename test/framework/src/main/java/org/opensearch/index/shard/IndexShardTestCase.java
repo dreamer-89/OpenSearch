@@ -891,7 +891,7 @@ public abstract class IndexShardTestCase extends OpenSearchTestCase {
         }
         final Set<String> inSyncIds = Collections.singleton(primary.routingEntry().allocationId().getId());
         final IndexShardRoutingTable routingTable = newRoutingTable.build();
-        recoverUnstartedReplica(replica, primary, targetSupplier, markAsRecovering, inSyncIds, replicatePrimaryFunction);
+        recoverUnstartedReplica(replica, primary, targetSupplier, markAsRecovering, inSyncIds, routingTable, replicatePrimaryFunction);
         if (markAsStarted) {
             startReplicaAfterRecovery(replica, primary, inSyncIds, routingTable);
         }
@@ -949,7 +949,7 @@ public abstract class IndexShardTestCase extends OpenSearchTestCase {
         recoverySettings.setChunkSize(new ByteSizeValue(fileChunkSizeInBytes));
         final RecoverySourceHandler recovery = RecoverySourceHandlerFactory.create(
             primary,
-            new AsyncRecoveryTarget(recoveryTarget, threadPool.generic()),
+            new AsyncRecoveryTarget(recoveryTarget, threadPool.generic(), primary, replica, replicatePrimaryFunction),
             request,
             recoverySettings
         );
@@ -1271,7 +1271,8 @@ public abstract class IndexShardTestCase extends OpenSearchTestCase {
             threadPool,
             new RecoverySettings(Settings.EMPTY, new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)),
             mock(TransportService.class),
-            sourceFactory
+            sourceFactory,
+            null
         );
         final SegmentReplicationSource replicationSource = new SegmentReplicationSource() {
             @Override

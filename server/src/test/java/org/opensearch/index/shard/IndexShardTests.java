@@ -141,6 +141,7 @@ import org.opensearch.indices.fielddata.cache.IndicesFieldDataCache;
 import org.opensearch.indices.recovery.RecoveryState;
 import org.opensearch.indices.recovery.RecoveryTarget;
 import org.opensearch.indices.replication.checkpoint.SegmentReplicationCheckpointPublisher;
+import org.opensearch.indices.replication.common.ReplicationFailedException;
 import org.opensearch.indices.replication.common.ReplicationLuceneIndex;
 import org.opensearch.indices.replication.common.ReplicationType;
 import org.opensearch.repositories.IndexId;
@@ -2110,12 +2111,14 @@ public class IndexShardTests extends IndexShardTestCase {
         final ShardRouting originalRouting = shard.routingEntry();
         final ShardRouting routing = ShardRoutingHelper.relocate(originalRouting, "other_node");
         IndexShardTestCase.updateRoutingEntry(shard, routing);
-        ReplicationFailedException segRepException = expectThrows(
-            ReplicationFailedException.class,
+        OpenSearchException segRepException = expectThrows(
+            OpenSearchException.class,
             () -> shard.relocated(
                 routing.getTargetRelocatingShard().allocationId().getId(),
                 primaryContext -> {},
-                () -> { throw new ReplicationFailedException("Segment replication failed"); }
+                () -> {
+                    throw new OpenSearchException("Segment replication failed");
+                }
             )
         );
         assertTrue(segRepException.getMessage().equals("Segment replication failed"));

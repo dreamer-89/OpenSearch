@@ -32,6 +32,8 @@
 
 package org.opensearch.index.shard;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opensearch.Assertions;
 import org.opensearch.ExceptionsHelper;
 import org.opensearch.action.ActionListener;
@@ -69,6 +71,7 @@ import java.util.stream.Collectors;
  */
 final class IndexShardOperationPermits implements Closeable {
 
+    Logger logger = LogManager.getLogger(IndexShardOperationPermits.class);
     private final ShardId shardId;
     private final ThreadPool threadPool;
 
@@ -119,8 +122,10 @@ final class IndexShardOperationPermits implements Closeable {
         throws InterruptedException, TimeoutException, E {
         delayOperations();
         try (Releasable ignored = acquireAll(timeout, timeUnit)) {
+            logger.info("--> Starting the runnable");
             onBlocked.run();
         } finally {
+            logger.info("--> Runnable completed");
             releaseDelayedOperations();
         }
     }
@@ -198,6 +203,7 @@ final class IndexShardOperationPermits implements Closeable {
             assert queuedBlockOperations > 0;
             queuedBlockOperations--;
             if (queuedBlockOperations == 0) {
+                logger.info("--> delayed operation {}", delayedOperations.size());
                 queuedActions = new ArrayList<>(delayedOperations);
                 delayedOperations.clear();
             } else {
@@ -216,6 +222,7 @@ final class IndexShardOperationPermits implements Closeable {
              */
             threadPool.executor(ThreadPool.Names.GENERIC).execute(() -> {
                 for (DelayedOperation queuedAction : queuedActions) {
+                    logger.info("--> Running queued operation {}", queuedAction.debugInfo);
                     acquire(queuedAction.listener, null, false, queuedAction.debugInfo, queuedAction.stackTrace);
                 }
             });

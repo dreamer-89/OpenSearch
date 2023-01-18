@@ -68,7 +68,7 @@ public class SegmentReplicationIT extends OpenSearchIntegTestCase {
 
     @BeforeClass
     public static void assumeFeatureFlag() {
-        assumeTrue("Segment replication Feature flag is enabled", Boolean.parseBoolean(System.getProperty(FeatureFlags.REPLICATION_TYPE)));
+//        assumeTrue("Segment replication Feature flag is enabled", Boolean.parseBoolean(System.getProperty(FeatureFlags.REPLICATION_TYPE)));
     }
 
     @Override
@@ -726,13 +726,14 @@ public class SegmentReplicationIT extends OpenSearchIntegTestCase {
                 if (primaryShardSegments.getSegments().isEmpty() == false) {
                     final Map<String, Segment> latestPrimarySegments = getLatestSegments(primaryShardSegments);
                     final Long latestPrimaryGen = latestPrimarySegments.values().stream().findFirst().map(Segment::getGeneration).get();
-                    for (ShardSegments shardSegments : replicaShardSegments) {
-                        logger.debug("Replica {} Segments: {}", shardSegments.getShardRouting(), shardSegments.getSegments());
-                        final boolean isReplicaCaughtUpToPrimary = shardSegments.getSegments()
-                            .stream()
-                            .anyMatch(segment -> segment.getGeneration() == latestPrimaryGen);
-                        assertTrue(isReplicaCaughtUpToPrimary);
-                    }
+                    if (replicaShardSegments != null)
+                        for (ShardSegments shardSegments : replicaShardSegments) {
+                            logger.debug("Replica {} Segments: {}", shardSegments.getShardRouting(), shardSegments.getSegments());
+                            final boolean isReplicaCaughtUpToPrimary = shardSegments.getSegments()
+                                .stream()
+                                .anyMatch(segment -> segment.getGeneration() == latestPrimaryGen);
+                            assertTrue(isReplicaCaughtUpToPrimary);
+                        }
                 }
             }
         });

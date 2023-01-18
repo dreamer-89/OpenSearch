@@ -183,6 +183,7 @@ public class SegmentReplicationTarget extends ReplicationTarget {
          * snapshot from source that means the local copy of the segment has been corrupted/changed in some way and we throw an
          * IllegalStateException to fail the shard
          */
+        logger.info("--> diff.different {}", diff.different);
         if (diff.different.isEmpty() == false) {
             getFilesListener.onFailure(
                 new IllegalStateException(

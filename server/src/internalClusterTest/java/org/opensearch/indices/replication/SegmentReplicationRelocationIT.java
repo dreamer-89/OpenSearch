@@ -49,7 +49,7 @@ public class SegmentReplicationRelocationIT extends SegmentReplicationIT {
                 .put("index.number_of_shards", 1)
                 .put(IndexModule.INDEX_QUERY_CACHE_ENABLED_SETTING.getKey(), false)
                 .put(IndexMetadata.SETTING_REPLICATION_TYPE, ReplicationType.SEGMENT)
-                .put("index.number_of_replicas", 0)
+                .put("index.number_of_replicas", 1)
         ).get();
     }
 

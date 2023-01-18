@@ -64,6 +64,7 @@ import org.opensearch.indices.replication.common.ReplicationCollection;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 

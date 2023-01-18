@@ -3092,7 +3092,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
         recoveryState.getVerifyIndex().checkIndexTime(Math.max(0, TimeValue.nsecToMSec(System.nanoTime() - timeNS)));
     }
 
-    Engine getEngine() {
+    public Engine getEngine() {
         Engine engine = getEngineOrNull();
         if (engine == null) {
             throw new AlreadyClosedException("engine is closed");
@@ -3369,6 +3369,14 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
             internalRefreshListener.add(new CheckpointRefreshListener(this, this.checkpointPublisher));
         }
 
+        /**
+         * With segment replication enabled for primary relocation, recover replica shard initially as read only and
+         * change to a writeable engine during relocation handoff after a round of segment replication.
+         */
+        boolean isReadOnlyReplica = indexSettings.isSegRepEnabled()
+            && (shardRouting.primary() == false
+            || (shardRouting.isRelocationTarget() && recoveryState.getStage() != RecoveryState.Stage.FINALIZE));
+
         return this.engineConfigFactory.newEngineConfig(
             shardId,
             threadPool,
@@ -3392,7 +3400,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
             replicationTracker::getRetentionLeases,
             () -> getOperationPrimaryTerm(),
             tombstoneDocSupplier(),
-            indexSettings.isSegRepEnabled() && shardRouting.primary() == false,
+            isReadOnlyReplica,
             translogFactorySupplier.apply(indexSettings, shardRouting)
         );
     }

@@ -41,17 +41,14 @@ import static org.opensearch.common.util.CollectionUtils.iterableAsArrayList;
 
 public final class SearchableSnapshotIT extends AbstractSnapshotIntegTestCase {
 
-    @BeforeClass
-    public static void assumeFeatureFlag() {
-        assumeTrue(
-            "Searchable snapshot feature flag is enabled",
-            Boolean.parseBoolean(System.getProperty(FeatureFlags.SEARCHABLE_SNAPSHOT))
-        );
-    }
-
     @Override
     protected boolean addMockInternalEngine() {
         return false;
+    }
+
+    @Override
+    protected Settings featureFlagSettings() {
+        return Settings.builder().put(FeatureFlags.SEARCHABLE_SNAPSHOT, "true").build();
     }
 
     @Override

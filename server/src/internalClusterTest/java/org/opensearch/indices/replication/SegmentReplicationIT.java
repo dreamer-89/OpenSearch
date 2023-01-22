@@ -10,7 +10,13 @@ package org.opensearch.indices.replication;
 
 import com.carrotsearch.randomizedtesting.RandomizedTest;
 import org.opensearch.OpenSearchCorruptionException;
+import org.opensearch.action.ActionFuture;
 import org.opensearch.action.admin.cluster.health.ClusterHealthResponse;
+import org.opensearch.action.admin.indices.segments.IndexShardSegments;
+import org.opensearch.action.admin.indices.segments.IndicesSegmentResponse;
+import org.opensearch.action.admin.indices.segments.IndicesSegmentsRequest;
+import org.opensearch.action.admin.indices.segments.ShardSegments;
+import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.WriteRequest;
 import org.opensearch.action.update.UpdateResponse;
 import org.opensearch.client.Requests;
@@ -31,9 +37,20 @@ import org.opensearch.test.OpenSearchIntegTestCase;
 import org.opensearch.test.transport.MockTransportService;
 import org.opensearch.transport.TransportService;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static java.util.Arrays.asList;
 import static org.hamcrest.Matchers.equalTo;
@@ -138,6 +155,73 @@ public class SegmentReplicationIT extends SegmentReplicationBaseIT {
         waitForSearchableDocs(initialDocCount, replica, primary);
         verifyStoreContent();
     }
+
+    public void testMultipleIngestions() throws Exception {
+        final String primary = internalCluster().startNode();
+        createIndex(INDEX_NAME);
+        final String replica = internalCluster().startNode();
+        ensureGreen(INDEX_NAME);
+
+        // First round of ingestion
+        final int initialDocCount = 500;
+        ingestDocs(initialDocCount);
+        refresh(INDEX_NAME);
+        waitForReplicaUpdate();
+        assertDocCounts(initialDocCount, replica, primary);
+
+        // Second round of ingestion
+        ingestDocs(2 * initialDocCount);
+        ensureGreen(INDEX_NAME);
+        flushAndRefresh(INDEX_NAME);
+        waitForReplicaUpdate();
+        assertDocCounts(3 * initialDocCount, replica, primary);
+    }
+
+    public void testConcurrentIngestion() throws Exception {
+        final String primary = internalCluster().startNode();
+        createIndex(INDEX_NAME);
+        final String replica = internalCluster().startNode();
+        ensureGreen(INDEX_NAME);
+
+        final int ingestionThreadCount = 2;
+        final int docCount = 2000;
+        final ConcurrentLinkedDeque<ActionFuture<IndexResponse>> pendingIndexResponses = new ConcurrentLinkedDeque<>();
+        AtomicInteger integer = new AtomicInteger();
+        Thread ingestionThreads[] = new Thread[ingestionThreadCount];
+        for(int i=0;i<ingestionThreadCount;i++) {
+            ingestionThreads[i] = new Thread(() -> {
+                for (int j = 0; j < docCount; j++) {
+                    pendingIndexResponses.add(
+                        client().prepareIndex(INDEX_NAME)
+                            .setId(Integer.toString(integer.incrementAndGet()))
+                            .setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL)
+                            .setSource("field", "value" + j)
+                            .execute()
+                    );
+                }
+            });
+        }
+        for(int i=0;i<ingestionThreadCount;i++)  {
+            ingestionThreads[i].start();
+        }
+        logger.info("--> restarting the primary");
+        internalCluster().restartNode(primary);
+        ensureGreen(INDEX_NAME);
+        assertEquals(getNodeContainingPrimaryShard().getName(), replica);
+
+        for(int i=0;i<ingestionThreadCount;i++) {
+            ingestionThreads[i].join();
+        }
+        assertBusy(() -> {
+            client().admin().indices().prepareRefresh().execute().actionGet();
+            assertTrue(pendingIndexResponses.stream().allMatch(ActionFuture::isDone));
+        }, 1, TimeUnit.MINUTES);
+
+        flushAndRefresh(INDEX_NAME);
+        waitForReplicaUpdate();
+        assertDocCounts(ingestionThreadCount * docCount, primary, replica);
+    }
+
 
     /**
      * This test verfies that replica shard is not added to the cluster when doing a round of segment replication fails during peer recovery.

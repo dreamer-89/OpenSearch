@@ -4220,6 +4220,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
         sync(); // persist the global checkpoint to disk
         final SeqNoStats seqNoStats = seqNoStats();
         final TranslogStats translogStats = translogStats();
+        logger.info("--> Translog operations {} Uncommitted {}", translogStats.estimatedNumberOfOperations(), translogStats.getUncommittedOperations());
         // flush to make sure the latest commit, which will be opened by the read-only engine, includes all operations.
         flush(new FlushRequest().waitIfOngoing(true));
 

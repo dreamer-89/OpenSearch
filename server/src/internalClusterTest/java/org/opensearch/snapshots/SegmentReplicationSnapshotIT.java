@@ -165,8 +165,8 @@ public class SegmentReplicationSnapshotIT extends AbstractSnapshotIntegTestCase 
         assertHitCount(resp, DOC_COUNT);
     }
 
-    @AwaitsFix(bugUrl = "https://github.com/opensearch-project/OpenSearch/issues/5669")
-    public void testSnapshotOnSegRep_RestoreOnSegRepDuringIngestion() throws Exception {
+//    @AwaitsFix(bugUrl = "https://github.com/opensearch-project/OpenSearch/issues/5669")
+    public void testSnapshotWithIngestionPostRestore() throws Exception {
         startClusterWithSettings(segRepEnableIndexSettings(), 1);
         createSnapshot();
         // Delete index
@@ -174,18 +174,49 @@ public class SegmentReplicationSnapshotIT extends AbstractSnapshotIntegTestCase 
         assertFalse("index [" + INDEX_NAME + "] should have been deleted", indexExists(INDEX_NAME));
 
         RestoreSnapshotResponse restoreSnapshotResponse = restoreSnapshotWithSettings(null);
+        ensureGreen(RESTORED_INDEX_NAME);
+        refresh(RESTORED_INDEX_NAME);
+        logger.info("--> docs restores {}", client().prepareSearch(RESTORED_INDEX_NAME).setQuery(QueryBuilders.matchAllQuery()).get().getHits().getTotalHits().value);
 
         // Assertions
-        assertThat(restoreSnapshotResponse.status(), equalTo(RestStatus.ACCEPTED));
-        ingestData(5000, RESTORED_INDEX_NAME);
+        assertEquals(RestStatus.ACCEPTED, restoreSnapshotResponse.status());
+
+        final int DOC_COUNT_POST_RESTORE = 2000;
+        ingestData(DOC_COUNT_POST_RESTORE, RESTORED_INDEX_NAME);
         ensureGreen(RESTORED_INDEX_NAME);
         GetSettingsResponse settingsResponse = client().admin()
             .indices()
             .getSettings(new GetSettingsRequest().indices(RESTORED_INDEX_NAME))
             .get();
         assertEquals(settingsResponse.getSetting(RESTORED_INDEX_NAME, "index.replication.type"), "SEGMENT");
+        refresh(RESTORED_INDEX_NAME);
         SearchResponse resp = client().prepareSearch(RESTORED_INDEX_NAME).setQuery(QueryBuilders.matchAllQuery()).get();
-        assertHitCount(resp, DOC_COUNT + 5000);
+        assertHitCount(resp, DOC_COUNT + DOC_COUNT_POST_RESTORE);
+    }
+
+    public void testSnapshotWithIngestionDuringRestore() throws Exception {
+        startClusterWithSettings(segRepEnableIndexSettings(), 1);
+        createSnapshot();
+        // Delete index
+        assertAcked(client().admin().indices().delete(new DeleteIndexRequest(INDEX_NAME)).get());
+        assertFalse("index [" + INDEX_NAME + "] should have been deleted", indexExists(INDEX_NAME));
+
+        RestoreSnapshotResponse restoreSnapshotResponse = restoreSnapshotWithSettings(null);
+        ensureGreen(RESTORED_INDEX_NAME);
+        logger.info("--> docs restores {}", client().prepareSearch(RESTORED_INDEX_NAME).setQuery(QueryBuilders.matchAllQuery()).get());
+
+        // Assertions
+        assertEquals(RestStatus.ACCEPTED, restoreSnapshotResponse.status());
+        final int DOC_COUNT_POST_RESTORE = 2000;
+        ingestData(DOC_COUNT_POST_RESTORE, RESTORED_INDEX_NAME);
+        GetSettingsResponse settingsResponse = client().admin()
+            .indices()
+            .getSettings(new GetSettingsRequest().indices(RESTORED_INDEX_NAME))
+            .get();
+        assertEquals(settingsResponse.getSetting(RESTORED_INDEX_NAME, "index.replication.type"), "SEGMENT");
+        refresh(RESTORED_INDEX_NAME);
+        SearchResponse resp = client().prepareSearch(RESTORED_INDEX_NAME).setQuery(QueryBuilders.matchAllQuery()).get();
+        assertHitCount(resp, DOC_COUNT + DOC_COUNT_POST_RESTORE);
     }
 
     public void testSnapshotOnDocRep_RestoreOnSegRep() throws Exception {

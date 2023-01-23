@@ -162,8 +162,8 @@ public class ReplicationOperation<
         this.primaryResult = primaryResult;
         final ReplicaRequest replicaRequest = primaryResult.replicaRequest();
         if (replicaRequest != null) {
-            if (logger.isTraceEnabled()) {
-                logger.trace("[{}] op [{}] completed on primary for request [{}]", primary.routingEntry().shardId(), opType, request);
+            if (true) {
+                logger.info("--> [{}] op [{}] completed on primary for request [{}]", primary.routingEntry().shardId(), opType, request);
             }
             // we have to get the replication group after successfully indexing into the primary in order to honour recovery semantics.
             // we have to make sure that every operation indexed into the primary after recovery start will also be replicated
@@ -173,6 +173,7 @@ public class ReplicationOperation<
             // of the sampled replication group, and advanced further than what the given replication group would allow it to.
             // This would entail that some shards could learn about a global checkpoint that would be higher than its local checkpoint.
             final long globalCheckpoint = primary.computedGlobalCheckpoint();
+            logger.info("--> globalCheckpoint {}, localCP {}", globalCheckpoint, primary.localCheckpoint());
             // we have to capture the max_seq_no_of_updates after this request was completed on the primary to make sure the value of
             // max_seq_no_of_updates on replica when this request is executed is at least the value on the primary when it was executed
             // on.
@@ -197,7 +198,7 @@ public class ReplicationOperation<
 
             @Override
             public void onFailure(Exception e) {
-                logger.trace("[{}] op [{}] post replication actions failed for [{}]", primary.routingEntry().shardId(), opType, request);
+                logger.info("[{}] op [{}] post replication actions failed for [{}]", primary.routingEntry().shardId(), opType, request);
                 // TODO: fail shard? This will otherwise have the local / global checkpoint info lagging, or possibly have replicas
                 // go out of sync with the primary
                 finishAsFailed(e);
@@ -253,8 +254,8 @@ public class ReplicationOperation<
         final ReplicaRequest replicaRequest = replicationProxyRequest.getReplicaRequest();
         final PendingReplicationActions pendingReplicationActions = replicationProxyRequest.getPendingReplicationActions();
 
-        if (logger.isTraceEnabled()) {
-            logger.trace("[{}] sending op [{}] to replica {} for request [{}]", shard.shardId(), opType, shard, replicaRequest);
+        if (true) {
+            logger.info("[{}] sending op [{}] to replica {} for request [{}]", shard.shardId(), opType, shard, replicaRequest);
         }
         totalShards.incrementAndGet();
         pendingActions.incrementAndGet();
@@ -271,7 +272,7 @@ public class ReplicationOperation<
 
             @Override
             public void onFailure(Exception replicaException) {
-                logger.trace(
+                logger.info(
                     () -> new ParameterizedMessage(
                         "[{}] failure while performing [{}] on replica {}, request [{}]",
                         shard.shardId(),
@@ -399,7 +400,7 @@ public class ReplicationOperation<
             final String resolvedShards = waitForActiveShards == ActiveShardCount.ALL
                 ? Integer.toString(shardRoutingTable.shards().size())
                 : waitForActiveShards.toString();
-            logger.trace(
+            logger.info(
                 "[{}] not enough active copies to meet shard count of [{}] (have {}, needed {}), scheduling a retry. op [{}], "
                     + "request [{}]",
                 shardId,

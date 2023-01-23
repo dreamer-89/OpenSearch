@@ -59,6 +59,7 @@ import org.opensearch.index.shard.ShardId;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -282,11 +283,11 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
                         return false;
                     }
                     if (allShardsStarted) {
-                        logger.trace("expiring unused [{}]", lease);
+                        logger.info("expiring unused [{}]", lease);
                         return true;
                     }
                     if (lease.retainingSequenceNumber() < minimumReasonableRetainedSeqNo) {
-                        logger.trace("expiring unreasonable [{}] retaining history before [{}]", lease, minimumReasonableRetainedSeqNo);
+                        logger.info("expiring unreasonable [{}] retaining history before [{}]", lease, minimumReasonableRetainedSeqNo);
                         return true;
                     }
                 }
@@ -295,13 +296,13 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
         final Collection<RetentionLease> expiredLeases = partitionByExpiration.get(true);
         if (expiredLeases == null) {
             // early out as no retention leases have expired
-            logger.debug("no retention leases are expired from current retention leases [{}]", retentionLeases);
+            logger.info("no retention leases are expired from current retention leases [{}]", retentionLeases);
             return Tuple.tuple(false, retentionLeases);
         }
         final Collection<RetentionLease> nonExpiredLeases = partitionByExpiration.get(false) != null
             ? partitionByExpiration.get(false)
             : Collections.emptyList();
-        logger.debug("expiring retention leases [{}] from current retention leases [{}]", expiredLeases, retentionLeases);
+        logger.info("expiring retention leases [{}] from current retention leases [{}]", expiredLeases, retentionLeases);
         retentionLeases = new RetentionLeases(operationPrimaryTerm, retentionLeases.version() + 1, nonExpiredLeases);
         return Tuple.tuple(true, retentionLeases);
     }
@@ -395,7 +396,7 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
             currentTimeMillisSupplier.getAsLong(),
             source
         );
-        logger.debug("adding new retention lease [{}] to current retention leases [{}]", retentionLease, retentionLeases);
+        logger.info("adding new retention lease [{}] to current retention leases [{}]", retentionLease, retentionLeases);
         retentionLeases = new RetentionLeases(
             operationPrimaryTerm,
             retentionLeases.version() + 1,
@@ -459,7 +460,7 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
             if (retentionLeases.contains(id) == false) {
                 throw new RetentionLeaseNotFoundException(id);
             }
-            logger.debug("removing retention lease [{}] from current retention leases [{}]", id, retentionLeases);
+            logger.info("removing retention lease [{}] from current retention leases [{}]", id, retentionLeases);
             retentionLeases = new RetentionLeases(
                 operationPrimaryTerm,
                 retentionLeases.version() + 1,
@@ -517,12 +518,12 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
             final RetentionLeases currentRetentionLeases;
             synchronized (this) {
                 if (retentionLeases.supersedes(persistedRetentionLeasesPrimaryTerm, persistedRetentionLeasesVersion) == false) {
-                    logger.trace("skipping persisting retention leases [{}], already persisted", retentionLeases);
+                    logger.info("skipping persisting retention leases [{}], already persisted", retentionLeases);
                     return;
                 }
                 currentRetentionLeases = retentionLeases;
             }
-            logger.trace("persisting retention leases [{}]", currentRetentionLeases);
+            logger.info("persisting retention leases [{}]", currentRetentionLeases);
             RetentionLeases.FORMAT.writeAndCleanup(currentRetentionLeases, path);
             persistedRetentionLeasesPrimaryTerm = currentRetentionLeases.primaryTerm();
             persistedRetentionLeasesVersion = currentRetentionLeases.version();
@@ -1104,7 +1105,7 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
         final long previousGlobalCheckpoint = globalCheckpoint;
         if (newGlobalCheckpoint > previousGlobalCheckpoint) {
             globalCheckpoint = newGlobalCheckpoint;
-            logger.trace("updated global checkpoint from [{}] to [{}] due to [{}]", previousGlobalCheckpoint, globalCheckpoint, reason);
+            logger.info("updated global checkpoint from [{}] to [{}] due to [{}]", previousGlobalCheckpoint, globalCheckpoint, reason);
             onGlobalCheckpointUpdated.accept(globalCheckpoint);
         }
         assert invariant();
@@ -1125,7 +1126,7 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
         if (cps != null && globalCheckpoint > cps.globalCheckpoint) {
             final long previousGlobalCheckpoint = cps.globalCheckpoint;
             cps.globalCheckpoint = globalCheckpoint;
-            logger.trace(
+            logger.info(
                 "updated local knowledge for [{}] on the primary of the global checkpoint from [{}] to [{}]",
                 allocationId,
                 previousGlobalCheckpoint,
@@ -1178,7 +1179,7 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
                     + shardAllocationId;
                 // Safe to call innerAddRetentionLease() without a subsequent sync since there are no other members of this replication
                 // group.
-                logger.trace("addPeerRecoveryRetentionLeaseForSolePrimary: adding lease [{}]", leaseId);
+                logger.info("addPeerRecoveryRetentionLeaseForSolePrimary: adding lease [{}]", leaseId);
                 innerAddRetentionLease(
                     leaseId,
                     Math.max(0L, checkpoints.get(shardAllocationId).globalCheckpoint + 1),
@@ -1191,7 +1192,7 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
                  * leases for every shard copy, but in this case we do not expect any leases to exist.
                  */
                 assert hasAllPeerRecoveryRetentionLeases == false : routingTable + " vs " + retentionLeases;
-                logger.debug("{} becoming primary of {} with missing lease: {}", primaryShard, routingTable, retentionLeases);
+                logger.info("{} becoming primary of {} with missing lease: {}", primaryShard, routingTable, retentionLeases);
             }
         } else if (hasAllPeerRecoveryRetentionLeases == false
             && routingTable.assignedShards()
@@ -1412,7 +1413,7 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
         } else {
             cps.inSync = true;
             updateReplicationGroupAndNotify();
-            logger.trace("marked [{}] as in-sync", allocationId);
+            logger.info("marked [{}] as in-sync", allocationId);
             updateGlobalCheckpointOnPrimary();
         }
 
@@ -1426,12 +1427,15 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
             + "] for shard copy ["
             + allocationId
             + "]";
+        logger.info("--> cps {}", cps);
+//        logger.info("--> {}", Arrays.toString(Thread.currentThread().getStackTrace()).replace( ',', '\n' ));
         if (localCheckpoint > cps.localCheckpoint) {
-            logger.trace("updated local checkpoint of [{}] from [{}] to [{}]", allocationId, cps.localCheckpoint, localCheckpoint);
+            logger.info("--> {}", Arrays.toString(Thread.currentThread().getStackTrace()).replace( ',', '\n' ));
+            logger.info("updated local checkpoint of [{}] from [{}] to [{}]", allocationId, cps.localCheckpoint, localCheckpoint);
             cps.localCheckpoint = localCheckpoint;
             return true;
         } else {
-            logger.trace(
+            logger.info(
                 "skipped updating local checkpoint of [{}] from [{}] to [{}], current checkpoint is higher",
                 allocationId,
                 cps.localCheckpoint,
@@ -1464,7 +1468,7 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
             pending = false;
             cps.inSync = true;
             updateReplicationGroupAndNotify();
-            logger.trace("marked [{}] as in-sync", allocationId);
+            logger.info("marked [{}] as in-sync", allocationId);
             notifyAllWaiters();
         }
         if (cps.replicated && increasedLocalCheckpoint && pending == false) {
@@ -1513,7 +1517,7 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
             + "]";
         if (globalCheckpoint != computedGlobalCheckpoint) {
             globalCheckpoint = computedGlobalCheckpoint;
-            logger.trace("updated global checkpoint to [{}]", computedGlobalCheckpoint);
+            logger.info("updated global checkpoint to [{}]", computedGlobalCheckpoint);
             onGlobalCheckpointUpdated.accept(computedGlobalCheckpoint);
         }
     }
@@ -1635,7 +1639,7 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
                     if (checkpointState.tracked == false) {
                         groupedActionListener.onResponse(null);
                     } else {
-                        logger.trace("createMissingPeerRecoveryRetentionLeases: adding missing lease for {}", shardRouting);
+                        logger.info("createMissingPeerRecoveryRetentionLeases: adding missing lease for {}", shardRouting);
                         try {
                             addPeerRecoveryRetentionLease(
                                 shardRouting.currentNodeId(),
@@ -1649,7 +1653,7 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
                 }
             }
         } else {
-            logger.trace("createMissingPeerRecoveryRetentionLeases: nothing to do");
+            logger.info("createMissingPeerRecoveryRetentionLeases: nothing to do");
             listener.onResponse(null);
         }
     }

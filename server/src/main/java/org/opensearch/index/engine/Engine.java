@@ -256,7 +256,7 @@ public abstract class Engine implements LifecycleAware, Closeable {
             try {
                 sizeInBytes += info.sizeInBytes();
             } catch (IOException e) {
-                logger.trace(() -> new ParameterizedMessage("failed to get size for [{}]", info.info.name), e);
+                logger.info(() -> new ParameterizedMessage("failed to get size for [{}]", info.info.name), e);
             }
         }
         return new DocsStats(numDocs, numDeletedDocs, sizeInBytes);
@@ -1079,7 +1079,7 @@ public abstract class Engine implements LifecycleAware, Closeable {
                     try {
                         segment.sizeInBytes = info.sizeInBytes();
                     } catch (IOException e) {
-                        logger.trace(() -> new ParameterizedMessage("failed to get size for [{}]", info.info.name), e);
+                        logger.info(() -> new ParameterizedMessage("failed to get size for [{}]", info.info.name), e);
                     }
                     segment.segmentSort = info.info.getIndexSort();
                     segment.attributes = info.info.getAttributes();
@@ -1107,7 +1107,7 @@ public abstract class Engine implements LifecycleAware, Closeable {
         try {
             segment.sizeInBytes = info.sizeInBytes();
         } catch (IOException e) {
-            logger.trace(() -> new ParameterizedMessage("failed to get size for [{}]", info.info.name), e);
+            logger.info(() -> new ParameterizedMessage("failed to get size for [{}]", info.info.name), e);
         }
         segment.segmentSort = info.info.getIndexSort();
         segment.attributes = info.info.getAttributes();
@@ -1299,7 +1299,7 @@ public abstract class Engine implements LifecycleAware, Closeable {
                 logger.warn("failEngine threw exception", inner);
             }
         } else {
-            logger.debug(
+            logger.info(
                 () -> new ParameterizedMessage(
                     "tried to fail engine but could not acquire lock - engine should " + "be failed by now [{}]",
                     reason
@@ -1919,17 +1919,17 @@ public abstract class Engine implements LifecycleAware, Closeable {
      */
     public void flushAndClose() throws IOException {
         if (isClosed.get() == false) {
-            logger.trace("flushAndClose now acquire writeLock");
+            logger.info("flushAndClose now acquire writeLock");
             try (ReleasableLock lock = writeLock.acquire()) {
-                logger.trace("flushAndClose now acquired writeLock");
+                logger.info("flushAndClose now acquired writeLock");
                 try {
-                    logger.debug("flushing shard on close - this might take some time to sync files to disk");
+                    logger.info("flushing shard on close - this might take some time to sync files to disk");
                     try {
                         // TODO we might force a flush in the future since we have the write lock already even though recoveries
                         // are running.
                         flush();
                     } catch (AlreadyClosedException ex) {
-                        logger.debug("engine already closed - skipping flushAndClose");
+                        logger.info("engine already closed - skipping flushAndClose");
                     }
                 } finally {
                     close(); // double close is not a problem
@@ -1942,9 +1942,9 @@ public abstract class Engine implements LifecycleAware, Closeable {
     @Override
     public void close() throws IOException {
         if (isClosed.get() == false) { // don't acquire the write lock if we are already closed
-            logger.debug("close now acquiring writeLock");
+            logger.info("close now acquiring writeLock");
             try (ReleasableLock lock = writeLock.acquire()) {
-                logger.debug("close acquired writeLock");
+                logger.info("close acquired writeLock");
                 closeNoLock("api", closedLatch);
             }
         }

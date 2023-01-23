@@ -197,7 +197,7 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
     public Store(ShardId shardId, IndexSettings indexSettings, Directory directory, ShardLock shardLock, OnClose onClose) {
         super(shardId, indexSettings);
         final TimeValue refreshInterval = indexSettings.getValue(INDEX_STORE_STATS_REFRESH_INTERVAL_SETTING);
-        logger.debug("store stats are refreshed with refresh_interval [{}]", refreshInterval);
+        logger.info("store stats are refreshed with refresh_interval [{}]", refreshInterval);
         ByteSizeCachingDirectory sizeCachingDir = new ByteSizeCachingDirectory(directory, refreshInterval);
         this.directory = new StoreDirectory(sizeCachingDir, Loggers.getLogger("index.store.deletes", shardId));
         this.shardLock = shardLock;
@@ -438,7 +438,7 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
                 try {
                     directory.deleteFile(origFile);
                 } catch (FileNotFoundException | NoSuchFileException e) {} catch (Exception ex) {
-                    logger.debug(() -> new ParameterizedMessage("failed to delete file [{}]", origFile), ex);
+                    logger.info(() -> new ParameterizedMessage("failed to delete file [{}]", origFile), ex);
                 }
                 // now, rename the files... and fail it it won't work
                 directory.rename(tempFile, origFile);
@@ -527,7 +527,7 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
         if (isClosed.compareAndSet(false, true)) {
             // only do this once!
             decRef();
-            logger.debug("store reference count on close: {}", refCounter.refCount());
+            logger.info("store reference count on close: {}", refCounter.refCount());
         }
     }
 
@@ -593,7 +593,7 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
         ) {
             failIfCorrupted(dir);
             SegmentInfos segInfo = Lucene.readSegmentInfos(dir);
-            logger.trace("{} loaded segment info [{}]", shardId, segInfo);
+            logger.info("{} loaded segment info [{}]", shardId, segInfo);
         }
     }
 
@@ -769,7 +769,7 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
                         // point around?
                         throw new IllegalStateException("Can't delete " + existingFile + " - cleanup failed", ex);
                     }
-                    logger.debug(() -> new ParameterizedMessage("failed to delete file [{}]", existingFile), ex);
+                    logger.info(() -> new ParameterizedMessage("failed to delete file [{}]", existingFile), ex);
                     // ignore, we don't really care, will get deleted later on
                 }
             }
@@ -823,7 +823,7 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
                     // point around?
                     throw new IllegalStateException("Can't delete " + existingFile + " - cleanup failed", ex);
                 }
-                logger.debug(() -> new ParameterizedMessage("failed to delete file [{}]", existingFile), ex);
+                logger.info(() -> new ParameterizedMessage("failed to delete file [{}]", existingFile), ex);
                 // ignore, we don't really care, will get deleted later on
             }
         }
@@ -844,7 +844,7 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
 
                     // all is fine this file is just part of a commit or a segment that is different
                     if (local.isSame(remote) == false) {
-                        logger.debug("Files are different on the recovery target: {} ", recoveryDiff);
+                        logger.info("Files are different on the recovery target: {} ", recoveryDiff);
                         throw new IllegalStateException(
                             "local version: " + local + " is different from remote version after recovery: " + remote,
                             null
@@ -852,7 +852,7 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
                     }
                 }
             } else {
-                logger.debug("Files are missing on the recovery target: {} ", recoveryDiff);
+                logger.info("Files are missing on the recovery target: {} ", recoveryDiff);
                 throw new IllegalStateException(
                     "Files are missing on the recovery target: [different="
                         + recoveryDiff.different
@@ -903,7 +903,7 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
             latestSegmentInfos.commit(directory());
             directory.sync(latestSegmentInfos.files(true));
             directory.syncMetaData();
-            cleanupAndPreserveLatestCommitPoint("After commit", latestSegmentInfos);
+            cleanupAndPreserveLatestCommitPoint("--> After commit", latestSegmentInfos);
         } finally {
             metadataLock.writeLock().unlock();
         }
@@ -1183,7 +1183,7 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
                     }
 
                 } catch (Exception ex) {
-                    logger.debug(() -> new ParameterizedMessage("Can retrieve checksum from file [{}]", file), ex);
+                    logger.info(() -> new ParameterizedMessage("Can retrieve checksum from file [{}]", file), ex);
                     throw ex;
                 }
                 builder.put(file, new StoreFileMetadata(file, length, checksum, version, fileHash.get()));

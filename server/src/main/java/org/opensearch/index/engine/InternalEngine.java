@@ -358,7 +358,9 @@ public class InternalEngine extends Engine {
                 }
             }
         }
-        logger.trace("created new InternalEngine");
+//        logger.info("--> {}", Arrays.toString(Thread.currentThread().getStackTrace()).replace( ',', '\n' ));
+
+        logger.info("created new InternalEngine");
     }
 
     private LocalCheckpointTracker createLocalCheckpointTracker(
@@ -371,7 +373,7 @@ public class InternalEngine extends Engine {
         );
         maxSeqNo = seqNoStats.maxSeqNo;
         localCheckpoint = seqNoStats.localCheckpoint;
-        logger.trace("recovered maximum sequence number [{}] and local checkpoint [{}]", maxSeqNo, localCheckpoint);
+        logger.info("recovered maximum sequence number [{}] and local checkpoint [{}]", maxSeqNo, localCheckpoint);
         return localCheckpointTrackerSupplier.apply(maxSeqNo, localCheckpoint);
     }
 
@@ -953,6 +955,8 @@ public class InternalEngine extends Engine {
                         new IndexVersionValue(translogLocation, plan.versionForIndexing, index.seqNo(), index.primaryTerm())
                     );
                 }
+                logger.info("--> markSeqNoAsProcessed {}", indexResult.getSeqNo());
+                logger.info("--> {}", Arrays.toString(Thread.currentThread().getStackTrace()).replace( ',', '\n' ));
                 localCheckpointTracker.markSeqNoAsProcessed(indexResult.getSeqNo());
                 if (indexResult.getTranslogLocation() == null) {
                     // the op is coming from the translog (and is hence persisted already) or it does not have a sequence number
@@ -1822,11 +1826,11 @@ public class InternalEngine extends Engine {
                 if (waitIfOngoing == false) {
                     return;
                 }
-                logger.trace("waiting for in-flight flush to finish");
+                logger.info("waiting for in-flight flush to finish");
                 flushLock.lock();
-                logger.trace("acquired flush lock after blocking");
+                logger.info("acquired flush lock after blocking");
             } else {
-                logger.trace("acquired flush lock immediately");
+                logger.info("acquired flush lock immediately");
             }
             try {
                 // Only flush if (1) Lucene has uncommitted docs, or (2) forced by caller, or (3) the
@@ -1843,12 +1847,12 @@ public class InternalEngine extends Engine {
                     translogManager.ensureCanFlush();
                     try {
                         translogManager.rollTranslogGeneration();
-                        logger.trace("starting commit for flush; commitTranslog=true");
+                        logger.info("starting commit for flush; commitTranslog=true");
                         commitIndexWriter(indexWriter, translogManager.getTranslogUUID());
-                        logger.trace("finished commit for flush");
+                        logger.info("finished commit for flush");
 
                         // a temporary debugging to investigate test failure - issue#32827. Remove when the issue is resolved
-                        logger.debug(
+                        logger.info(
                             "new commit on flush, hasUncommittedChanges:{}, force:{}, shouldPeriodicallyFlush:{}",
                             hasUncommittedChanges,
                             force,
@@ -2028,9 +2032,9 @@ public class InternalEngine extends Engine {
         // we have to flush outside of the readlock otherwise we might have a problem upgrading
         // the to a write lock when we fail the engine in this operation
         if (flushFirst) {
-            logger.trace("start flush for snapshot");
+            logger.info("start flush for snapshot");
             flush(false, true);
-            logger.trace("finish flush for snapshot");
+            logger.info("finish flush for snapshot");
         }
         final IndexCommit lastCommit = combinedDeletionPolicy.acquireIndexCommit(false);
         return new GatedCloseable<>(lastCommit, () -> releaseIndexCommit(lastCommit));
@@ -2207,20 +2211,20 @@ public class InternalEngine extends Engine {
                     logger.warn("Failed to close translog", e);
                 }
                 // no need to commit in this case!, we snapshot before we close the shard, so translog and all sync'ed
-                logger.trace("rollback indexWriter");
+                logger.info("rollback indexWriter");
                 try {
                     indexWriter.rollback();
                 } catch (AlreadyClosedException ex) {
                     failOnTragicEvent(ex);
                     throw ex;
                 }
-                logger.trace("rollback indexWriter done");
+                logger.info("rollback indexWriter done");
             } catch (Exception e) {
                 logger.warn("failed to rollback writer on close", e);
             } finally {
                 try {
                     store.decRef();
-                    logger.debug("engine closed [{}]", reason);
+                    logger.info("engine closed [{}]", reason);
                 } finally {
                     closedLatch.countDown();
                 }
@@ -2448,7 +2452,7 @@ public class InternalEngine extends Engine {
             engineConfig.getThreadPool().generic().execute(new AbstractRunnable() {
                 @Override
                 public void onFailure(Exception e) {
-                    logger.debug("merge failure action rejected", e);
+                    logger.info("merge failure action rejected", e);
                 }
 
                 @Override
@@ -2495,7 +2499,7 @@ public class InternalEngine extends Engine {
                 if (currentForceMergeUUID != null) {
                     commitData.put(FORCE_MERGE_UUID_KEY, currentForceMergeUUID);
                 }
-                logger.trace("committing writer with commit data [{}]", commitData);
+                logger.info("committing writer with commit data [{}]", commitData);
                 return commitData.entrySet().iterator();
             });
             shouldPeriodicallyFlushAfterBigMerge.set(false);

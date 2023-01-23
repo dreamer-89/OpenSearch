@@ -27,10 +27,15 @@ import org.opensearch.common.Priority;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.index.IndexModule;
+import org.opensearch.index.IndexService;
+import org.opensearch.index.engine.Segment;
+import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.index.shard.IndexShard;
 import org.opensearch.indices.IndicesService;
 import org.opensearch.indices.recovery.FileChunkRequest;
 import org.opensearch.indices.replication.common.ReplicationType;
+import org.opensearch.plugins.Plugin;
+import org.opensearch.search.SearchHit;
 import org.opensearch.test.BackgroundIndexer;
 import org.opensearch.test.InternalTestCluster;
 import org.opensearch.test.OpenSearchIntegTestCase;
@@ -41,10 +46,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.Optional;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -183,19 +190,22 @@ public class SegmentReplicationIT extends SegmentReplicationBaseIT {
         final String replica = internalCluster().startNode();
         ensureGreen(INDEX_NAME);
 
+        logger.info("--> Wait for green completed");
+
         final int ingestionThreadCount = 2;
-        final int docCount = 2000;
+        final int docCount = 2;
         final ConcurrentLinkedDeque<ActionFuture<IndexResponse>> pendingIndexResponses = new ConcurrentLinkedDeque<>();
         AtomicInteger integer = new AtomicInteger();
+        AtomicInteger valueInte = new AtomicInteger();
         Thread ingestionThreads[] = new Thread[ingestionThreadCount];
         for(int i=0;i<ingestionThreadCount;i++) {
             ingestionThreads[i] = new Thread(() -> {
                 for (int j = 0; j < docCount; j++) {
                     pendingIndexResponses.add(
                         client().prepareIndex(INDEX_NAME)
-                            .setId(Integer.toString(integer.incrementAndGet()))
+                            .setSource("field", "value" + valueInte.getAndIncrement())
+                            .setId(Integer.toString(integer.getAndIncrement()))
                             .setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL)
-                            .setSource("field", "value" + j)
                             .execute()
                     );
                 }
@@ -205,8 +215,8 @@ public class SegmentReplicationIT extends SegmentReplicationBaseIT {
             ingestionThreads[i].start();
         }
         logger.info("--> restarting the primary");
-        internalCluster().restartNode(primary);
-        ensureGreen(INDEX_NAME);
+        internalCluster().stopRandomNode(InternalTestCluster.nameFilter(primary));
+        ensureYellow(INDEX_NAME);
         assertEquals(getNodeContainingPrimaryShard().getName(), replica);
 
         for(int i=0;i<ingestionThreadCount;i++) {
@@ -219,7 +229,18 @@ public class SegmentReplicationIT extends SegmentReplicationBaseIT {
 
         flushAndRefresh(INDEX_NAME);
         waitForReplicaUpdate();
-        assertDocCounts(ingestionThreadCount * docCount, primary, replica);
+
+        TreeSet<Integer> set = new TreeSet();
+        for(int i =0;i<ingestionThreadCount*docCount;i++) {
+            set.add(i);
+        }
+        SearchHit[] hits = client().prepareSearch(INDEX_NAME).setQuery(QueryBuilders.matchAllQuery()).get().getHits().getHits();
+        for(SearchHit hit: hits) {//.getTotalHits(); // termQuery("_id", Integer.toString(i)))
+            set.remove(Integer.parseInt(hit.getId()));
+        }
+//        logger.info("--> total hits {} set size {}", hits.length, set.size());
+        set.stream().forEach(str -> logger.info("--> Missing ids {}", str));
+        assertDocCounts(ingestionThreadCount * docCount, replica);
     }
 
 

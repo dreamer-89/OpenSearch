@@ -197,7 +197,7 @@ public abstract class Translog extends AbstractIndexShardComponent implements In
         boolean success = false;
         ArrayList<TranslogReader> foundTranslogs = new ArrayList<>();
         try (ReleasableLock ignored = writeLock.acquire()) {
-            logger.debug("open uncommitted translog checkpoint {}", checkpoint);
+            logger.info("open uncommitted translog checkpoint {}", checkpoint);
             final long minGenerationToRecoverFrom = checkpoint.minTranslogGeneration;
 
             // we open files in reverse order in order to validate the translog uuid before we start traversing the translog based on
@@ -229,7 +229,7 @@ public abstract class Translog extends AbstractIndexShardComponent implements In
                     + reader.getPrimaryTerm()
                     + "]";
                 foundTranslogs.add(reader);
-                logger.debug("recovered local translog from checkpoint {}", checkpoint);
+                logger.info("recovered local translog from checkpoint {}", checkpoint);
             }
             Collections.reverse(foundTranslogs);
 
@@ -360,7 +360,7 @@ public abstract class Translog extends AbstractIndexShardComponent implements In
                     closeFilesIfNoPendingRetentionLocks();
                 }
             } finally {
-                logger.debug("translog closed");
+                logger.info("translog closed");
             }
         }
     }
@@ -1713,7 +1713,7 @@ public abstract class Translog extends AbstractIndexShardComponent implements In
                 copyCheckpointTo(location.resolve(getCommitCheckpointFileName(current.getGeneration())));
                 // create a new translog file; this will sync it and update the checkpoint data;
                 current = createWriter(current.getGeneration() + 1);
-                logger.trace("current translog set to [{}]", current.getGeneration());
+                logger.info("current translog set to [{}]", current.getGeneration());
             } catch (final Exception e) {
                 tragedy.setTragicException(e);
                 closeOnTragicEvent(e);
@@ -1760,7 +1760,7 @@ public abstract class Translog extends AbstractIndexShardComponent implements In
                 iterator.remove();
                 IOUtils.closeWhileHandlingException(reader);
                 final Path translogPath = reader.path();
-                logger.trace("delete translog file [{}], not referenced and not current anymore", translogPath);
+                logger.info("delete translog file [{}], not referenced and not current anymore", translogPath);
                 // The checkpoint is used when opening the translog to know which files should be recovered from.
                 // We now update the checkpoint to ignore the file we are going to remove.
                 // Note that there is a provision in recoverFromFiles to allow for the case where we synced the checkpoint
@@ -1819,7 +1819,7 @@ public abstract class Translog extends AbstractIndexShardComponent implements In
     void closeFilesIfNoPendingRetentionLocks() throws IOException {
         try (ReleasableLock ignored = writeLock.acquire()) {
             if (closed.get() && deletionPolicy.pendingTranslogRefCount() == 0) {
-                logger.trace("closing files. translog is closed and there are no pending retention locks");
+                logger.info("closing files. translog is closed and there are no pending retention locks");
                 ArrayList<Closeable> toClose = new ArrayList<>(readers);
                 toClose.add(current);
                 IOUtils.close(toClose);

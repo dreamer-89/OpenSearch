@@ -374,7 +374,7 @@ public class NRTReplicationEngine extends Engine {
             } catch (Exception e) {
                 logger.warn("failed to close engine", e);
             } finally {
-                logger.debug("engine closed [{}]", reason);
+                logger.info("--> engine closed [{}]", reason);
                 closedLatch.countDown();
             }
         }

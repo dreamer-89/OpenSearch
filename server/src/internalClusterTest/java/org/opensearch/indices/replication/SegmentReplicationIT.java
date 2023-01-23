@@ -95,6 +95,20 @@ public class SegmentReplicationIT extends OpenSearchIntegTestCase {
         return Settings.builder().put(super.featureFlagSettings()).put(FeatureFlags.REPLICATION_TYPE, "true").build();
     }
 
+    protected void createIndex(String idxName, int shardCount, int replicaCount, boolean isSegRep) {
+        Settings.Builder builder = Settings.builder()
+            .put("index.number_of_shards", shardCount)
+            .put(IndexModule.INDEX_QUERY_CACHE_ENABLED_SETTING.getKey(), false)
+            .put("index.number_of_replicas", replicaCount);
+        if (isSegRep) {
+            builder = builder.put(IndexMetadata.SETTING_REPLICATION_TYPE, ReplicationType.SEGMENT);
+        } else {
+            builder = builder.put(IndexMetadata.SETTING_REPLICATION_TYPE, ReplicationType.DOCUMENT);
+        }
+        prepareCreate(idxName, builder).get();
+    }
+
+
     public void ingestDocs(int docCount) throws Exception {
         try (
             BackgroundIndexer indexer = new BackgroundIndexer(

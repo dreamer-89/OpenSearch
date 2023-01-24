@@ -108,7 +108,6 @@ public class SegmentReplicationIT extends OpenSearchIntegTestCase {
         prepareCreate(idxName, builder).get();
     }
 
-
     public void ingestDocs(int docCount) throws Exception {
         try (
             BackgroundIndexer indexer = new BackgroundIndexer(

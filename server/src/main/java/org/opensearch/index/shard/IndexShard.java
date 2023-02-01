@@ -1010,49 +1010,49 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
         final Engine.IndexResult result;
         index = indexingOperationListeners.preIndex(shardId, index);
         try {
-//             if(true) {
-                // don't use index.source().utf8ToString() here source might not be valid UTF-8
-                logger.info(
-                    "index [{}] seq# [{}] allocation-id [{}] primaryTerm [{}] operationPrimaryTerm [{}] origin [{}]",
+            // if(true) {
+            // don't use index.source().utf8ToString() here source might not be valid UTF-8
+            logger.info(
+                "index [{}] seq# [{}] allocation-id [{}] primaryTerm [{}] operationPrimaryTerm [{}] origin [{}]",
+                index.id(),
+                index.seqNo(),
+                routingEntry().allocationId(),
+                index.primaryTerm(),
+                getOperationPrimaryTerm(),
+                index.origin()
+            );
+            // }
+            result = engine.index(index);
+            // if(true) {
+            logger.info(
+                "index-done [{}] seq# [{}] allocation-id [{}] primaryTerm [{}] operationPrimaryTerm [{}] origin [{}] "
+                    + "result-seq# [{}] result-term [{}] failure [{}]",
+                index.id(),
+                index.seqNo(),
+                routingEntry().allocationId(),
+                index.primaryTerm(),
+                getOperationPrimaryTerm(),
+                index.origin(),
+                result.getSeqNo(),
+                result.getTerm(),
+                result.getFailure()
+            );
+            // }
+        } catch (Exception e) {
+            // if(true) {
+            logger.info(
+                new ParameterizedMessage(
+                    "index-fail [{}] seq# [{}] allocation-id [{}] primaryTerm [{}] operationPrimaryTerm [{}] origin [{}]",
                     index.id(),
                     index.seqNo(),
                     routingEntry().allocationId(),
                     index.primaryTerm(),
                     getOperationPrimaryTerm(),
                     index.origin()
-                );
-//            }
-            result = engine.index(index);
-//             if(true) {
-                logger.info(
-                    "index-done [{}] seq# [{}] allocation-id [{}] primaryTerm [{}] operationPrimaryTerm [{}] origin [{}] "
-                        + "result-seq# [{}] result-term [{}] failure [{}]",
-                    index.id(),
-                    index.seqNo(),
-                    routingEntry().allocationId(),
-                    index.primaryTerm(),
-                    getOperationPrimaryTerm(),
-                    index.origin(),
-                    result.getSeqNo(),
-                    result.getTerm(),
-                    result.getFailure()
-                );
-//            }
-        } catch (Exception e) {
-//             if(true) {
-                logger.info(
-                    new ParameterizedMessage(
-                        "index-fail [{}] seq# [{}] allocation-id [{}] primaryTerm [{}] operationPrimaryTerm [{}] origin [{}]",
-                        index.id(),
-                        index.seqNo(),
-                        routingEntry().allocationId(),
-                        index.primaryTerm(),
-                        getOperationPrimaryTerm(),
-                        index.origin()
-                    ),
-                    e
-                );
-//            }
+                ),
+                e
+            );
+            // }
             indexingOperationListeners.postIndex(shardId, index, e);
             throw e;
         }
@@ -1079,7 +1079,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
 
     private Engine.NoOpResult noOp(Engine engine, Engine.NoOp noOp) throws IOException {
         active.set(true);
-         if(true) {
+        if (true) {
             logger.info("noop (seq# [{}])", noOp.seqNo());
         }
         return engine.noOp(noOp);
@@ -1169,7 +1169,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
         final Engine.DeleteResult result;
         delete = indexingOperationListeners.preDelete(shardId, delete);
         try {
-             if(true) {
+            if (true) {
                 logger.info("delete [{}] (seq no [{}])", delete.uid().text(), delete.seqNo());
             }
             result = engine.delete(delete);
@@ -1195,7 +1195,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
      */
     public void refresh(String source) {
         verifyNotClosed();
-         if(true) {
+        if (true) {
             logger.info("refresh with source [{}]", source);
         }
         getEngine().refresh(source);
@@ -1352,7 +1352,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
 
     public void forceMerge(ForceMergeRequest forceMerge) throws IOException {
         verifyActive();
-         if(true) {
+        if (true) {
             logger.info("force merge with {}", forceMerge);
         }
         Engine engine = getEngine();
@@ -1371,7 +1371,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
      */
     public org.apache.lucene.util.Version upgrade(UpgradeRequest upgrade) throws IOException {
         verifyActive();
-         if(true) {
+        if (true) {
             logger.info("upgrade with {}", upgrade);
         }
         org.apache.lucene.util.Version previousVersion = minimumCompatibleVersion();
@@ -1386,7 +1386,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
             null
         );
         org.apache.lucene.util.Version version = minimumCompatibleVersion();
-         if(true) {
+        if (true) {
             logger.info("upgraded segments for {} from version {} to version {}", shardId, previousVersion, version);
         }
 
@@ -4035,7 +4035,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
                 setRefreshPending(engine);
                 return false;
             } else {
-                 if(true) {
+                if (true) {
                     logger.info("refresh with source [schedule]");
                 }
                 return getEngine().maybeRefresh("schedule");
@@ -4222,10 +4222,18 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
         sync(); // persist the global checkpoint to disk
         final SeqNoStats seqNoStats = seqNoStats();
         final TranslogStats translogStats = translogStats();
-        logger.info("--> Translog operations {} Uncommitted {}", translogStats.estimatedNumberOfOperations(), translogStats.getUncommittedOperations());
+        logger.info(
+            "--> Translog operations {} Uncommitted {}",
+            translogStats.estimatedNumberOfOperations(),
+            translogStats.getUncommittedOperations()
+        );
         // flush to make sure the latest commit, which will be opened by the read-only engine, includes all operations.
         flush(new FlushRequest().waitIfOngoing(true));
-        logger.info("--> Translog operations {} Uncommitted {}", translogStats.estimatedNumberOfOperations(), translogStats.getUncommittedOperations());
+        logger.info(
+            "--> Translog operations {} Uncommitted {}",
+            translogStats.estimatedNumberOfOperations(),
+            translogStats.getUncommittedOperations()
+        );
 
         SetOnce<Engine> newEngineReference = new SetOnce<>();
         final long globalCheckpoint = getLastKnownGlobalCheckpoint();

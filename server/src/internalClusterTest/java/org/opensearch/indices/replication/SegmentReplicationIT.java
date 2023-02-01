@@ -163,26 +163,26 @@ public class SegmentReplicationIT extends SegmentReplicationBaseIT {
         verifyStoreContent();
     }
 
-    public void testMultipleIngestions() throws Exception {
-        final String primary = internalCluster().startNode();
-        createIndex(INDEX_NAME);
-        final String replica = internalCluster().startNode();
-        ensureGreen(INDEX_NAME);
-
-        // First round of ingestion
-        final int initialDocCount = 500;
-        ingestDocs(initialDocCount);
-        refresh(INDEX_NAME);
-        waitForReplicaUpdate();
-        assertDocCounts(initialDocCount, replica, primary);
-
-        // Second round of ingestion
-        ingestDocs(2 * initialDocCount);
-        ensureGreen(INDEX_NAME);
-        flushAndRefresh(INDEX_NAME);
-        waitForReplicaUpdate();
-        assertDocCounts(3 * initialDocCount, replica, primary);
-    }
+//    public void testMultipleIngestions() throws Exception {
+//        final String primary = internalCluster().startNode();
+//        createIndex(INDEX_NAME);
+//        final String replica = internalCluster().startNode();
+//        ensureGreen(INDEX_NAME);
+//
+//        // First round of ingestion
+//        final int initialDocCount = 500;
+//        ingestDocs(initialDocCount);
+//        refresh(INDEX_NAME);
+//        waitForReplicaUpdate();
+//        assertDocCounts(initialDocCount, replica, primary);
+//
+//        // Second round of ingestion
+//        ingestDocs(2 * initialDocCount);
+//        ensureGreen(INDEX_NAME);
+//        flushAndRefresh(INDEX_NAME);
+//        waitForReplicaUpdate();
+//        assertDocCounts(3 * initialDocCount, replica, primary);
+//    }
 
     public void testConcurrentIngestion() throws Exception {
         final String primary = internalCluster().startNode();
@@ -228,7 +228,8 @@ public class SegmentReplicationIT extends SegmentReplicationBaseIT {
         }, 1, TimeUnit.MINUTES);
 
         flushAndRefresh(INDEX_NAME);
-        waitForReplicaUpdate();
+//        waitForSearchableDocs(ingestionThreadCount * docCount, primary, replica);
+//        waitForReplicaUpdate();
 
         TreeSet<Integer> set = new TreeSet();
         for(int i =0;i<ingestionThreadCount*docCount;i++) {

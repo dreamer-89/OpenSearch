@@ -165,7 +165,7 @@ public class SegmentReplicationSnapshotIT extends AbstractSnapshotIntegTestCase 
         assertHitCount(resp, DOC_COUNT);
     }
 
-//    @AwaitsFix(bugUrl = "https://github.com/opensearch-project/OpenSearch/issues/5669")
+    // @AwaitsFix(bugUrl = "https://github.com/opensearch-project/OpenSearch/issues/5669")
     public void testSnapshotWithIngestionPostRestore() throws Exception {
         startClusterWithSettings(segRepEnableIndexSettings(), 1);
         createSnapshot();
@@ -176,7 +176,10 @@ public class SegmentReplicationSnapshotIT extends AbstractSnapshotIntegTestCase 
         RestoreSnapshotResponse restoreSnapshotResponse = restoreSnapshotWithSettings(null);
         ensureGreen(RESTORED_INDEX_NAME);
         refresh(RESTORED_INDEX_NAME);
-        logger.info("--> docs restores {}", client().prepareSearch(RESTORED_INDEX_NAME).setQuery(QueryBuilders.matchAllQuery()).get().getHits().getTotalHits().value);
+        logger.info(
+            "--> docs restores {}",
+            client().prepareSearch(RESTORED_INDEX_NAME).setQuery(QueryBuilders.matchAllQuery()).get().getHits().getTotalHits().value
+        );
 
         // Assertions
         assertEquals(RestStatus.ACCEPTED, restoreSnapshotResponse.status());

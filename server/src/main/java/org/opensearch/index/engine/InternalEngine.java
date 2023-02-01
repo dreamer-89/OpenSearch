@@ -358,7 +358,7 @@ public class InternalEngine extends Engine {
                 }
             }
         }
-//        logger.info("--> {}", Arrays.toString(Thread.currentThread().getStackTrace()).replace( ',', '\n' ));
+        // logger.info("--> {}", Arrays.toString(Thread.currentThread().getStackTrace()).replace( ',', '\n' ));
 
         logger.info("created new InternalEngine");
     }
@@ -956,7 +956,7 @@ public class InternalEngine extends Engine {
                     );
                 }
                 logger.info("--> markSeqNoAsProcessed {}", indexResult.getSeqNo());
-                logger.info("--> {}", Arrays.toString(Thread.currentThread().getStackTrace()).replace( ',', '\n' ));
+                logger.info("--> {}", Arrays.toString(Thread.currentThread().getStackTrace()).replace(',', '\n'));
                 localCheckpointTracker.markSeqNoAsProcessed(indexResult.getSeqNo());
                 if (indexResult.getTranslogLocation() == null) {
                     // the op is coming from the translog (and is hence persisted already) or it does not have a sequence number

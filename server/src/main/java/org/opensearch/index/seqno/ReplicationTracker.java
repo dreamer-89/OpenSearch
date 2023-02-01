@@ -1428,9 +1428,9 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
             + allocationId
             + "]";
         logger.info("--> cps {}", cps);
-//        logger.info("--> {}", Arrays.toString(Thread.currentThread().getStackTrace()).replace( ',', '\n' ));
+        // logger.info("--> {}", Arrays.toString(Thread.currentThread().getStackTrace()).replace( ',', '\n' ));
         if (localCheckpoint > cps.localCheckpoint) {
-            logger.info("--> {}", Arrays.toString(Thread.currentThread().getStackTrace()).replace( ',', '\n' ));
+            logger.info("--> {}", Arrays.toString(Thread.currentThread().getStackTrace()).replace(',', '\n'));
             logger.info("updated local checkpoint of [{}] from [{}] to [{}]", allocationId, cps.localCheckpoint, localCheckpoint);
             cps.localCheckpoint = localCheckpoint;
             return true;

@@ -218,7 +218,12 @@ public class NRTReplicationEngine extends Engine {
         noOpResult.setTranslogLocation(location);
         noOpResult.setTook(System.nanoTime() - noOp.startTime());
         noOpResult.freeze();
-        logger.info("--> Translog operations {} Uncommitted {} noOp.seqNo() {}", translogManager.getTranslogStats().estimatedNumberOfOperations(), translogManager.getTranslogStats().getUncommittedOperations(), noOp.seqNo());
+        logger.info(
+            "--> Translog operations {} Uncommitted {} noOp.seqNo() {}",
+            translogManager.getTranslogStats().estimatedNumberOfOperations(),
+            translogManager.getTranslogStats().getUncommittedOperations(),
+            noOp.seqNo()
+        );
         localCheckpointTracker.advanceMaxSeqNo(noOp.seqNo());
         return noOpResult;
     }

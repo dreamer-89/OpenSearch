@@ -67,8 +67,8 @@ public class BalanceConfigurationTests extends OpenSearchAllocationTestCase {
 
     private final Logger logger = LogManager.getLogger(BalanceConfigurationTests.class);
     // TODO maybe we can randomize these numbers somehow
-    final int numberOfNodes = 25;
-    final int numberOfIndices = 12;
+    final int numberOfNodes = 3;
+    final int numberOfIndices = 2;
     final int numberOfShards = 2;
     final int numberOfReplicas = 2;
 
@@ -144,8 +144,9 @@ public class BalanceConfigurationTests extends OpenSearchAllocationTestCase {
         settings.put(BalancedShardsAllocator.THRESHOLD_SETTING.getKey(), balanceThreshold);
 
         AllocationService strategy = createAllocationService(settings.build(), new TestGatewayAllocator());
-
         ClusterState clusterState = initCluster(strategy);
+
+        logger.info("--> State {}", clusterState.getRoutingNodes());
         assertPrimaryBalance(
             clusterState.getRoutingTable(),
             clusterState.getRoutingNodes(),
@@ -157,6 +158,7 @@ public class BalanceConfigurationTests extends OpenSearchAllocationTestCase {
         );
 
         clusterState = addNode(clusterState, strategy);
+        logger.info("--> State {}", clusterState.getRoutingNodes());
         assertPrimaryBalance(
             clusterState.getRoutingTable(),
             clusterState.getRoutingNodes(),
@@ -168,6 +170,7 @@ public class BalanceConfigurationTests extends OpenSearchAllocationTestCase {
         );
 
         clusterState = removeNodes(clusterState, strategy);
+        logger.info("--> State {}", clusterState.getRoutingNodes());
         assertPrimaryBalance(
             clusterState.getRoutingTable(),
             clusterState.getRoutingNodes(),

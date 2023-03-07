@@ -12,6 +12,7 @@ import com.carrotsearch.hppc.cursors.ObjectObjectCursor;
 import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.routing.IndexRoutingTable;
+import org.opensearch.cluster.routing.IndexShardRoutingTable;
 import org.opensearch.cluster.routing.RoutingNode;
 import org.opensearch.cluster.routing.RoutingNodes;
 import org.opensearch.cluster.routing.ShardRouting;
@@ -24,6 +25,7 @@ import org.opensearch.test.InternalTestCluster;
 import org.opensearch.test.OpenSearchIntegTestCase;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -132,6 +134,36 @@ public class SegmentReplicationAllocationIT extends SegmentReplicationBaseIT {
         state = client().admin().cluster().prepareState().execute().actionGet().getState();
         logger.info(ShardAllocations.printShardDistribution(state));
         verifyPerIndexPrimaryBalance();
+    }
+
+    public void testShardStuckInit() throws Exception {
+        internalCluster().startClusterManagerOnlyNode();
+
+        final int nodeCount = 5;
+        logger.info("--> Creating {} nodes", nodeCount);
+        final List<String> nodeNames = new ArrayList<>();
+        for (int i = 0; i < nodeCount; i++) {
+            nodeNames.add(internalCluster().startNode());
+        }
+        // create index with 24 shards, 1 replica and segrep enabled
+        createIndex(INDEX_NAME, 24, 1, true);
+        ensureGreen(TimeValue.timeValueSeconds(60));
+
+        ClusterState state;
+        // restart nodes one by one and verify if shard is stuck in initialization.
+        for (int i = 0; i < nodeNames.size(); i ++) {
+            internalCluster().restartNode(nodeNames.get(i));
+            ensureGreen();
+            state = client().admin().cluster().prepareState().execute().actionGet().getState();
+            for (Iterator<IndexRoutingTable> it = state.getRoutingTable().indicesRouting().valuesIt(); it.hasNext(); ) {
+                for (Iterator<IndexShardRoutingTable> iter = it.next().iterator(); iter.hasNext(); ) {
+                    IndexShardRoutingTable indexShardRoutingTable = iter.next();
+                    for (ShardRouting shardRouting : indexShardRoutingTable.shards()) {
+                        assertFalse(shardRouting.initializing());
+                    }
+                }
+            }
+        }
     }
 
     /**

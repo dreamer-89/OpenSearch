@@ -168,7 +168,7 @@ public class PeerRecoverySourceService extends AbstractLifecycleComponent implem
 
         if (request.isPrimaryRelocation()
             && (routingEntry.relocating() == false || routingEntry.relocatingNodeId().equals(request.targetNode().getId()) == false)) {
-            logger.debug(
+            logger.info(
                 "delaying recovery of {} as source shard is not marked yet as relocating to {}",
                 request.shardId(),
                 request.targetNode()
@@ -177,7 +177,7 @@ public class PeerRecoverySourceService extends AbstractLifecycleComponent implem
         }
 
         RecoverySourceHandler handler = ongoingRecoveries.addNewRecovery(request, shard);
-        logger.trace(
+        logger.info(
             "[{}][{}] starting recovery to {}",
             request.shardId().getIndex().getName(),
             request.shardId().id(),
@@ -190,7 +190,7 @@ public class PeerRecoverySourceService extends AbstractLifecycleComponent implem
         final IndexService indexService = indicesService.indexServiceSafe(request.shardId().getIndex());
         final IndexShard shard = indexService.getShard(request.shardId().id());
 
-        logger.trace(
+        logger.info(
             "[{}][{}] reestablishing recovery {}",
             request.shardId().getIndex().getName(),
             request.shardId().id(),

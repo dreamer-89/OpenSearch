@@ -397,7 +397,7 @@ public abstract class RecoverySourceHandler {
                     phase1ExistingFileSizes.add(md.length());
                     existingTotalSizeInBytes += md.length();
                     if (logger.isTraceEnabled()) {
-                        logger.trace(
+                        logger.info(
                             "recovery [phase1]: not recovering [{}], exist in local store and has checksum [{}]," + " size [{}]",
                             md.name(),
                             md.checksum(),
@@ -411,21 +411,21 @@ public abstract class RecoverySourceHandler {
                 phase1Files.addAll(diff.missing);
                 for (StoreFileMetadata md : phase1Files) {
                     if (request.metadataSnapshot().asMap().containsKey(md.name())) {
-                        logger.trace(
+                        logger.info(
                             "recovery [phase1]: recovering [{}], exists in local store, but is different: remote [{}], local [{}]",
                             md.name(),
                             request.metadataSnapshot().asMap().get(md.name()),
                             md
                         );
                     } else {
-                        logger.trace("recovery [phase1]: recovering [{}], does not exist in remote", md.name());
+                        logger.info("recovery [phase1]: recovering [{}], does not exist in remote", md.name());
                     }
                     phase1FileNames.add(md.name());
                     phase1FileSizes.add(md.length());
                     totalSizeInBytes += md.length();
                 }
 
-                logger.trace(
+                logger.info(
                     "recovery [phase1]: recovering_files [{}] with total_size [{}], reusing_files [{}] with total_size [{}]",
                     phase1FileNames.size(),
                     new ByteSizeValue(totalSizeInBytes),
@@ -473,7 +473,7 @@ public abstract class RecoverySourceHandler {
                 final long existingTotalSize = existingTotalSizeInBytes;
                 cleanFilesStep.whenComplete(r -> {
                     final TimeValue took = stopWatch.totalTime();
-                    logger.trace("recovery [phase1]: took [{}]", took);
+                    logger.info("recovery [phase1]: took [{}]", took);
                     listener.onResponse(
                         new SendFileResult(
                             phase1FileNames,
@@ -487,14 +487,14 @@ public abstract class RecoverySourceHandler {
                     );
                 }, listener::onFailure);
             } else {
-                logger.trace("skipping [phase1] since source and target have identical sync id [{}]", recoverySourceMetadata.getSyncId());
+                logger.info("skipping [phase1] since source and target have identical sync id [{}]", recoverySourceMetadata.getSyncId());
 
                 // but we must still create a retention lease
                 final StepListener<RetentionLease> createRetentionLeaseStep = new StepListener<>();
                 createRetentionLease(startingSeqNo, createRetentionLeaseStep);
                 createRetentionLeaseStep.whenComplete(retentionLease -> {
                     final TimeValue took = stopWatch.totalTime();
-                    logger.trace("recovery [phase1]: took [{}]", took);
+                    logger.info("recovery [phase1]: took [{}]", took);
                     listener.onResponse(
                         new SendFileResult(
                             Collections.emptyList(),
@@ -534,14 +534,14 @@ public abstract class RecoverySourceHandler {
             // not enough, and fall back to a file-based recovery.
             //
             // (approximately) because we do not guarantee to be able to satisfy every lease on every peer.
-            logger.trace("cloning primary's retention lease");
+            logger.info("cloning primary's retention lease");
             try {
                 final StepListener<ReplicationResponse> cloneRetentionLeaseStep = new StepListener<>();
                 final RetentionLease clonedLease = shard.cloneLocalPeerRecoveryRetentionLease(
                     request.targetNode().getId(),
                     new ThreadedActionListener<>(logger, shard.getThreadPool(), ThreadPool.Names.GENERIC, cloneRetentionLeaseStep, false)
                 );
-                logger.trace("cloned primary's retention lease as [{}]", clonedLease);
+                logger.info("cloned primary's retention lease as [{}]", clonedLease);
                 cloneRetentionLeaseStep.whenComplete(rr -> listener.onResponse(clonedLease), listener::onFailure);
             } catch (RetentionLeaseNotFoundException e) {
                 // it's possible that the primary has no retention lease yet if we are doing a rolling upgrade from a version before
@@ -557,7 +557,7 @@ public abstract class RecoverySourceHandler {
                     new ThreadedActionListener<>(logger, shard.getThreadPool(), ThreadPool.Names.GENERIC, addRetentionLeaseStep, false)
                 );
                 addRetentionLeaseStep.whenComplete(rr -> listener.onResponse(newLease), listener::onFailure);
-                logger.trace("created retention lease with estimated checkpoint of [{}]", estimatedGlobalCheckpoint);
+                logger.info("created retention lease with estimated checkpoint of [{}]", estimatedGlobalCheckpoint);
             }
         }, shardId + " establishing retention lease for [" + request.targetAllocationId() + "]", shard, cancellableThreads, logger);
     }
@@ -604,12 +604,12 @@ public abstract class RecoverySourceHandler {
         final ActionListener<Void> wrappedListener = ActionListener.wrap(nullVal -> {
             stopWatch.stop();
             final TimeValue tookTime = stopWatch.totalTime();
-            logger.trace("recovery [phase1]: remote engine start took [{}]", tookTime);
+            logger.info("recovery [phase1]: remote engine start took [{}]", tookTime);
             listener.onResponse(tookTime);
         }, e -> listener.onFailure(new RecoveryEngineException(shard.shardId(), 1, "prepare target for translog failed", e)));
         // Send a request preparing the new shard's translog to receive operations. This ensures the shard engine is started and disables
         // garbage collection (not the JVM's GC!) of tombstone deletes.
-        logger.trace("recovery [phase1]: prepare remote engine for translog");
+        logger.info("recovery [phase1]: prepare remote engine for translog");
         cancellableThreads.checkForCancel();
         recoveryTarget.prepareForTranslogOperations(totalTranslogOps, wrappedListener);
     }
@@ -642,7 +642,7 @@ public abstract class RecoverySourceHandler {
         if (shard.state() == IndexShardState.CLOSED) {
             throw new IndexShardClosedException(request.shardId());
         }
-        logger.trace("recovery [phase2]: sending transaction log operations (from [" + startingSeqNo + "] to [" + endingSeqNo + "]");
+        logger.info("recovery [phase2]: sending transaction log operations (from [" + startingSeqNo + "] to [" + endingSeqNo + "]");
         final StopWatch stopWatch = new StopWatch().start();
         final StepListener<Void> sendListener = new StepListener<>();
         final OperationBatchSender sender = new OperationBatchSender(
@@ -669,7 +669,7 @@ public abstract class RecoverySourceHandler {
             );
             stopWatch.stop();
             final TimeValue tookTime = stopWatch.totalTime();
-            logger.trace("recovery [phase2]: took [{}]", tookTime);
+            logger.info("recovery [phase2]: took [{}]", tookTime);
             listener.onResponse(new SendSnapshotResult(targetLocalCheckpoint, totalSentOps, tookTime));
         }, listener::onFailure);
         sender.start();
@@ -793,7 +793,7 @@ public abstract class RecoverySourceHandler {
         }
         cancellableThreads.checkForCancel();
         StopWatch stopWatch = new StopWatch().start();
-        logger.trace("finalizing recovery");
+        logger.info("finalizing recovery");
         /*
          * Before marking the shard as in-sync we acquire an operation permit. We do this so that there is a barrier between marking a
          * shard as in-sync and relocating a shard. If we acquire the permit then no relocation handoff can complete before we are done
@@ -821,7 +821,7 @@ public abstract class RecoverySourceHandler {
             );
 
             if (request.isPrimaryRelocation()) {
-                logger.trace("performing relocation hand-off");
+                logger.info("performing relocation hand-off");
                 final Runnable forceSegRepRunnable = shard.indexSettings().isSegRepEnabled()
                     ? recoveryTarget::forceSegmentFileSync
                     : () -> {};

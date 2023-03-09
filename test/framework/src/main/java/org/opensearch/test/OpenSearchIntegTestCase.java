@@ -140,6 +140,7 @@ import org.opensearch.index.store.Store;
 import org.opensearch.index.translog.Translog;
 import org.opensearch.indices.IndicesQueryCache;
 import org.opensearch.indices.IndicesRequestCache;
+import org.opensearch.indices.replication.common.ReplicationType;
 import org.opensearch.indices.store.IndicesStore;
 import org.opensearch.ingest.IngestMetadata;
 import org.opensearch.monitor.os.OsInfo;
@@ -850,7 +851,7 @@ public abstract class OpenSearchIntegTestCase extends OpenSearchTestCase {
      * </p>
      */
     public CreateIndexRequestBuilder prepareCreate(String index, int numNodes, Settings.Builder settingsBuilder) {
-        Settings.Builder builder = Settings.builder().put(indexSettings()).put(settingsBuilder.build());
+        Settings.Builder builder = Settings.builder().put(indexSettings()).put(settingsBuilder.put(IndexMetadata.SETTING_REPLICATION_TYPE, ReplicationType.SEGMENT).build());
 
         if (numNodes > 0) {
             internalCluster().ensureAtLeastNumDataNodes(numNodes);
@@ -2074,7 +2075,7 @@ public abstract class OpenSearchIntegTestCase extends OpenSearchTestCase {
      * Returns {@code true} if this test cluster can use a mock internal engine. Defaults to true.
      */
     protected boolean addMockInternalEngine() {
-        return true;
+        return false;
     }
 
     /** Returns {@code true} iff this test cluster should use a dummy geo_shape field mapper */

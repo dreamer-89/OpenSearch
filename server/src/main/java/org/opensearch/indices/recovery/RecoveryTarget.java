@@ -142,7 +142,7 @@ public class RecoveryTarget extends ReplicationTarget implements RecoveryTargetH
         final long recoveryId = getId();
         if (finished.compareAndSet(false, true)) {
             try {
-                logger.debug("reset of recovery with shard {} and id [{}]", shardId(), recoveryId);
+                logger.info("reset of recovery with shard {} and id [{}]", shardId(), recoveryId);
             } finally {
                 // release the initial reference. recovery files will be cleaned as soon as ref count goes to zero, potentially now.
                 decRef();
@@ -150,7 +150,7 @@ public class RecoveryTarget extends ReplicationTarget implements RecoveryTargetH
             try {
                 newTargetCancellableThreads.execute(closedLatch::await);
             } catch (CancellableThreads.ExecutionCancelledException e) {
-                logger.trace(
+                logger.info(
                     "new recovery target cancelled for shard {} while waiting on old recovery target with id [{}] to close",
                     shardId(),
                     recoveryId
@@ -182,7 +182,7 @@ public class RecoveryTarget extends ReplicationTarget implements RecoveryTargetH
     public void cancel(String reason) {
         if (finished.compareAndSet(false, true)) {
             try {
-                logger.debug("recovery canceled (reason: [{}])", reason);
+                logger.info("recovery canceled (reason: [{}])", reason);
                 cancellableThreads.cancel(reason);
             } finally {
                 // release the initial reference. recovery files will be cleaned as soon as ref count goes to zero, potentially now
@@ -449,7 +449,7 @@ public class RecoveryTarget extends ReplicationTarget implements RecoveryTargetH
                         Lucene.cleanLuceneIndex(store.directory()); // clean up and delete all files
                     }
                 } catch (Exception e) {
-                    logger.debug("Failed to clean lucene index", e);
+                    logger.info("Failed to clean lucene index", e);
                     ex.addSuppressed(e);
                 }
                 RecoveryFailedException rfe = new RecoveryFailedException(state(), "failed to clean after recovery", ex);

@@ -57,6 +57,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
 
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, minNumDataNodes = 2)
 public class IndexActionIT extends OpenSearchIntegTestCase {
     /**
      * This test tries to simulate load while creating an index and indexing documents

@@ -62,6 +62,8 @@ import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertSecondHit;
 import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertThirdHit;
 import static org.opensearch.test.hamcrest.OpenSearchAssertions.hasScore;
 
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, minNumDataNodes = 2)
+
 public class ScriptScoreQueryIT extends OpenSearchIntegTestCase {
 
     @Override

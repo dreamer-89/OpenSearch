@@ -364,7 +364,6 @@ public class SegmentReplicationTargetService implements IndexEventListener {
                         }
                     } else {
                         onGoingReplications.fail(replicationId, new ReplicationFailedException("Segment Replication failed", e), false);
-                        logger.info("--> engine type {}", target.indexShard().getEngine().getClass());
                     }
                 }
             });

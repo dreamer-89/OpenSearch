@@ -74,6 +74,7 @@ import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertAllSuccess
 import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertHitCount;
 import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertNoTimeout;
 
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, minNumDataNodes = 2)
 public class RecoveryWhileUnderLoadIT extends OpenSearchIntegTestCase {
     private final Logger logger = LogManager.getLogger(RecoveryWhileUnderLoadIT.class);
 

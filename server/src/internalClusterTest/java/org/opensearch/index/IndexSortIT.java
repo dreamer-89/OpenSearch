@@ -45,6 +45,7 @@ import java.io.IOException;
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.hamcrest.Matchers.containsString;
 
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, minNumDataNodes = 2)
 public class IndexSortIT extends OpenSearchIntegTestCase {
     private static final XContentBuilder TEST_MAPPING = createTestMapping();
 

@@ -76,7 +76,7 @@ import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertAcked;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasSize;
 
-@OpenSearchIntegTestCase.ClusterScope(minNumDataNodes = 2)
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, minNumDataNodes = 2)
 public class CloseWhileRelocatingShardsIT extends OpenSearchIntegTestCase {
 
     @Override

@@ -43,6 +43,7 @@ import org.junit.After;
 import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertAcked;
 import static org.hamcrest.Matchers.equalTo;
 
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, minNumDataNodes = 2)
 public class DestructiveOperationsIT extends OpenSearchIntegTestCase {
 
     @After

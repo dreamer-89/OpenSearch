@@ -32,6 +32,7 @@
 
 package org.opensearch.action.admin.cluster.node.tasks;
 
+import org.apache.lucene.tests.util.LuceneTestCase;
 import org.opensearch.OpenSearchException;
 import org.opensearch.OpenSearchTimeoutException;
 import org.opensearch.ExceptionsHelper;
@@ -119,6 +120,7 @@ import static org.hamcrest.Matchers.startsWith;
  * <p>
  * We need at least 2 nodes so we have a cluster-manager node a non-cluster-manager node
  */
+@LuceneTestCase.AwaitsFix(bugUrl = "https://github.com/opensearch-project/OpenSearch/issues/2515")
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.SUITE, minNumDataNodes = 2)
 public class TasksIT extends OpenSearchIntegTestCase {
 

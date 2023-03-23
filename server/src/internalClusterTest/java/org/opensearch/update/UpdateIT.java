@@ -81,6 +81,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, minNumDataNodes = 2)
 public class UpdateIT extends OpenSearchIntegTestCase {
 
     private static final String UPDATE_SCRIPTS = "update_scripts";

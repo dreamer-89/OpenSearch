@@ -64,6 +64,8 @@ import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, minNumDataNodes = 2)
+
 public class SimpleGetFieldMappingsIT extends OpenSearchIntegTestCase {
 
     @Override

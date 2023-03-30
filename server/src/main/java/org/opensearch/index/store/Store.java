@@ -818,7 +818,7 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
                 || localSnapshot.contains(existingFile)
                 || (additionalFiles != null && additionalFiles.contains(existingFile))
                 // also ensure we are not deleting a file referenced by an active reader.
-                || replicaFileTracker != null && replicaFileTracker.canDelete(existingFile) == false) {
+                ) {
                 // don't delete snapshot file, or the checksums file (note, this is extra protection since the Store won't delete
                 // checksum)
                 continue;
@@ -1919,15 +1919,15 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
             .setMergePolicy(NoMergePolicy.INSTANCE);
     }
 
-    public void incRefFileDeleter(Collection<String> files) {
-        if (this.indexSettings.isSegRepEnabled()) {
-            this.replicaFileTracker.incRef(files);
-        }
-    }
-
-    public void decrefFileDeleter(Collection<String> files) {
-        if (this.indexSettings.isSegRepEnabled()) {
-            this.replicaFileTracker.decRef(files);
-        }
-    }
+//    public void incRefFileDeleter(Collection<String> files) {
+//        if (this.indexSettings.isSegRepEnabled()) {
+//            this.replicaFileTracker.incRef(files);
+//        }
+//    }
+//
+//    public void decrefFileDeleter(Collection<String> files) {
+//        if (this.indexSettings.isSegRepEnabled()) {
+//            this.replicaFileTracker.decRef(files);
+//        }
+//    }
 }

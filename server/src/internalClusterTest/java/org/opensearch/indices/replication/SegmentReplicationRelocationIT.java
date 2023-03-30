@@ -41,7 +41,7 @@ import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertHitCount;
  */
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, numDataNodes = 0)
 public class SegmentReplicationRelocationIT extends SegmentReplicationBaseIT {
-    private final TimeValue ACCEPTABLE_RELOCATION_TIME = new TimeValue(5, TimeUnit.MINUTES);
+    private final TimeValue ACCEPTABLE_RELOCATION_TIME = new TimeValue(2, TimeUnit.MINUTES);
 
     private void createIndex(int replicaCount) {
         prepareCreate(INDEX_NAME, Settings.builder().put(SETTING_NUMBER_OF_REPLICAS, replicaCount)).get();
@@ -214,6 +214,7 @@ public class SegmentReplicationRelocationIT extends SegmentReplicationBaseIT {
      *
      */
     public void testRelocateWhileContinuouslyIndexingAndWaitingForRefresh() throws Exception {
+        internalCluster().startClusterManagerOnlyNode();
         final String primary = internalCluster().startNode();
         createIndex(1);
         final String replica = internalCluster().startNode();

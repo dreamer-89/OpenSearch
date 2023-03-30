@@ -46,18 +46,18 @@ public class NRTReplicationReaderManager extends OpenSearchReaderManager {
      * the incoming reference.
      *
      * @param reader         - The SegmentReplicationReaderManager to use for future reopens.
-     * @param onNewReader    - Called when a new reader is created.
-     * @param onReaderClosed - Called when a reader is closed.
+//     * @param onNewReader    - Called when a new reader is created.
+//     * @param onReaderClosed - Called when a reader is closed.
      */
     NRTReplicationReaderManager(
-        OpenSearchDirectoryReader reader,
-        Consumer<Collection<String>> onNewReader,
-        Consumer<Collection<String>> onReaderClosed
+        OpenSearchDirectoryReader reader
+//        Consumer<Collection<String>> onNewReader,
+//        Consumer<Collection<String>> onReaderClosed
     ) {
         super(reader);
         currentInfos = unwrapStandardReader(reader).getSegmentInfos();
-        this.onNewReader = onNewReader;
-        this.onReaderClosed = onReaderClosed;
+//        this.onNewReader = onNewReader;
+//        this.onReaderClosed = onReaderClosed;
     }
 
     @Override
@@ -72,7 +72,7 @@ public class NRTReplicationReaderManager extends OpenSearchReaderManager {
         for (LeafReaderContext ctx : standardDirectoryReader.leaves()) {
             subs.add(ctx.reader());
         }
-        final Collection<String> files = currentInfos.files(true);
+//        final Collection<String> files = currentInfos.files(true);
         DirectoryReader innerReader = StandardDirectoryReader.open(referenceToRefresh.directory(), currentInfos, subs, null);
         final DirectoryReader softDeletesDirectoryReaderWrapper = new SoftDeletesDirectoryReaderWrapper(
             innerReader,
@@ -85,8 +85,8 @@ public class NRTReplicationReaderManager extends OpenSearchReaderManager {
             softDeletesDirectoryReaderWrapper,
             referenceToRefresh.shardId()
         );
-        onNewReader.accept(files);
-        OpenSearchDirectoryReader.addReaderCloseListener(reader, key -> onReaderClosed.accept(files));
+//        onNewReader.accept(files);
+//        OpenSearchDirectoryReader.addReaderCloseListener(reader, key -> onReaderClosed.accept(files));
         return reader;
     }
 
@@ -108,7 +108,7 @@ public class NRTReplicationReaderManager extends OpenSearchReaderManager {
         return currentInfos;
     }
 
-    public static StandardDirectoryReader unwrapStandardReader(OpenSearchDirectoryReader reader) {
+    private StandardDirectoryReader unwrapStandardReader(OpenSearchDirectoryReader reader) {
         final DirectoryReader delegate = reader.getDelegate();
         if (delegate instanceof SoftDeletesDirectoryReaderWrapper) {
             return (StandardDirectoryReader) ((SoftDeletesDirectoryReaderWrapper) delegate).getDelegate();

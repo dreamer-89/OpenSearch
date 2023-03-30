@@ -214,6 +214,7 @@ public class SegmentReplicationRelocationIT extends SegmentReplicationBaseIT {
      *
      */
     public void testRelocateWhileContinuouslyIndexingAndWaitingForRefresh() throws Exception {
+        internalCluster().startClusterManagerOnlyNode();
         final String primary = internalCluster().startNode();
         createIndex(1);
         final String replica = internalCluster().startNode();

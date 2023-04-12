@@ -134,7 +134,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasItem;
 
-@ClusterScope(scope = Scope.SUITE, numClientNodes = 1, minNumDataNodes = 2)
+@ClusterScope(scope = Scope.TEST, numClientNodes = 1, minNumDataNodes = 2)
 public class IndicesRequestIT extends OpenSearchIntegTestCase {
 
     private final List<String> indices = new ArrayList<>();

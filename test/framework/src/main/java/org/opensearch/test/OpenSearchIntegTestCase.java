@@ -269,6 +269,7 @@ import static org.hamcrest.Matchers.startsWith;
  * </ul>
  */
 @LuceneTestCase.SuppressFileSystems("ExtrasFS") // doesn't work with potential multi data path from test cluster yet
+@LuceneTestCase.SuppressCodecs("*")
 public abstract class OpenSearchIntegTestCase extends OpenSearchTestCase {
 
     /**

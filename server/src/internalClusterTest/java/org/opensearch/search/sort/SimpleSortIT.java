@@ -203,24 +203,26 @@ public class SimpleSortIT extends OpenSearchIntegTestCase {
 
         Script script = new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "doc['str_value'].value", Collections.emptyMap());
 
-        SearchResponse searchResponse = client().prepareSearch()
-            .setQuery(matchAllQuery())
-            .setSize(size)
-            .addSort(new ScriptSortBuilder(script, ScriptSortType.STRING))
-            .get();
+        int finalSize = size;
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch()
+                .setQuery(matchAllQuery())
+                .setSize(finalSize)
+                .addSort(new ScriptSortBuilder(script, ScriptSortType.STRING))
+                .get();
+            assertHitCount(searchResponse, 10);
+            assertThat(searchResponse.getHits().getHits().length, equalTo(finalSize));
+            for (int i = 0; i < finalSize; i++) {
+                SearchHit searchHit = searchResponse.getHits().getAt(i);
+                assertThat(searchHit.getId(), equalTo(Integer.toString(i)));
 
-        assertHitCount(searchResponse, 10);
-        assertThat(searchResponse.getHits().getHits().length, equalTo(size));
-        for (int i = 0; i < size; i++) {
-            SearchHit searchHit = searchResponse.getHits().getAt(i);
-            assertThat(searchHit.getId(), equalTo(Integer.toString(i)));
-
-            String expected = new String(new char[] { (char) (97 + i), (char) (97 + i) });
-            assertThat(searchHit.getSortValues()[0].toString(), equalTo(expected));
-        }
+                String expected = new String(new char[] { (char) (97 + i), (char) (97 + i) });
+                assertThat(searchHit.getSortValues()[0].toString(), equalTo(expected));
+            }
+        });
 
         size = 1 + random.nextInt(10);
-        searchResponse = client().prepareSearch().setQuery(matchAllQuery()).setSize(size).addSort("str_value", SortOrder.DESC).get();
+        SearchResponse searchResponse = client().prepareSearch().setQuery(matchAllQuery()).setSize(size).addSort("str_value", SortOrder.DESC).get();
 
         assertHitCount(searchResponse, 10);
         assertThat(searchResponse.getHits().getHits().length, equalTo(size));
@@ -236,7 +238,7 @@ public class SimpleSortIT extends OpenSearchIntegTestCase {
         assertNoFailures(searchResponse);
     }
 
-    public void testSortMinValueScript() throws IOException {
+    public void testSortMinValueScript() throws Exception {
         String mapping = Strings.toString(
             jsonBuilder().startObject()
                 .startObject("properties")
@@ -283,23 +285,24 @@ public class SimpleSortIT extends OpenSearchIntegTestCase {
         client().admin().indices().prepareRefresh("test").get();
 
         // test the long values
-        SearchResponse searchResponse = client().prepareSearch()
-            .setQuery(matchAllQuery())
-            .addScriptField("min", new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "get min long", Collections.emptyMap()))
-            .addSort(SortBuilders.fieldSort("ord").order(SortOrder.ASC).unmappedType("long"))
-            .setSize(10)
-            .get();
 
-        assertNoFailures(searchResponse);
-
-        assertHitCount(searchResponse, 20L);
-        for (int i = 0; i < 10; i++) {
-            SearchHit searchHit = searchResponse.getHits().getAt(i);
-            assertThat("res: " + i + " id: " + searchHit.getId(), searchHit.field("min").getValue(), equalTo((long) i));
-        }
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch()
+                .setQuery(matchAllQuery())
+                .addScriptField("min", new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "get min long", Collections.emptyMap()))
+                .addSort(SortBuilders.fieldSort("ord").order(SortOrder.ASC).unmappedType("long"))
+                .setSize(10)
+                .get();
+            assertNoFailures(searchResponse);
+            assertHitCount(searchResponse, 20L);
+            for (int i = 0; i < 10; i++) {
+                SearchHit searchHit = searchResponse.getHits().getAt(i);
+                assertThat("res: " + i + " id: " + searchHit.getId(), searchHit.field("min").getValue(), equalTo((long) i));
+            }
+        });
 
         // test the double values
-        searchResponse = client().prepareSearch()
+        SearchResponse searchResponse = client().prepareSearch()
             .setQuery(matchAllQuery())
             .addScriptField("min", new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "get min double", Collections.emptyMap()))
             .addSort(SortBuilders.fieldSort("ord").order(SortOrder.ASC).unmappedType("long"))

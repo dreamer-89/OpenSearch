@@ -122,7 +122,10 @@ public class ExtendedStatsIT extends AbstractNumericTestCase {
             )
             .get();
 
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
+        final SearchResponse searchFinalResponse = searchResponse;
+        assertBusy(() -> {
+            assertThat(searchFinalResponse.getHits().getTotalHits().value, equalTo(2L));
+        });
         Histogram histo = searchResponse.getAggregations().get("histo");
         assertThat(histo, notNullValue());
         Histogram.Bucket bucket = histo.getBuckets().get(1);

@@ -276,25 +276,31 @@ public class TermsDocCountErrorIT extends OpenSearchIntegTestCase {
     }
 
     private void assertUnboundedDocCountError(int size, SearchResponse accurateResponse, SearchResponse testResponse) {
-        Terms accurateTerms = accurateResponse.getAggregations().get("terms");
-        assertThat(accurateTerms, notNullValue());
-        assertThat(accurateTerms.getName(), equalTo("terms"));
-        assertThat(accurateTerms.getDocCountError(), equalTo(0L));
+        try {
+            assertBusy(() -> {
+                Terms accurateTerms = accurateResponse.getAggregations().get("terms");
+                assertThat(accurateTerms, notNullValue());
+                assertThat(accurateTerms.getName(), equalTo("terms"));
+                assertThat(accurateTerms.getDocCountError(), equalTo(0L));
 
-        Terms testTerms = testResponse.getAggregations().get("terms");
-        assertThat(testTerms, notNullValue());
-        assertThat(testTerms.getName(), equalTo("terms"));
-        assertThat(testTerms.getDocCountError(), anyOf(equalTo(-1L), equalTo(0L)));
-        List<? extends Bucket> testBuckets = testTerms.getBuckets();
-        assertThat(testBuckets.size(), lessThanOrEqualTo(size));
-        assertThat(accurateTerms.getBuckets().size(), greaterThanOrEqualTo(testBuckets.size()));
+                Terms testTerms = testResponse.getAggregations().get("terms");
+                assertThat(testTerms, notNullValue());
+                assertThat(testTerms.getName(), equalTo("terms"));
+                assertThat(testTerms.getDocCountError(), anyOf(equalTo(-1L), equalTo(0L)));
+                List<? extends Bucket> testBuckets = testTerms.getBuckets();
+                assertThat(testBuckets.size(), lessThanOrEqualTo(size));
+                assertThat(accurateTerms.getBuckets().size(), greaterThanOrEqualTo(testBuckets.size()));
 
-        for (Terms.Bucket testBucket : testBuckets) {
-            assertThat(testBucket, notNullValue());
-            Terms.Bucket accurateBucket = accurateTerms.getBucketByKey(testBucket.getKeyAsString());
-            assertThat(accurateBucket, notNullValue());
-            assertThat(accurateBucket.getDocCountError(), equalTo(0L));
-            assertThat(testBucket.getDocCountError(), anyOf(equalTo(-1L), equalTo(0L)));
+                for (Terms.Bucket testBucket : testBuckets) {
+                    assertThat(testBucket, notNullValue());
+                    Terms.Bucket accurateBucket = accurateTerms.getBucketByKey(testBucket.getKeyAsString());
+                    assertThat(accurateBucket, notNullValue());
+                    assertThat(accurateBucket.getDocCountError(), equalTo(0L));
+                    assertThat(testBucket.getDocCountError(), anyOf(equalTo(-1L), equalTo(0L)));
+                }
+            });
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 

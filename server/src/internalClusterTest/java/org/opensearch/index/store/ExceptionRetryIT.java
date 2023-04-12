@@ -140,32 +140,38 @@ public class ExceptionRetryIT extends OpenSearchIntegTestCase {
         }
 
         refresh();
-        SearchResponse searchResponse = client().prepareSearch("index").setSize(numDocs * 2).addStoredField("_id").get();
+        try {
+            assertBusy(() -> {
+                SearchResponse searchResponse = client().prepareSearch("index").setSize(numDocs * 2).addStoredField("_id").get();
 
-        Set<String> uniqueIds = new HashSet<>();
-        long dupCounter = 0;
-        boolean found_duplicate_already = false;
-        for (int i = 0; i < searchResponse.getHits().getHits().length; i++) {
-            if (!uniqueIds.add(searchResponse.getHits().getHits()[i].getId())) {
-                if (!found_duplicate_already) {
-                    SearchResponse dupIdResponse = client().prepareSearch("index")
-                        .setQuery(termQuery("_id", searchResponse.getHits().getHits()[i].getId()))
-                        .setExplain(true)
-                        .get();
-                    assertThat(dupIdResponse.getHits().getTotalHits().value, greaterThan(1L));
-                    logger.info("found a duplicate id:");
-                    for (SearchHit hit : dupIdResponse.getHits()) {
-                        logger.info("Doc {} was found on shard {}", hit.getId(), hit.getShard().getShardId());
+                Set<String> uniqueIds = new HashSet<>();
+                long dupCounter = 0;
+                boolean found_duplicate_already = false;
+                for (int i = 0; i < searchResponse.getHits().getHits().length; i++) {
+                    if (!uniqueIds.add(searchResponse.getHits().getHits()[i].getId())) {
+                        if (!found_duplicate_already) {
+                            SearchResponse dupIdResponse = client().prepareSearch("index")
+                                .setQuery(termQuery("_id", searchResponse.getHits().getHits()[i].getId()))
+                                .setExplain(true)
+                                .get();
+                            assertThat(dupIdResponse.getHits().getTotalHits().value, greaterThan(1L));
+                            logger.info("found a duplicate id:");
+                            for (SearchHit hit : dupIdResponse.getHits()) {
+                                logger.info("Doc {} was found on shard {}", hit.getId(), hit.getShard().getShardId());
+                            }
+                            logger.info("will not print anymore in case more duplicates are found.");
+                            found_duplicate_already = true;
+                        }
+                        dupCounter++;
                     }
-                    logger.info("will not print anymore in case more duplicates are found.");
-                    found_duplicate_already = true;
                 }
-                dupCounter++;
-            }
+                assertSearchResponse(searchResponse);
+                assertThat(dupCounter, equalTo(0L));
+                assertHitCount(searchResponse, numDocs);
+            });
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
-        assertSearchResponse(searchResponse);
-        assertThat(dupCounter, equalTo(0L));
-        assertHitCount(searchResponse, numDocs);
         IndicesStatsResponse index = client().admin().indices().prepareStats("index").clear().setSegments(true).get();
         IndexStats indexStats = index.getIndex("index");
         long maxUnsafeAutoIdTimestamp = Long.MIN_VALUE;

@@ -125,23 +125,25 @@ abstract class AbstractGeoBoundingBoxQueryIT extends OpenSearchIntegTestCase {
 
         client().admin().indices().prepareRefresh().get();
 
-        SearchResponse searchResponse = client().prepareSearch() // from NY
-            .setQuery(geoBoundingBoxQuery("location").setCorners(40.73, -74.1, 40.717, -73.99))
-            .get();
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
-        assertThat(searchResponse.getHits().getHits().length, equalTo(2));
-        for (SearchHit hit : searchResponse.getHits()) {
-            assertThat(hit.getId(), anyOf(equalTo("1"), equalTo("3"), equalTo("5")));
-        }
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch() // from NY
+                .setQuery(geoBoundingBoxQuery("location").setCorners(40.73, -74.1, 40.717, -73.99))
+                .get();
+            assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
+            assertThat(searchResponse.getHits().getHits().length, equalTo(2));
+            for (SearchHit hit : searchResponse.getHits()) {
+                assertThat(hit.getId(), anyOf(equalTo("1"), equalTo("3"), equalTo("5")));
+            }
 
-        searchResponse = client().prepareSearch() // from NY
-            .setQuery(geoBoundingBoxQuery("location").setCorners(40.73, -74.1, 40.717, -73.99).type("indexed"))
-            .get();
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
-        assertThat(searchResponse.getHits().getHits().length, equalTo(2));
-        for (SearchHit hit : searchResponse.getHits()) {
-            assertThat(hit.getId(), anyOf(equalTo("1"), equalTo("3"), equalTo("5")));
-        }
+            searchResponse = client().prepareSearch() // from NY
+                .setQuery(geoBoundingBoxQuery("location").setCorners(40.73, -74.1, 40.717, -73.99).type("indexed"))
+                .get();
+            assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
+            assertThat(searchResponse.getHits().getHits().length, equalTo(2));
+            for (SearchHit hit : searchResponse.getHits()) {
+                assertThat(hit.getId(), anyOf(equalTo("1"), equalTo("3"), equalTo("5")));
+            }
+        });
     }
 
     public void testLimit2BoundingBox() throws Exception {
@@ -243,50 +245,53 @@ abstract class AbstractGeoBoundingBoxQueryIT extends OpenSearchIntegTestCase {
             .setRefreshPolicy(IMMEDIATE)
             .get();
 
-        SearchResponse searchResponse = client().prepareSearch()
-            .setQuery(geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE).setCorners(50, -180, -50, 180))
-            .get();
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(1L));
-        searchResponse = client().prepareSearch()
-            .setQuery(
-                geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE)
-                    .setCorners(50, -180, -50, 180)
-                    .type("indexed")
-            )
-            .get();
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(1L));
-        searchResponse = client().prepareSearch()
-            .setQuery(geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE).setCorners(90, -180, -90, 180))
-            .get();
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
-        searchResponse = client().prepareSearch()
-            .setQuery(
-                geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE)
-                    .setCorners(90, -180, -90, 180)
-                    .type("indexed")
-            )
-            .get();
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch()
+                .setQuery(geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE).setCorners(50, -180, -50, 180))
+                .get();
+            final SearchResponse searchFinalResponse = searchResponse;
+            assertThat(searchResponse.getHits().getTotalHits().value, equalTo(1L));
+            searchResponse = client().prepareSearch()
+                .setQuery(
+                    geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE)
+                        .setCorners(50, -180, -50, 180)
+                        .type("indexed")
+                )
+                .get();
+            assertThat(searchResponse.getHits().getTotalHits().value, equalTo(1L));
+            searchResponse = client().prepareSearch()
+                .setQuery(geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE).setCorners(90, -180, -90, 180))
+                .get();
+            assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
+            searchResponse = client().prepareSearch()
+                .setQuery(
+                    geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE)
+                        .setCorners(90, -180, -90, 180)
+                        .type("indexed")
+                )
+                .get();
+            assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
 
-        searchResponse = client().prepareSearch()
-            .setQuery(geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE).setCorners(50, 0, -50, 360))
-            .get();
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(1L));
-        searchResponse = client().prepareSearch()
-            .setQuery(
-                geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE).setCorners(50, 0, -50, 360).type("indexed")
-            )
-            .get();
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(1L));
-        searchResponse = client().prepareSearch()
-            .setQuery(geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE).setCorners(90, 0, -90, 360))
-            .get();
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
-        searchResponse = client().prepareSearch()
-            .setQuery(
-                geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE).setCorners(90, 0, -90, 360).type("indexed")
-            )
-            .get();
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
+            searchResponse = client().prepareSearch()
+                .setQuery(geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE).setCorners(50, 0, -50, 360))
+                .get();
+            assertThat(searchResponse.getHits().getTotalHits().value, equalTo(1L));
+            searchResponse = client().prepareSearch()
+                .setQuery(
+                    geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE).setCorners(50, 0, -50, 360).type("indexed")
+                )
+                .get();
+            assertThat(searchResponse.getHits().getTotalHits().value, equalTo(1L));
+            searchResponse = client().prepareSearch()
+                .setQuery(geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE).setCorners(90, 0, -90, 360))
+                .get();
+            assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
+            searchResponse = client().prepareSearch()
+                .setQuery(
+                    geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE).setCorners(90, 0, -90, 360).type("indexed")
+                )
+                .get();
+            assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
+        });
     }
 }

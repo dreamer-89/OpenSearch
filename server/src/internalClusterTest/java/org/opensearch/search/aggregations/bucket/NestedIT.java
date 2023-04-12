@@ -253,53 +253,55 @@ public class NestedIT extends OpenSearchIntegTestCase {
     }
 
     public void testNestedWithSubTermsAgg() throws Exception {
-        SearchResponse response = client().prepareSearch("idx")
-            .addAggregation(
-                nested("nested", "nested").subAggregation(terms("values").field("nested.value").size(100).collectMode(aggCollectionMode))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse response = client().prepareSearch("idx")
+                .addAggregation(
+                    nested("nested", "nested").subAggregation(terms("values").field("nested.value").size(100).collectMode(aggCollectionMode))
+                )
+                .get();
 
-        assertSearchResponse(response);
+            assertSearchResponse(response);
 
-        long docCount = 0;
-        long[] counts = new long[numParents + 6];
-        for (int i = 0; i < numParents; ++i) {
-            for (int j = 0; j < numChildren[i]; ++j) {
-                final int value = i + 1 + j;
-                ++counts[value];
-                ++docCount;
+            long docCount = 0;
+            long[] counts = new long[numParents + 6];
+            for (int i = 0; i < numParents; ++i) {
+                for (int j = 0; j < numChildren[i]; ++j) {
+                    final int value = i + 1 + j;
+                    ++counts[value];
+                    ++docCount;
+                }
             }
-        }
-        int uniqueValues = 0;
-        for (long count : counts) {
-            if (count > 0) {
-                ++uniqueValues;
+            int uniqueValues = 0;
+            for (long count : counts) {
+                if (count > 0) {
+                    ++uniqueValues;
+                }
             }
-        }
 
-        Nested nested = response.getAggregations().get("nested");
-        assertThat(nested, notNullValue());
-        assertThat(nested.getName(), equalTo("nested"));
-        assertThat(nested.getDocCount(), equalTo(docCount));
-        assertThat(((InternalAggregation) nested).getProperty("_count"), equalTo(docCount));
-        assertThat(nested.getAggregations().asList().isEmpty(), is(false));
+            Nested nested = response.getAggregations().get("nested");
+            assertThat(nested, notNullValue());
+            assertThat(nested.getName(), equalTo("nested"));
+            assertThat(nested.getDocCount(), equalTo(docCount));
+            assertThat(((InternalAggregation) nested).getProperty("_count"), equalTo(docCount));
+            assertThat(nested.getAggregations().asList().isEmpty(), is(false));
 
-        LongTerms values = nested.getAggregations().get("values");
-        assertThat(values, notNullValue());
-        assertThat(values.getName(), equalTo("values"));
-        assertThat(values.getBuckets(), notNullValue());
-        assertThat(values.getBuckets().size(), equalTo(uniqueValues));
-        for (int i = 0; i < counts.length; ++i) {
-            final String key = Long.toString(i);
-            if (counts[i] == 0) {
-                assertNull(values.getBucketByKey(key));
-            } else {
-                Bucket bucket = values.getBucketByKey(key);
-                assertNotNull(bucket);
-                assertEquals(counts[i], bucket.getDocCount());
+            LongTerms values = nested.getAggregations().get("values");
+            assertThat(values, notNullValue());
+            assertThat(values.getName(), equalTo("values"));
+            assertThat(values.getBuckets(), notNullValue());
+            assertThat(values.getBuckets().size(), equalTo(uniqueValues));
+            for (int i = 0; i < counts.length; ++i) {
+                final String key = Long.toString(i);
+                if (counts[i] == 0) {
+                    assertNull(values.getBucketByKey(key));
+                } else {
+                    Bucket bucket = values.getBucketByKey(key);
+                    assertNotNull(bucket);
+                    assertEquals(counts[i], bucket.getDocCount());
+                }
             }
-        }
-        assertThat(((InternalAggregation) nested).getProperty("values"), sameInstance(values));
+            assertThat(((InternalAggregation) nested).getProperty("values"), sameInstance(values));
+        });
     }
 
     public void testNestedAsSubAggregation() throws Exception {

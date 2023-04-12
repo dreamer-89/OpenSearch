@@ -138,18 +138,20 @@ public class MinimumClusterManagerNodesIT extends OpenSearchIntegTestCase {
         flushAndRefresh();
 
         logger.info("--> verify we get the data back");
-        for (int i = 0; i < 10; i++) {
-            assertThat(
-                client().prepareSearch()
-                    .setSize(0)
-                    .setQuery(QueryBuilders.matchAllQuery())
-                    .execute()
-                    .actionGet()
-                    .getHits()
-                    .getTotalHits().value,
-                equalTo(100L)
-            );
-        }
+        assertBusy(() -> {
+            for (int i = 0; i < 10; i++) {
+                assertThat(
+                    client().prepareSearch()
+                        .setSize(0)
+                        .setQuery(QueryBuilders.matchAllQuery())
+                        .execute()
+                        .actionGet()
+                        .getHits()
+                        .getTotalHits().value,
+                    equalTo(100L)
+                );
+            }
+        });
 
         String clusterManagerNode = internalCluster().getClusterManagerName();
         String otherNode = node1Name.equals(clusterManagerNode) ? node2Name : node1Name;

@@ -67,6 +67,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.nullValue;
 
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST)
 public class UpdateSettingsIT extends OpenSearchIntegTestCase {
     public void testInvalidUpdateOnClosedIndex() {
         createIndex("test");

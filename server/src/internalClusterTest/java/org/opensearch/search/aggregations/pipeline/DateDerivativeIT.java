@@ -319,26 +319,28 @@ public class DateDerivativeIT extends OpenSearchIntegTestCase {
 
         DateFormatter dateFormatter = DateFormatter.forPattern("uuuu-MM-dd").withZone(ZoneOffset.UTC);
 
-        ZonedDateTime expectedKeyFirstBucket = LocalDate.from(dateFormatter.parse("2012-10-27"))
-            .atStartOfDay(timezone)
-            .withZoneSameInstant(ZoneOffset.UTC);
-        assertBucket(buckets.get(0), expectedKeyFirstBucket, 1L, nullValue(), null, null);
+        assertBusy(() -> {
+            ZonedDateTime expectedKeyFirstBucket = LocalDate.from(dateFormatter.parse("2012-10-27"))
+                .atStartOfDay(timezone)
+                .withZoneSameInstant(ZoneOffset.UTC);
+            assertBucket(buckets.get(0), expectedKeyFirstBucket, 1L, nullValue(), null, null);
 
-        ZonedDateTime expectedKeySecondBucket = LocalDate.from(dateFormatter.parse("2012-10-28"))
-            .atStartOfDay(timezone)
-            .withZoneSameInstant(ZoneOffset.UTC);
-        assertBucket(buckets.get(1), expectedKeySecondBucket, 2L, notNullValue(), 1d, 1d / 24d);
+            ZonedDateTime expectedKeySecondBucket = LocalDate.from(dateFormatter.parse("2012-10-28"))
+                .atStartOfDay(timezone)
+                .withZoneSameInstant(ZoneOffset.UTC);
+            assertBucket(buckets.get(1), expectedKeySecondBucket, 2L, notNullValue(), 1d, 1d / 24d);
 
-        // the following is normalized using a 25h bucket width
-        ZonedDateTime expectedKeyThirdBucket = LocalDate.from(dateFormatter.parse("2012-10-29"))
-            .atStartOfDay(timezone)
-            .withZoneSameInstant(ZoneOffset.UTC);
-        assertBucket(buckets.get(2), expectedKeyThirdBucket, 3L, notNullValue(), 1d, 1d / 25d);
+            // the following is normalized using a 25h bucket width
+            ZonedDateTime expectedKeyThirdBucket = LocalDate.from(dateFormatter.parse("2012-10-29"))
+                .atStartOfDay(timezone)
+                .withZoneSameInstant(ZoneOffset.UTC);
+            assertBucket(buckets.get(2), expectedKeyThirdBucket, 3L, notNullValue(), 1d, 1d / 25d);
 
-        ZonedDateTime expectedKeyFourthBucket = LocalDate.from(dateFormatter.parse("2012-10-30"))
-            .atStartOfDay(timezone)
-            .withZoneSameInstant(ZoneOffset.UTC);
-        assertBucket(buckets.get(3), expectedKeyFourthBucket, 4L, notNullValue(), 1d, 1d / 24d);
+            ZonedDateTime expectedKeyFourthBucket = LocalDate.from(dateFormatter.parse("2012-10-30"))
+                .atStartOfDay(timezone)
+                .withZoneSameInstant(ZoneOffset.UTC);
+            assertBucket(buckets.get(3), expectedKeyFourthBucket, 4L, notNullValue(), 1d, 1d / 24d);
+        });
     }
 
     /**

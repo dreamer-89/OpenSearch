@@ -86,6 +86,7 @@ import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.hamcrest.Matchers.notNullValue;
 
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST)
 public class QueryRescorerIT extends OpenSearchIntegTestCase {
     public void testEnforceWindowSize() {
         createIndex("test");

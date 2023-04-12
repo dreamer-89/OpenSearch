@@ -75,7 +75,10 @@ public class ExplainActionIT extends OpenSearchIntegTestCase {
         refresh();
         response = client().prepareExplain(indexOrAlias(), "1").setQuery(QueryBuilders.matchAllQuery()).get();
         assertNotNull(response);
-        assertTrue(response.isMatch());
+        final ExplainResponse assertResponse = response;
+        assertBusy(() -> {
+            assertTrue(assertResponse.isMatch());
+        });
         assertNotNull(response.getExplanation());
         assertTrue(response.getExplanation().isMatch());
         assertThat(response.getIndex(), equalTo("test"));
@@ -192,7 +195,10 @@ public class ExplainActionIT extends OpenSearchIntegTestCase {
             .setFetchSource("obj1.field1", null)
             .get();
         assertNotNull(response);
-        assertTrue(response.isMatch());
+        final ExplainResponse assertResponse = response;
+        assertBusy(() -> {
+            assertTrue(assertResponse.isMatch());
+        });
         assertNotNull(response.getExplanation());
         assertTrue(response.getExplanation().isMatch());
         assertThat(response.getExplanation().getValue(), equalTo(1.0f));

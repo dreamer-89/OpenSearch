@@ -94,9 +94,10 @@ public class ConcurrentDynamicTemplateIT extends OpenSearchIntegTestCase {
             latch.await();
             assertThat(throwable, emptyIterable());
             refresh();
-            assertHitCount(client().prepareSearch("test").setQuery(QueryBuilders.matchQuery(fieldName, "test-user")).get(), numDocs);
-            assertHitCount(client().prepareSearch("test").setQuery(QueryBuilders.matchQuery(fieldName, "test user")).get(), 0);
-
+            assertBusy(() -> {
+                assertHitCount(client().prepareSearch("test").setQuery(QueryBuilders.matchQuery(fieldName, "test-user")).get(), numDocs);
+                assertHitCount(client().prepareSearch("test").setQuery(QueryBuilders.matchQuery(fieldName, "test user")).get(), 0);
+            });
         }
     }
 }

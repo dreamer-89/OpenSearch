@@ -1146,7 +1146,8 @@ public class DateRangeIT extends OpenSearchIntegTestCase {
             .setSize(0)
             .addAggregation(dateRange("date_range").field("date").addRange(1000, 3000).addRange(3000, 4000))
             .get();
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(3L));
+        SearchResponse finalSearchResponse = searchResponse;
+        assertBusy(() -> assertThat(finalSearchResponse.getHits().getTotalHits().value, equalTo(3L)));
         List<Bucket> buckets = checkBuckets(searchResponse.getAggregations().get("date_range"), "date_range", 2);
         assertBucket(buckets.get(0), 2L, "1000-3000", 1000000L, 3000000L);
         assertBucket(buckets.get(1), 1L, "3000-4000", 3000000L, 4000000L);

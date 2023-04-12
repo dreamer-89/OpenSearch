@@ -225,12 +225,12 @@ public class PartitionedRoutingIT extends OpenSearchIntegTestCase {
         }
     }
 
-    private void verifyGets(String index, Map<String, Set<String>> routingToDocumentIds) {
+    private void verifyGets(String index, Map<String, Set<String>> routingToDocumentIds) throws Exception {
         for (Map.Entry<String, Set<String>> routingEntry : routingToDocumentIds.entrySet()) {
             String routing = routingEntry.getKey();
 
             for (String id : routingEntry.getValue()) {
-                assertTrue(client().prepareGet(index, id).setRouting(routing).execute().actionGet().isExists());
+                assertBusy(() -> assertTrue(client().prepareGet(index, id).setRouting(routing).execute().actionGet().isExists()));
             }
         }
     }

@@ -198,46 +198,44 @@ public class SimpleSortIT extends OpenSearchIntegTestCase {
         }
         refresh();
 
-        int size = 1 + random.nextInt(10);
-        final SearchResponse[] searchResponse = new SearchResponse[1];
         // STRING script
+        int size = 1 + random.nextInt(10);
 
         Script script = new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "doc['str_value'].value", Collections.emptyMap());
 
         int finalSize = size;
         assertBusy(() -> {
-            searchResponse[0] = client().prepareSearch()
+            SearchResponse searchResponse = client().prepareSearch()
                 .setQuery(matchAllQuery())
                 .setSize(finalSize)
                 .addSort(new ScriptSortBuilder(script, ScriptSortType.STRING))
                 .get();
-            assertHitCount(searchResponse[0], 10);
+            assertHitCount(searchResponse, 10);
+            assertThat(searchResponse.getHits().getHits().length, equalTo(finalSize));
+            for (int i = 0; i < finalSize; i++) {
+                SearchHit searchHit = searchResponse.getHits().getAt(i);
+                assertThat(searchHit.getId(), equalTo(Integer.toString(i)));
+
+                String expected = new String(new char[] { (char) (97 + i), (char) (97 + i) });
+                assertThat(searchHit.getSortValues()[0].toString(), equalTo(expected));
+            }
         });
 
-        assertThat(searchResponse[0].getHits().getHits().length, equalTo(size));
-        for (int i = 0; i < size; i++) {
-            SearchHit searchHit = searchResponse[0].getHits().getAt(i);
-            assertThat(searchHit.getId(), equalTo(Integer.toString(i)));
-
-            String expected = new String(new char[] { (char) (97 + i), (char) (97 + i) });
-            assertThat(searchHit.getSortValues()[0].toString(), equalTo(expected));
-        }
-
         size = 1 + random.nextInt(10);
-        searchResponse[0] = client().prepareSearch().setQuery(matchAllQuery()).setSize(size).addSort("str_value", SortOrder.DESC).get();
+        SearchResponse searchResponse = client().prepareSearch().setQuery(matchAllQuery()).setSize(size).addSort("str_value", SortOrder.DESC).get();
 
-        assertHitCount(searchResponse[0], 10);
-        assertThat(searchResponse[0].getHits().getHits().length, equalTo(size));
+        assertHitCount(searchResponse, 10);
+        assertThat(searchResponse.getHits().getHits().length, equalTo(size));
         for (int i = 0; i < size; i++) {
-            SearchHit searchHit = searchResponse[0].getHits().getAt(i);
+            SearchHit searchHit = searchResponse.getHits().getAt(i);
             assertThat(searchHit.getId(), equalTo(Integer.toString(9 - i)));
 
             String expected = new String(new char[] { (char) (97 + (9 - i)), (char) (97 + (9 - i)) });
             assertThat(searchHit.getSortValues()[0].toString(), equalTo(expected));
         }
 
-        assertThat(searchResponse[0].toString(), not(containsString("error")));
-        assertNoFailures(searchResponse[0]);
+        assertThat(searchResponse.toString(), not(containsString("error")));
+        assertNoFailures(searchResponse);
     }
 
     public void testSortMinValueScript() throws Exception {

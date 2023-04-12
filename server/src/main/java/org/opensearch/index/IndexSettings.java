@@ -751,13 +751,6 @@ public final class IndexSettings {
         this.indexMetadata = indexMetadata;
         numberOfShards = settings.getAsInt(IndexMetadata.SETTING_NUMBER_OF_SHARDS, null);
         replicationType = IndexMetadata.INDEX_REPLICATION_TYPE_SETTING.get(settings);
-        // if (FeatureFlags.isEnabled(FeatureFlags.SEGMENT_REPLICATION_EXPERIMENTAL)
-        // && indexMetadata.isSystem() == false
-        // && settings.get(IndexMetadata.SETTING_REPLICATION_TYPE) == null) {
-        // replicationType = IndicesService.CLUSTER_REPLICATION_TYPE_SETTING.get(settings);
-        // } else {
-        // replicationType = IndexMetadata.INDEX_REPLICATION_TYPE_SETTING.get(settings);
-        // }
         isRemoteStoreEnabled = settings.getAsBoolean(IndexMetadata.SETTING_REMOTE_STORE_ENABLED, false);
         isRemoteTranslogStoreEnabled = settings.getAsBoolean(IndexMetadata.SETTING_REMOTE_TRANSLOG_STORE_ENABLED, false);
         remoteStoreTranslogRepository = settings.get(IndexMetadata.SETTING_REMOTE_TRANSLOG_STORE_REPOSITORY);

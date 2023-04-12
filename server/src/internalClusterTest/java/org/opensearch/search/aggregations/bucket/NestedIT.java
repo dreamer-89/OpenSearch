@@ -256,7 +256,9 @@ public class NestedIT extends OpenSearchIntegTestCase {
         assertBusy(() -> {
             SearchResponse response = client().prepareSearch("idx")
                 .addAggregation(
-                    nested("nested", "nested").subAggregation(terms("values").field("nested.value").size(100).collectMode(aggCollectionMode))
+                    nested("nested", "nested").subAggregation(
+                        terms("values").field("nested.value").size(100).collectMode(aggCollectionMode)
+                    )
                 )
                 .get();
 

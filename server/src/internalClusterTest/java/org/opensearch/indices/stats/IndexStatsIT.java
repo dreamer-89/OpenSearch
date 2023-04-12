@@ -419,9 +419,14 @@ public class IndexStatsIT extends OpenSearchIntegTestCase {
         );
         for (int i = 0; i < 10; i++) {
             final int numberOfDocs = numDocs;
-            assertBusy(() ->{
+            assertBusy(() -> {
                 assertThat(
-                    client().prepareSearch("idx").setSearchType(SearchType.QUERY_THEN_FETCH).setSize(0).get().getHits().getTotalHits().value,
+                    client().prepareSearch("idx")
+                        .setSearchType(SearchType.QUERY_THEN_FETCH)
+                        .setSize(0)
+                        .get()
+                        .getHits()
+                        .getTotalHits().value,
                     equalTo((long) numberOfDocs)
                 );
             });

@@ -278,7 +278,9 @@ abstract class AbstractGeoBoundingBoxQueryIT extends OpenSearchIntegTestCase {
             assertThat(searchResponse.getHits().getTotalHits().value, equalTo(1L));
             searchResponse = client().prepareSearch()
                 .setQuery(
-                    geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE).setCorners(50, 0, -50, 360).type("indexed")
+                    geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE)
+                        .setCorners(50, 0, -50, 360)
+                        .type("indexed")
                 )
                 .get();
             assertThat(searchResponse.getHits().getTotalHits().value, equalTo(1L));
@@ -288,7 +290,9 @@ abstract class AbstractGeoBoundingBoxQueryIT extends OpenSearchIntegTestCase {
             assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
             searchResponse = client().prepareSearch()
                 .setQuery(
-                    geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE).setCorners(90, 0, -90, 360).type("indexed")
+                    geoBoundingBoxQuery("location").setValidationMethod(GeoValidationMethod.COERCE)
+                        .setCorners(90, 0, -90, 360)
+                        .type("indexed")
                 )
                 .get();
             assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));

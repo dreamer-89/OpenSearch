@@ -298,9 +298,7 @@ public abstract class OpenSearchBlobStoreRepositoryIntegTestCase extends OpenSea
             logger.info("-->  create random index {} with {} records", indexNames[i], docCounts[i]);
             addRandomDocuments(indexNames[i], docCounts[i]);
             final int j = i;
-            assertBusy(() ->{
-                assertHitCount(client().prepareSearch(indexNames[j]).setSize(0).get(), docCounts[j]);
-            });
+            assertBusy(() -> { assertHitCount(client().prepareSearch(indexNames[j]).setSize(0).get(), docCounts[j]); });
         }
 
         final String snapshotName = randomName();
@@ -347,7 +345,7 @@ public abstract class OpenSearchBlobStoreRepositoryIntegTestCase extends OpenSea
         // higher timeout since we can have quite a few shards and a little more data here
         ensureGreen(TimeValue.timeValueSeconds(120));
 
-        assertBusy(() ->{
+        assertBusy(() -> {
             for (int i = 0; i < indexCount; i++) {
                 assertHitCount(client().prepareSearch(indexNames[i]).setSize(0).get(), docCounts[i]);
             }
@@ -424,9 +422,7 @@ public abstract class OpenSearchBlobStoreRepositoryIntegTestCase extends OpenSea
             );
 
             ensureGreen();
-            assertBusy(() -> {
-                assertHitCount(client().prepareSearch(indexName).setSize(0).get(), docCounts[iterationToRestore]);
-            });
+            assertBusy(() -> { assertHitCount(client().prepareSearch(indexName).setSize(0).get(), docCounts[iterationToRestore]); });
         }
 
         for (int i = 0; i < iterationCount; i++) {

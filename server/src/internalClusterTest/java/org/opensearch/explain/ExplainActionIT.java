@@ -84,7 +84,6 @@ public class ExplainActionIT extends OpenSearchIntegTestCase {
             assertThat(responseFinal.getExplanation().getValue(), equalTo(1.0f));
         });
 
-
         response = client().prepareExplain(indexOrAlias(), "1").setQuery(QueryBuilders.termQuery("field", "value2")).get();
         assertNotNull(response);
         assertTrue(response.isExists());
@@ -274,7 +273,9 @@ public class ExplainActionIT extends OpenSearchIntegTestCase {
 
         try {
             assertBusy(() -> {
-                ExplainResponse explainResponse = client().prepareExplain("test", "1").setQuery(queryStringQuery("past:[now-2M/d TO now/d]")).get();
+                ExplainResponse explainResponse = client().prepareExplain("test", "1")
+                    .setQuery(queryStringQuery("past:[now-2M/d TO now/d]"))
+                    .get();
                 assertThat(explainResponse.isExists(), equalTo(true));
                 assertThat(explainResponse.isMatch(), equalTo(true));
             });

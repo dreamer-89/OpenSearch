@@ -244,7 +244,12 @@ public class SimpleRoutingIT extends OpenSearchIntegTestCase {
             assertBusy(() -> {
                 for (int i = 0; i < 5; i++) {
                     assertThat(
-                        client().prepareSearch().setQuery(QueryBuilders.matchAllQuery()).execute().actionGet().getHits().getTotalHits().value,
+                        client().prepareSearch()
+                            .setQuery(QueryBuilders.matchAllQuery())
+                            .execute()
+                            .actionGet()
+                            .getHits()
+                            .getTotalHits().value,
                         equalTo(2L)
                     );
                     assertThat(
@@ -395,7 +400,10 @@ public class SimpleRoutingIT extends OpenSearchIntegTestCase {
         logger.info("--> verifying get with routing, should find");
         assertBusy(() -> {
             for (int i = 0; i < 5; i++) {
-                assertThat(client().prepareGet(indexOrAlias(), "1").setRouting(routingValue).execute().actionGet().isExists(), equalTo(true));
+                assertThat(
+                    client().prepareGet(indexOrAlias(), "1").setRouting(routingValue).execute().actionGet().isExists(),
+                    equalTo(true)
+                );
             }
         });
 

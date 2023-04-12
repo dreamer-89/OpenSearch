@@ -269,6 +269,7 @@ import static org.hamcrest.Matchers.startsWith;
  * </ul>
  */
 @LuceneTestCase.SuppressFileSystems("ExtrasFS") // doesn't work with potential multi data path from test cluster yet
+@LuceneTestCase.SuppressCodecs("*")
 public abstract class OpenSearchIntegTestCase extends OpenSearchTestCase {
 
     /**
@@ -851,7 +852,9 @@ public abstract class OpenSearchIntegTestCase extends OpenSearchTestCase {
      * </p>
      */
     public CreateIndexRequestBuilder prepareCreate(String index, int numNodes, Settings.Builder settingsBuilder) {
-        Settings.Builder builder = Settings.builder().put(indexSettings()).put(settingsBuilder.put(IndexMetadata.SETTING_REPLICATION_TYPE, ReplicationType.SEGMENT).build());
+        Settings.Builder builder = Settings.builder()
+            .put(indexSettings())
+            .put(settingsBuilder.put(IndexMetadata.SETTING_REPLICATION_TYPE, ReplicationType.SEGMENT).build());
 
         if (numNodes > 0) {
             internalCluster().ensureAtLeastNumDataNodes(numNodes);

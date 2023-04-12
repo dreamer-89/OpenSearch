@@ -240,7 +240,7 @@ public class IndicesService extends AbstractLifecycleComponent
 
     public static final Setting<ReplicationType> CLUSTER_REPLICATION_TYPE_SETTING = new Setting<>(
         CLUSTER_SETTING_REPLICATION_TYPE,
-        ReplicationType.DOCUMENT.toString(),
+        ReplicationType.SEGMENT.toString(),
         ReplicationType::parseString,
         Property.NodeScope,
         Property.Final

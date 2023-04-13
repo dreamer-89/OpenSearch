@@ -816,7 +816,7 @@ public class IndexStatsIT extends OpenSearchIntegTestCase {
         assertThat(stats.getTotal().getMerge().getTotal(), greaterThan(0L));
     }
 
-    public void testSegmentsStats() {
+    public void testSegmentsStats() throws Exception {
         assertAcked(
             prepareCreate("test_index").setSettings(
                 Settings.builder()
@@ -832,23 +832,19 @@ public class IndexStatsIT extends OpenSearchIntegTestCase {
             index("test_index", "_doc", Integer.toString(i), "field", "value");
         }
 
-        try {
-            assertBusy(() -> {
-                IndicesStatsResponse stats = client().admin().indices().prepareStats().setSegments(true).get();
-                assertThat(stats.getTotal().getSegments().getIndexWriterMemoryInBytes(), greaterThan(0L));
-                assertThat(stats.getTotal().getSegments().getVersionMapMemoryInBytes(), greaterThan(0L));
+        assertBusy(() -> {
+            IndicesStatsResponse stats = client().admin().indices().prepareStats().setSegments(true).get();
+            assertThat(stats.getTotal().getSegments().getIndexWriterMemoryInBytes(), greaterThan(0L));
+            assertThat(stats.getTotal().getSegments().getVersionMapMemoryInBytes(), greaterThan(0L));
 
-                client().admin().indices().prepareFlush().get();
-                client().admin().indices().prepareForceMerge().setMaxNumSegments(1).execute().actionGet();
-                client().admin().indices().prepareRefresh().get();
-                stats = client().admin().indices().prepareStats().setSegments(true).get();
+            client().admin().indices().prepareFlush().get();
+            client().admin().indices().prepareForceMerge().setMaxNumSegments(1).execute().actionGet();
+            client().admin().indices().prepareRefresh().get();
+            stats = client().admin().indices().prepareStats().setSegments(true).get();
 
-                assertThat(stats.getTotal().getSegments(), notNullValue());
-                assertThat(stats.getTotal().getSegments().getCount(), equalTo((long) test1.totalNumShards));
-            });
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+            assertThat(stats.getTotal().getSegments(), notNullValue());
+            assertThat(stats.getTotal().getSegments().getCount(), equalTo((long) test1.totalNumShards));
+        });
     }
 
     public void testAllFlags() throws Exception {

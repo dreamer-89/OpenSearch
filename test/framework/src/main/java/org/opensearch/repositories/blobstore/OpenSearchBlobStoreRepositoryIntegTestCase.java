@@ -345,11 +345,10 @@ public abstract class OpenSearchBlobStoreRepositoryIntegTestCase extends OpenSea
         // higher timeout since we can have quite a few shards and a little more data here
         ensureGreen(TimeValue.timeValueSeconds(120));
 
-        assertBusy(() -> {
-            for (int i = 0; i < indexCount; i++) {
-                assertHitCount(client().prepareSearch(indexNames[i]).setSize(0).get(), docCounts[i]);
-            }
-        });
+        for (int i = 0; i < indexCount; i++) {
+            final int j = i;
+            assertBusy(() -> { assertHitCount(client().prepareSearch(indexNames[j]).setSize(0).get(), docCounts[j]); });
+        }
 
         logger.info("-->  delete snapshot {}:{}", repoName, snapshotName);
         assertAcked(client().admin().cluster().prepareDeleteSnapshot(repoName, snapshotName).get());

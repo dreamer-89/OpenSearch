@@ -260,7 +260,7 @@ public class ExplainActionIT extends OpenSearchIntegTestCase {
         assertThat((String) response.getGetResult().getSource().get("field1"), equalTo("value1"));
     }
 
-    public void testExplainDateRangeInQueryString() {
+    public void testExplainDateRangeInQueryString() throws Exception {
         createIndex("test");
 
         ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
@@ -271,17 +271,13 @@ public class ExplainActionIT extends OpenSearchIntegTestCase {
 
         refresh();
 
-        try {
-            assertBusy(() -> {
-                ExplainResponse explainResponse = client().prepareExplain("test", "1")
-                    .setQuery(queryStringQuery("past:[now-2M/d TO now/d]"))
-                    .get();
-                assertThat(explainResponse.isExists(), equalTo(true));
-                assertThat(explainResponse.isMatch(), equalTo(true));
-            });
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        assertBusy(() -> {
+            ExplainResponse explainResponse = client().prepareExplain("test", "1")
+                .setQuery(queryStringQuery("past:[now-2M/d TO now/d]"))
+                .get();
+            assertThat(explainResponse.isExists(), equalTo(true));
+            assertThat(explainResponse.isMatch(), equalTo(true));
+        });
     }
 
     private static String indexOrAlias() {

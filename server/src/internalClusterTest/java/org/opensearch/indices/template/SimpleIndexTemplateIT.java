@@ -573,7 +573,7 @@ public class SimpleIndexTemplateIT extends OpenSearchIntegTestCase {
         });
     }
 
-    public void testIndexTemplateWithAliasesInSource() {
+    public void testIndexTemplateWithAliasesInSource() throws Exception {
         client().admin()
             .indices()
             .preparePutTemplate("template_1")
@@ -607,21 +607,17 @@ public class SimpleIndexTemplateIT extends OpenSearchIntegTestCase {
         client().prepareIndex("test_index").setId("2").setSource("field", "value2").get();
         refresh();
 
-        try {
-            assertBusy(() -> {
-                SearchResponse searchResponse = client().prepareSearch("test_index").get();
-                assertHitCount(searchResponse, 2L);
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test_index").get();
+            assertHitCount(searchResponse, 2L);
 
-                searchResponse = client().prepareSearch("my_alias").get();
-                assertHitCount(searchResponse, 1L);
-                assertThat(searchResponse.getHits().getAt(0).getSourceAsMap().get("field"), equalTo("value2"));
-            });
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+            searchResponse = client().prepareSearch("my_alias").get();
+            assertHitCount(searchResponse, 1L);
+            assertThat(searchResponse.getHits().getAt(0).getSourceAsMap().get("field"), equalTo("value2"));
+        });
     }
 
-    public void testIndexTemplateWithAliasesSource() {
+    public void testIndexTemplateWithAliasesSource() throws Exception {
         client().admin()
             .indices()
             .preparePutTemplate("template_1")
@@ -652,21 +648,17 @@ public class SimpleIndexTemplateIT extends OpenSearchIntegTestCase {
         client().prepareIndex("test_index").setId("2").setSource("field", "value2").get();
         refresh();
 
-        try {
-            assertBusy(() -> {
-                SearchResponse searchResponse = client().prepareSearch("test_index").get();
-                assertHitCount(searchResponse, 2L);
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test_index").get();
+            assertHitCount(searchResponse, 2L);
 
-                searchResponse = client().prepareSearch("alias1").get();
-                assertHitCount(searchResponse, 2L);
+            searchResponse = client().prepareSearch("alias1").get();
+            assertHitCount(searchResponse, 2L);
 
-                searchResponse = client().prepareSearch("alias2").get();
-                assertHitCount(searchResponse, 1L);
-                assertThat(searchResponse.getHits().getAt(0).getSourceAsMap().get("field"), equalTo("value2"));
-            });
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+            searchResponse = client().prepareSearch("alias2").get();
+            assertHitCount(searchResponse, 1L);
+            assertThat(searchResponse.getHits().getAt(0).getSourceAsMap().get("field"), equalTo("value2"));
+        });
     }
 
     public void testDuplicateAlias() throws Exception {

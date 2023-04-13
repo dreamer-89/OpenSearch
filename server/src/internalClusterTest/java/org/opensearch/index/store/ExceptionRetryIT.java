@@ -53,12 +53,10 @@ import org.opensearch.test.transport.MockTransportService;
 import org.opensearch.transport.ConnectTransportException;
 import org.opensearch.transport.TransportService;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -89,7 +87,7 @@ public class ExceptionRetryIT extends OpenSearchIntegTestCase {
      * failing. If auto generated ids are used this must not lead to duplicate ids
      * see https://github.com/elastic/elasticsearch/issues/8788
      */
-    public void testRetryDueToExceptionOnNetworkLayer() throws ExecutionException, InterruptedException, IOException {
+    public void testRetryDueToExceptionOnNetworkLayer() throws Exception {
         final AtomicBoolean exceptionThrown = new AtomicBoolean(false);
         int numDocs = scaledRandomIntBetween(100, 1000);
         Client client = internalCluster().coordOnlyNodeClient();
@@ -140,38 +138,34 @@ public class ExceptionRetryIT extends OpenSearchIntegTestCase {
         }
 
         refresh();
-        try {
-            assertBusy(() -> {
-                SearchResponse searchResponse = client().prepareSearch("index").setSize(numDocs * 2).addStoredField("_id").get();
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("index").setSize(numDocs * 2).addStoredField("_id").get();
 
-                Set<String> uniqueIds = new HashSet<>();
-                long dupCounter = 0;
-                boolean found_duplicate_already = false;
-                for (int i = 0; i < searchResponse.getHits().getHits().length; i++) {
-                    if (!uniqueIds.add(searchResponse.getHits().getHits()[i].getId())) {
-                        if (!found_duplicate_already) {
-                            SearchResponse dupIdResponse = client().prepareSearch("index")
-                                .setQuery(termQuery("_id", searchResponse.getHits().getHits()[i].getId()))
-                                .setExplain(true)
-                                .get();
-                            assertThat(dupIdResponse.getHits().getTotalHits().value, greaterThan(1L));
-                            logger.info("found a duplicate id:");
-                            for (SearchHit hit : dupIdResponse.getHits()) {
-                                logger.info("Doc {} was found on shard {}", hit.getId(), hit.getShard().getShardId());
-                            }
-                            logger.info("will not print anymore in case more duplicates are found.");
-                            found_duplicate_already = true;
+            Set<String> uniqueIds = new HashSet<>();
+            long dupCounter = 0;
+            boolean found_duplicate_already = false;
+            for (int i = 0; i < searchResponse.getHits().getHits().length; i++) {
+                if (!uniqueIds.add(searchResponse.getHits().getHits()[i].getId())) {
+                    if (!found_duplicate_already) {
+                        SearchResponse dupIdResponse = client().prepareSearch("index")
+                            .setQuery(termQuery("_id", searchResponse.getHits().getHits()[i].getId()))
+                            .setExplain(true)
+                            .get();
+                        assertThat(dupIdResponse.getHits().getTotalHits().value, greaterThan(1L));
+                        logger.info("found a duplicate id:");
+                        for (SearchHit hit : dupIdResponse.getHits()) {
+                            logger.info("Doc {} was found on shard {}", hit.getId(), hit.getShard().getShardId());
                         }
-                        dupCounter++;
+                        logger.info("will not print anymore in case more duplicates are found.");
+                        found_duplicate_already = true;
                     }
+                    dupCounter++;
                 }
-                assertSearchResponse(searchResponse);
-                assertThat(dupCounter, equalTo(0L));
-                assertHitCount(searchResponse, numDocs);
-            });
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+            }
+            assertSearchResponse(searchResponse);
+            assertThat(dupCounter, equalTo(0L));
+            assertHitCount(searchResponse, numDocs);
+        });
         IndicesStatsResponse index = client().admin().indices().prepareStats("index").clear().setSegments(true).get();
         IndexStats indexStats = index.getIndex("index");
         long maxUnsafeAutoIdTimestamp = Long.MIN_VALUE;

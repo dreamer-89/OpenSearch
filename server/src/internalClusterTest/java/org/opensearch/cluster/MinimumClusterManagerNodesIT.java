@@ -138,8 +138,8 @@ public class MinimumClusterManagerNodesIT extends OpenSearchIntegTestCase {
         flushAndRefresh();
 
         logger.info("--> verify we get the data back");
-        assertBusy(() -> {
-            for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 10; i++) {
+            assertBusy(() -> {
                 assertThat(
                     client().prepareSearch()
                         .setSize(0)
@@ -150,8 +150,8 @@ public class MinimumClusterManagerNodesIT extends OpenSearchIntegTestCase {
                         .getTotalHits().value,
                     equalTo(100L)
                 );
-            }
-        });
+            });
+        }
 
         String clusterManagerNode = internalCluster().getClusterManagerName();
         String otherNode = node1Name.equals(clusterManagerNode) ? node2Name : node1Name;

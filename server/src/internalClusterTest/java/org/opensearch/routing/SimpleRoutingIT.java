@@ -104,11 +104,13 @@ public class SimpleRoutingIT extends OpenSearchIntegTestCase {
             assertThat(client().prepareGet("test", "1").execute().actionGet().isExists(), equalTo(false));
         }
         logger.info("--> verifying get with routing, should find");
-        assertBusy(() -> {
-            for (int i = 0; i < 5; i++) {
-                assertThat(client().prepareGet("test", "1").setRouting(routingValue).execute().actionGet().isExists(), equalTo(true));
-            }
-        });
+        for (int i = 0; i < 5; i++) {
+            assertBusy(
+                () -> {
+                    assertThat(client().prepareGet("test", "1").setRouting(routingValue).execute().actionGet().isExists(), equalTo(true));
+                }
+            );
+        }
 
         logger.info("--> deleting with no routing, should not delete anything");
         client().prepareDelete("test", "1").setRefreshPolicy(RefreshPolicy.IMMEDIATE).get();
@@ -119,12 +121,12 @@ public class SimpleRoutingIT extends OpenSearchIntegTestCase {
 
         logger.info("--> deleting with routing, should delete");
         client().prepareDelete("test", "1").setRouting(routingValue).setRefreshPolicy(RefreshPolicy.IMMEDIATE).get();
-        assertBusy(() -> {
-            for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 5; i++) {
+            assertBusy(() -> {
                 assertThat(client().prepareGet("test", "1").execute().actionGet().isExists(), equalTo(false));
                 assertThat(client().prepareGet("test", "1").setRouting(routingValue).execute().actionGet().isExists(), equalTo(false));
-            }
-        });
+            });
+        }
 
         logger.info("--> indexing with id [1], and routing [0]");
         client().prepareIndex("test")
@@ -138,14 +140,16 @@ public class SimpleRoutingIT extends OpenSearchIntegTestCase {
             assertThat(client().prepareGet("test", "1").execute().actionGet().isExists(), equalTo(false));
         }
         logger.info("--> verifying get with routing, should find");
-        assertBusy(() -> {
-            for (int i = 0; i < 5; i++) {
-                assertThat(client().prepareGet("test", "1").setRouting(routingValue).execute().actionGet().isExists(), equalTo(true));
-            }
-        });
+        for (int i = 0; i < 5; i++) {
+            assertBusy(
+                () -> {
+                    assertThat(client().prepareGet("test", "1").setRouting(routingValue).execute().actionGet().isExists(), equalTo(true));
+                }
+            );
+        }
     }
 
-    public void testSimpleSearchRouting() {
+    public void testSimpleSearchRouting() throws Exception {
         createIndex("test");
         ensureGreen();
         String routingValue = findNonMatchingRoutingValue("test", "1");
@@ -162,14 +166,12 @@ public class SimpleRoutingIT extends OpenSearchIntegTestCase {
             assertThat(client().prepareGet("test", "1").execute().actionGet().isExists(), equalTo(false));
         }
         logger.info("--> verifying get with routing, should find");
-        try {
-            assertBusy(() -> {
-                for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 5; i++) {
+            assertBusy(
+                () -> {
                     assertThat(client().prepareGet("test", "1").setRouting(routingValue).execute().actionGet().isExists(), equalTo(true));
                 }
-            });
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+            );
         }
 
         logger.info("--> search with no routing, should fine one");
@@ -240,32 +242,23 @@ public class SimpleRoutingIT extends OpenSearchIntegTestCase {
             .get();
 
         logger.info("--> search with no routing, should fine two");
-        try {
+        for (int i = 0; i < 5; i++) {
             assertBusy(() -> {
-                for (int i = 0; i < 5; i++) {
-                    assertThat(
-                        client().prepareSearch()
-                            .setQuery(QueryBuilders.matchAllQuery())
-                            .execute()
-                            .actionGet()
-                            .getHits()
-                            .getTotalHits().value,
-                        equalTo(2L)
-                    );
-                    assertThat(
-                        client().prepareSearch()
-                            .setSize(0)
-                            .setQuery(QueryBuilders.matchAllQuery())
-                            .execute()
-                            .actionGet()
-                            .getHits()
-                            .getTotalHits().value,
-                        equalTo(2L)
-                    );
-                }
+                assertThat(
+                    client().prepareSearch().setQuery(QueryBuilders.matchAllQuery()).execute().actionGet().getHits().getTotalHits().value,
+                    equalTo(2L)
+                );
+                assertThat(
+                    client().prepareSearch()
+                        .setSize(0)
+                        .setQuery(QueryBuilders.matchAllQuery())
+                        .execute()
+                        .actionGet()
+                        .getHits()
+                        .getTotalHits().value,
+                    equalTo(2L)
+                );
             });
-        } catch (Exception e) {
-            throw new RuntimeException(e);
         }
 
         logger.info("--> search with {} routing, should find one", routingValue);
@@ -398,14 +391,14 @@ public class SimpleRoutingIT extends OpenSearchIntegTestCase {
         }
 
         logger.info("--> verifying get with routing, should find");
-        assertBusy(() -> {
-            for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 5; i++) {
+            assertBusy(() -> {
                 assertThat(
                     client().prepareGet(indexOrAlias(), "1").setRouting(routingValue).execute().actionGet().isExists(),
                     equalTo(true)
                 );
-            }
-        });
+            });
+        }
 
         logger.info("--> deleting with no routing, should fail");
         try {

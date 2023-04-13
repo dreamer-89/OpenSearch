@@ -308,7 +308,7 @@ public class GatewayIndexStateIT extends OpenSearchIntegTestCase {
 
         logger.info("--> verify 1 doc in the index");
         for (int i = 0; i < 10; i++) {
-            assertHitCount(client().prepareSearch().setQuery(matchAllQuery()).get(), 1L);
+            assertBusy(() -> assertHitCount(client().prepareSearch().setQuery(matchAllQuery()).get(), 1L));
         }
 
         logger.info("--> closing test index...");

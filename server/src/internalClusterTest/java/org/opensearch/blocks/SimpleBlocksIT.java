@@ -446,7 +446,13 @@ public class SimpleBlocksIT extends OpenSearchIntegTestCase {
             disableIndexBlock(indexName, block);
         }
         refresh(indexName);
-        assertHitCount(client().prepareSearch(indexName).setSize(0).setTrackTotalHitsUpTo(TRACK_TOTAL_HITS_ACCURATE).get(), nbDocs);
+        int finalNbDocs = nbDocs;
+        assertBusy(
+            () -> assertHitCount(
+                client().prepareSearch(indexName).setSize(0).setTrackTotalHitsUpTo(TRACK_TOTAL_HITS_ACCURATE).get(),
+                finalNbDocs
+            )
+        );
     }
 
     public void testAddBlockWhileDeletingIndices() throws Exception {

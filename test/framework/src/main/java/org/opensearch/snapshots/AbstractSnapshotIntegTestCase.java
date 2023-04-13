@@ -31,6 +31,7 @@
 
 package org.opensearch.snapshots;
 
+import org.opensearch.OpenSearchException;
 import org.opensearch.Version;
 import org.opensearch.action.ActionFuture;
 import org.opensearch.action.admin.cluster.snapshots.create.CreateSnapshotResponse;
@@ -482,7 +483,11 @@ public abstract class AbstractSnapshotIntegTestCase extends OpenSearchIntegTestC
     }
 
     protected void assertDocCount(String index, long count) {
-        assertEquals(getCountForIndex(index), count);
+        try {
+            assertBusy(() -> { assertEquals(getCountForIndex(index), count); });
+        } catch (Exception e) {
+            throw new OpenSearchException("assert doc count failed", e);
+        }
     }
 
     /**

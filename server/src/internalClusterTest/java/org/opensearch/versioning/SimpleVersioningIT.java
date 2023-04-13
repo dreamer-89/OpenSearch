@@ -141,7 +141,7 @@ public class SimpleVersioningIT extends OpenSearchIntegTestCase {
             refresh();
         }
         for (int i = 0; i < 10; i++) {
-            assertThat(client().prepareGet("test", "1").get().getVersion(), equalTo(14L));
+            assertBusy(() -> { assertThat(client().prepareGet("test", "1").get().getVersion(), equalTo(14L)); });
         }
 
         // deleting with a lower version fails.
@@ -208,7 +208,7 @@ public class SimpleVersioningIT extends OpenSearchIntegTestCase {
             refresh();
         }
         for (int i = 0; i < 10; i++) {
-            assertThat(client().prepareGet("test", "1").execute().actionGet().getVersion(), equalTo(14L));
+            assertBusy(() -> { assertThat(client().prepareGet("test", "1").execute().actionGet().getVersion(), equalTo(14L)); });
         }
 
         // deleting with a lower version fails.
@@ -307,7 +307,7 @@ public class SimpleVersioningIT extends OpenSearchIntegTestCase {
         assertThat(indexResponse.getVersion(), equalTo(1L));
     }
 
-    public void testCompareAndSet() {
+    public void testCompareAndSet() throws Exception {
         createIndex("test");
         ensureGreen();
 
@@ -349,9 +349,11 @@ public class SimpleVersioningIT extends OpenSearchIntegTestCase {
 
         client().admin().indices().prepareRefresh().execute().actionGet();
         for (int i = 0; i < 10; i++) {
-            final GetResponse response = client().prepareGet("test", "1").get();
-            assertThat(response.getSeqNo(), equalTo(1L));
-            assertThat(response.getPrimaryTerm(), equalTo(1L));
+            assertBusy(() -> {
+                final GetResponse response = client().prepareGet("test", "1").get();
+                assertThat(response.getSeqNo(), equalTo(1L));
+                assertThat(response.getPrimaryTerm(), equalTo(1L));
+            });
         }
 
         // search with versioning

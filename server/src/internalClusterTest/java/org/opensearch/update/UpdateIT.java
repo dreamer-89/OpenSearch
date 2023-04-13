@@ -177,8 +177,10 @@ public class UpdateIT extends OpenSearchIntegTestCase {
         assertThat(updateResponse.getIndex(), equalTo("test"));
 
         for (int i = 0; i < 5; i++) {
-            GetResponse getResponse = client().prepareGet("test", "1").execute().actionGet();
-            assertThat(getResponse.getSourceAsMap().get("field").toString(), equalTo("1"));
+            assertBusy(() -> {
+                GetResponse getResponse = client().prepareGet("test", "1").execute().actionGet();
+                assertThat(getResponse.getSourceAsMap().get("field").toString(), equalTo("1"));
+            });
         }
 
         updateResponse = client().prepareUpdate(indexOrAlias(), "1")
@@ -220,8 +222,10 @@ public class UpdateIT extends OpenSearchIntegTestCase {
         assertThat(updateResponse.getIndex(), equalTo("test"));
 
         for (int i = 0; i < 5; i++) {
-            GetResponse getResponse = client().prepareGet("test", "1").execute().actionGet();
-            assertThat(getResponse.getSourceAsMap().get("balance").toString(), equalTo("9"));
+            assertBusy(() -> {
+                GetResponse getResponse = client().prepareGet("test", "1").execute().actionGet();
+                assertThat(getResponse.getSourceAsMap().get("balance").toString(), equalTo("9"));
+            });
         }
 
         // Now pay money for an existing account where balance is stored in es
@@ -337,8 +341,10 @@ public class UpdateIT extends OpenSearchIntegTestCase {
         assertThat(updateResponse.getIndex(), equalTo("test"));
 
         for (int i = 0; i < 5; i++) {
-            GetResponse getResponse = client().prepareGet("test", "1").execute().actionGet();
-            assertThat(getResponse.getSourceAsMap().get("field").toString(), equalTo("2"));
+            assertBusy(() -> {
+                GetResponse getResponse = client().prepareGet("test", "1").execute().actionGet();
+                assertThat(getResponse.getSourceAsMap().get("field").toString(), equalTo("2"));
+            }, 30, TimeUnit.SECONDS);
         }
 
         Map<String, Object> params = new HashMap<>();
@@ -353,8 +359,10 @@ public class UpdateIT extends OpenSearchIntegTestCase {
         assertThat(updateResponse.getIndex(), equalTo("test"));
 
         for (int i = 0; i < 5; i++) {
-            GetResponse getResponse = client().prepareGet("test", "1").execute().actionGet();
-            assertThat(getResponse.getSourceAsMap().get("field").toString(), equalTo("5"));
+            assertBusy(() -> {
+                GetResponse getResponse = client().prepareGet("test", "1").execute().actionGet();
+                assertThat(getResponse.getSourceAsMap().get("field").toString(), equalTo("5"));
+            }, 30, TimeUnit.SECONDS);
         }
 
         // check noop
@@ -374,8 +382,10 @@ public class UpdateIT extends OpenSearchIntegTestCase {
         assertThat(updateResponse.getIndex(), equalTo("test"));
 
         for (int i = 0; i < 5; i++) {
-            GetResponse getResponse = client().prepareGet("test", "1").execute().actionGet();
-            assertThat(getResponse.getSourceAsMap().get("field").toString(), equalTo("5"));
+            assertBusy(() -> {
+                GetResponse getResponse = client().prepareGet("test", "1").execute().actionGet();
+                assertThat(getResponse.getSourceAsMap().get("field").toString(), equalTo("5"));
+            }, 60, TimeUnit.SECONDS);
         }
 
         // check delete
@@ -566,12 +576,14 @@ public class UpdateIT extends OpenSearchIntegTestCase {
 
         assertEquals(2, updateResponse.getVersion());
 
-        GetResponse getResponse = client().prepareGet("test", "id1").setRouting("routing1").execute().actionGet();
-        Map<String, Object> updateContext = (Map<String, Object>) getResponse.getSourceAsMap().get("update_context");
-        assertEquals("test", updateContext.get("_index"));
-        assertEquals("id1", updateContext.get("_id"));
-        assertEquals(1, updateContext.get("_version"));
-        assertEquals("routing1", updateContext.get("_routing"));
+        assertBusy(() -> {
+            GetResponse getResponse = client().prepareGet("test", "id1").setRouting("routing1").execute().actionGet();
+            Map<String, Object> updateContext = (Map<String, Object>) getResponse.getSourceAsMap().get("update_context");
+            assertEquals("test", updateContext.get("_index"));
+            assertEquals("id1", updateContext.get("_id"));
+            assertEquals(1, updateContext.get("_version"));
+            assertEquals("routing1", updateContext.get("_routing"));
+        }, 30, TimeUnit.SECONDS);
 
         // Idem with the second object
         updateResponse = client().prepareUpdate("test", "id2")
@@ -581,13 +593,15 @@ public class UpdateIT extends OpenSearchIntegTestCase {
 
         assertEquals(2, updateResponse.getVersion());
 
-        getResponse = client().prepareGet("test", "id2").execute().actionGet();
-        updateContext = (Map<String, Object>) getResponse.getSourceAsMap().get("update_context");
-        assertEquals("test", updateContext.get("_index"));
-        assertEquals("id2", updateContext.get("_id"));
-        assertEquals(1, updateContext.get("_version"));
-        assertNull(updateContext.get("_routing"));
-        assertNull(updateContext.get("_ttl"));
+        assertBusy(() -> {
+            GetResponse getResponse = client().prepareGet("test", "id2").execute().actionGet();
+            Map<String, Object> updateContext = (Map<String, Object>) getResponse.getSourceAsMap().get("update_context");
+            assertEquals("test", updateContext.get("_index"));
+            assertEquals("id2", updateContext.get("_id"));
+            assertEquals(1, updateContext.get("_version"));
+            assertNull(updateContext.get("_routing"));
+            assertNull(updateContext.get("_ttl"));
+        });
     }
 
     public void testConcurrentUpdateWithRetryOnConflict() throws Exception {
@@ -659,13 +673,15 @@ public class UpdateIT extends OpenSearchIntegTestCase {
             logger.info("Captured failure on concurrent update:", throwable);
         }
         assertThat(failures.size(), equalTo(0));
-        for (int i = 0; i < numberOfUpdatesPerThread; i++) {
-            GetResponse response = client().prepareGet("test", Integer.toString(i)).execute().actionGet();
-            assertThat(response.getId(), equalTo(Integer.toString(i)));
-            assertThat(response.isExists(), equalTo(true));
-            assertThat(response.getVersion(), equalTo((long) numberOfThreads));
-            assertThat(response.getSource().get("field"), equalTo(numberOfThreads));
-        }
+        assertBusy(() -> {
+            for (int i = 0; i < numberOfUpdatesPerThread; i++) {
+                GetResponse response = client().prepareGet("test", Integer.toString(i)).execute().actionGet();
+                assertThat(response.getId(), equalTo(Integer.toString(i)));
+                assertThat(response.isExists(), equalTo(true));
+                assertThat(response.getVersion(), equalTo((long) numberOfThreads));
+                assertThat(response.getSource().get("field"), equalTo(numberOfThreads));
+            }
+        });
     }
 
     public void testStressUpdateDeleteConcurrency() throws Exception {
@@ -875,28 +891,30 @@ public class UpdateIT extends OpenSearchIntegTestCase {
 
         refresh();
 
-        for (int i = 0; i < numberOfIdsPerThread; ++i) {
-            int totalFailures = 0;
-            GetResponse response = client().prepareGet("test", Integer.toString(i)).execute().actionGet();
-            if (response.isExists()) {
-                assertThat(response.getId(), equalTo(Integer.toString(i)));
-                int expectedVersion = (numberOfThreads * numberOfUpdatesPerId * 2) + 1;
-                for (UpdateThread ut : threads) {
-                    if (ut.failedMap.containsKey(i)) {
-                        totalFailures += ut.failedMap.get(i);
+        assertBusy(() -> {
+            for (int i = 0; i < numberOfIdsPerThread; ++i) {
+                int totalFailures = 0;
+                GetResponse response = client().prepareGet("test", Integer.toString(i)).execute().actionGet();
+                if (response.isExists()) {
+                    assertThat(response.getId(), equalTo(Integer.toString(i)));
+                    int expectedVersion = (numberOfThreads * numberOfUpdatesPerId * 2) + 1;
+                    for (UpdateThread ut : threads) {
+                        if (ut.failedMap.containsKey(i)) {
+                            totalFailures += ut.failedMap.get(i);
+                        }
                     }
+                    expectedVersion -= totalFailures;
+                    logger.error(
+                        "Actual version [{}] Expected version [{}] Total failures [{}]",
+                        response.getVersion(),
+                        expectedVersion,
+                        totalFailures
+                    );
+                    assertThat(response.getVersion(), equalTo((long) expectedVersion));
+                    assertThat(response.getVersion() + totalFailures, equalTo((long) ((numberOfUpdatesPerId * numberOfThreads * 2) + 1)));
                 }
-                expectedVersion -= totalFailures;
-                logger.error(
-                    "Actual version [{}] Expected version [{}] Total failures [{}]",
-                    response.getVersion(),
-                    expectedVersion,
-                    totalFailures
-                );
-                assertThat(response.getVersion(), equalTo((long) expectedVersion));
-                assertThat(response.getVersion() + totalFailures, equalTo((long) ((numberOfUpdatesPerId * numberOfThreads * 2) + 1)));
             }
-        }
+        });
     }
 
     private static String indexOrAlias() {

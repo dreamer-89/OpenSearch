@@ -38,10 +38,10 @@ import org.opensearch.action.search.SearchResponse;
 import org.opensearch.index.query.InnerHitBuilder;
 import org.opensearch.index.query.NestedQueryBuilder;
 import org.opensearch.index.query.TermQueryBuilder;
+import org.opensearch.indices.replication.SegmentReplicationBaseIT;
 import org.opensearch.search.SearchException;
 import org.opensearch.search.SearchHits;
 import org.opensearch.search.fetch.subphase.FetchSourceContext;
-import org.opensearch.test.OpenSearchIntegTestCase;
 
 import java.util.Collections;
 
@@ -50,13 +50,14 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 
-public class MetadataFetchingIT extends OpenSearchIntegTestCase {
-    public void testSimple() {
+public class MetadataFetchingIT extends SegmentReplicationBaseIT {
+    public void testSimple() throws Exception {
         assertAcked(prepareCreate("test"));
         ensureGreen();
 
         client().prepareIndex("test").setId("1").setSource("field", "value").get();
         refresh();
+        verifyStoreContent();
 
         SearchResponse response = client().prepareSearch("test").storedFields("_none_").setFetchSource(false).setVersion(true).get();
         assertThat(response.getHits().getAt(0).getId(), nullValue());
@@ -68,11 +69,12 @@ public class MetadataFetchingIT extends OpenSearchIntegTestCase {
         assertThat(response.getHits().getAt(0).getSourceAsString(), nullValue());
     }
 
-    public void testInnerHits() {
+    public void testInnerHits() throws Exception {
         assertAcked(prepareCreate("test").setMapping("nested", "type=nested"));
         ensureGreen();
         client().prepareIndex("test").setId("1").setSource("field", "value", "nested", Collections.singletonMap("title", "foo")).get();
         refresh();
+        verifyStoreContent();
 
         SearchResponse response = client().prepareSearch("test")
             .storedFields("_none_")
@@ -94,12 +96,13 @@ public class MetadataFetchingIT extends OpenSearchIntegTestCase {
         assertThat(hits.getAt(0).getSourceAsString(), nullValue());
     }
 
-    public void testWithRouting() {
+    public void testWithRouting() throws Exception {
         assertAcked(prepareCreate("test"));
         ensureGreen();
 
         client().prepareIndex("test").setId("1").setSource("field", "value").setRouting("toto").get();
         refresh();
+        verifyStoreContent();
 
         SearchResponse response = client().prepareSearch("test").storedFields("_none_").setFetchSource(false).get();
         assertThat(response.getHits().getAt(0).getId(), nullValue());
@@ -111,12 +114,13 @@ public class MetadataFetchingIT extends OpenSearchIntegTestCase {
         assertThat(response.getHits().getAt(0).getSourceAsString(), nullValue());
     }
 
-    public void testInvalid() {
+    public void testInvalid() throws Exception {
         assertAcked(prepareCreate("test"));
         ensureGreen();
 
         index("test", "type1", "1", "field", "value");
         refresh();
+        verifyStoreContent();
 
         {
             SearchPhaseExecutionException exc = expectThrows(

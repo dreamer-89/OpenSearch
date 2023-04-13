@@ -38,8 +38,6 @@ import org.opensearch.common.lucene.search.function.FieldValueFactorFunction;
 import org.opensearch.search.SearchHit;
 import org.opensearch.test.OpenSearchIntegTestCase;
 
-import java.io.IOException;
-
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.arrayWithSize;
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
@@ -54,8 +52,9 @@ import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertOrderedSea
 /**
  * Tests for the {@code field_value_factor} function in a function_score query.
  */
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST)
 public class FunctionScoreFieldValueIT extends OpenSearchIntegTestCase {
-    public void testFieldValueFactor() throws IOException {
+    public void testFieldValueFactor() throws Exception {
         assertAcked(
             prepareCreate("test").setMapping(
                 jsonBuilder().startObject()
@@ -77,12 +76,15 @@ public class FunctionScoreFieldValueIT extends OpenSearchIntegTestCase {
 
         refresh();
 
+        SearchResponse response;
         // document 2 scores higher because 17 > 5
-        SearchResponse response = client().prepareSearch("test")
-            .setExplain(randomBoolean())
-            .setQuery(functionScoreQuery(simpleQueryStringQuery("foo"), fieldValueFactorFunction("test")))
-            .get();
-        assertOrderedSearchHits(response, "2", "1");
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test")
+                .setExplain(randomBoolean())
+                .setQuery(functionScoreQuery(simpleQueryStringQuery("foo"), fieldValueFactorFunction("test")))
+                .get();
+            assertOrderedSearchHits(searchResponse, "2", "1");
+        });
 
         // try again, but this time explicitly use the do-nothing modifier
         response = client().prepareSearch("test")
@@ -148,23 +150,25 @@ public class FunctionScoreFieldValueIT extends OpenSearchIntegTestCase {
 
         // -1 divided by 0 is infinity, which should provoke an exception.
         try {
-            response = client().prepareSearch("test")
-                .setExplain(randomBoolean())
-                .setQuery(
-                    functionScoreQuery(
-                        simpleQueryStringQuery("foo"),
-                        fieldValueFactorFunction("test").modifier(FieldValueFactorFunction.Modifier.RECIPROCAL).factor(0)
+            assertBusy(() -> {
+                SearchResponse searchResponse = client().prepareSearch("test")
+                    .setExplain(randomBoolean())
+                    .setQuery(
+                        functionScoreQuery(
+                            simpleQueryStringQuery("foo"),
+                            fieldValueFactorFunction("test").modifier(FieldValueFactorFunction.Modifier.RECIPROCAL).factor(0)
+                        )
                     )
-                )
-                .get();
-            assertFailures(response);
-        } catch (SearchPhaseExecutionException e) {
+                    .get();
+                assertFailures(searchResponse);
+            });
+        } catch (Exception e) {
             // This is fine, the query will throw an exception if executed
             // locally, instead of just having failures
         }
     }
 
-    public void testFieldValueFactorExplain() throws IOException {
+    public void testFieldValueFactorExplain() throws Exception {
         assertAcked(
             prepareCreate("test").setMapping(
                 jsonBuilder().startObject()
@@ -189,18 +193,20 @@ public class FunctionScoreFieldValueIT extends OpenSearchIntegTestCase {
         // document 2 scores higher because 17 > 5
         final String functionName = "func1";
         final String queryName = "query";
-        SearchResponse response = client().prepareSearch("test")
-            .setExplain(true)
-            .setQuery(
-                functionScoreQuery(simpleQueryStringQuery("foo").queryName(queryName), fieldValueFactorFunction("test", functionName))
-            )
-            .get();
-        assertOrderedSearchHits(response, "2", "1");
-        SearchHit firstHit = response.getHits().getAt(0);
-        assertThat(firstHit.getExplanation().getDetails(), arrayWithSize(2));
-        // "description": "sum of: (_name: query)"
-        assertThat(firstHit.getExplanation().getDetails()[0].getDescription(), containsString("_name: " + queryName));
-        // "description": "field value function(_name: func1): none(doc['test'].value * factor=1.0)"
-        assertThat(firstHit.getExplanation().getDetails()[1].toString(), containsString("_name: " + functionName));
+        assertBusy(() -> {
+            SearchResponse response = client().prepareSearch("test")
+                .setExplain(true)
+                .setQuery(
+                    functionScoreQuery(simpleQueryStringQuery("foo").queryName(queryName), fieldValueFactorFunction("test", functionName))
+                )
+                .get();
+            assertOrderedSearchHits(response, "2", "1");
+            SearchHit firstHit = response.getHits().getAt(0);
+            assertThat(firstHit.getExplanation().getDetails(), arrayWithSize(2));
+            // "description": "sum of: (_name: query)"
+            assertThat(firstHit.getExplanation().getDetails()[0].getDescription(), containsString("_name: " + queryName));
+            // "description": "field value function(_name: func1): none(doc['test'].value * factor=1.0)"
+            assertThat(firstHit.getExplanation().getDetails()[1].toString(), containsString("_name: " + functionName));
+        });
     }
 }

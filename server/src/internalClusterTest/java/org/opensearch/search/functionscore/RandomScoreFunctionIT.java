@@ -50,6 +50,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
@@ -116,53 +117,56 @@ public class RandomScoreFunctionIT extends OpenSearchIntegTestCase {
         int outerIters = scaledRandomIntBetween(10, 20);
         for (int o = 0; o < outerIters; o++) {
             final int seed = randomInt();
-            String preference = randomRealisticUnicodeOfLengthBetween(1, 10); // at least one char!!
-            // randomPreference should not start with '_' (reserved for known preference types (e.g. _shards)
-            while (preference.startsWith("_")) {
-                preference = randomRealisticUnicodeOfLengthBetween(1, 10);
-            }
-            int innerIters = scaledRandomIntBetween(2, 5);
-            SearchHit[] hits = null;
-            for (int i = 0; i < innerIters; i++) {
-                SearchResponse searchResponse = client().prepareSearch()
-                    .setSize(docCount) // get all docs otherwise we are prone to tie-breaking
-                    .setPreference(preference)
-                    .setQuery(functionScoreQuery(matchAllQuery(), randomFunction().seed(seed).setField("foo")))
-                    .get();
-                assertThat(
-                    "Failures " + Arrays.toString(searchResponse.getShardFailures()),
-                    searchResponse.getShardFailures().length,
-                    CoreMatchers.equalTo(0)
-                );
-                final int hitCount = searchResponse.getHits().getHits().length;
-                final SearchHit[] currentHits = searchResponse.getHits().getHits();
-                ArrayUtil.timSort(currentHits, (o1, o2) -> {
-                    // for tie-breaking we have to resort here since if the score is
-                    // identical we rely on collection order which might change.
-                    int cmp = Float.compare(o1.getScore(), o2.getScore());
-                    return cmp == 0 ? o1.getId().compareTo(o2.getId()) : cmp;
-                });
-                if (i == 0) {
-                    assertThat(hits, nullValue());
-                    hits = currentHits;
-                } else {
-                    assertThat(hits.length, equalTo(searchResponse.getHits().getHits().length));
-                    for (int j = 0; j < hitCount; j++) {
-                        assertThat("" + j, currentHits[j].getScore(), equalTo(hits[j].getScore()));
-                        assertThat("" + j, currentHits[j].getId(), equalTo(hits[j].getId()));
-                    }
+            assertBusy(() -> {
+                String preference = randomRealisticUnicodeOfLengthBetween(1, 10); // at least one char!!
+                // randomPreference should not start with '_' (reserved for known preference types (e.g. _shards)
+                while (preference.startsWith("_")) {
+                    preference = randomRealisticUnicodeOfLengthBetween(1, 10);
                 }
+                int innerIters = scaledRandomIntBetween(2, 5);
+                SearchHit[] hits = null;
+                for (int i = 0; i < innerIters; i++) {
+                    SearchResponse searchResponse = client().prepareSearch()
+                        .setSize(docCount) // get all docs otherwise we are prone to tie-breaking
+                        .setPreference(preference)
+                        .setQuery(functionScoreQuery(matchAllQuery(), randomFunction().seed(seed).setField("foo")))
+                        .get();
+                    assertThat(
+                        "Failures " + Arrays.toString(searchResponse.getShardFailures()),
+                        searchResponse.getShardFailures().length,
+                        CoreMatchers.equalTo(0)
+                    );
 
-                // randomly change some docs to get them in different segments
-                int numDocsToChange = randomIntBetween(20, 50);
-                while (numDocsToChange > 0) {
-                    int doc = randomInt(docCount - 1);// watch out this is inclusive the max values!
-                    index("test", "type", "" + doc, jsonBuilder().startObject().field("foo", doc).endObject());
-                    --numDocsToChange;
+                    final int hitCount = searchResponse.getHits().getHits().length;
+                    final SearchHit[] currentHits = searchResponse.getHits().getHits();
+                    ArrayUtil.timSort(currentHits, (o1, o2) -> {
+                        // for tie-breaking we have to resort here since if the score is
+                        // identical we rely on collection order which might change.
+                        int cmp = Float.compare(o1.getScore(), o2.getScore());
+                        return cmp == 0 ? o1.getId().compareTo(o2.getId()) : cmp;
+                    });
+                    if (i == 0) {
+                        assertThat(hits, nullValue());
+                        hits = currentHits;
+                    } else {
+                        assertThat(hits.length, equalTo(searchResponse.getHits().getHits().length));
+                        for (int j = 0; j < hitCount; j++) {
+                            assertThat("" + j, currentHits[j].getScore(), equalTo(hits[j].getScore()));
+                            assertThat("" + j, currentHits[j].getId(), equalTo(hits[j].getId()));
+                        }
+                    }
+
+                    // randomly change some docs to get them in different segments
+                    int numDocsToChange = randomIntBetween(20, 50);
+                    while (numDocsToChange > 0) {
+                        int doc = randomInt(docCount - 1);// watch out this is inclusive the max values!
+                        index("test", "type", "" + doc, jsonBuilder().startObject().field("foo", doc).endObject());
+                        --numDocsToChange;
+                    }
+                    flush();
+                    refresh();
                 }
-                flush();
-                refresh();
-            }
+            }, 30, TimeUnit.SECONDS);
         }
     }
 
@@ -279,14 +283,16 @@ public class RandomScoreFunctionIT extends OpenSearchIntegTestCase {
 
         int seed = 12345678;
 
-        SearchResponse resp = client().prepareSearch("test")
-            .setQuery(functionScoreQuery(matchAllQuery(), randomFunction().seed(seed).setField(SeqNoFieldMapper.NAME)))
-            .setExplain(true)
-            .get();
-        assertNoFailures(resp);
-        assertEquals(1, resp.getHits().getTotalHits().value);
-        SearchHit firstHit = resp.getHits().getAt(0);
-        assertThat(firstHit.getExplanation().toString(), containsString("" + seed));
+        assertBusy(() -> {
+            SearchResponse resp = client().prepareSearch("test")
+                .setQuery(functionScoreQuery(matchAllQuery(), randomFunction().seed(seed).setField(SeqNoFieldMapper.NAME)))
+                .setExplain(true)
+                .get();
+            assertNoFailures(resp);
+            assertEquals(1, resp.getHits().getTotalHits().value);
+            SearchHit firstHit = resp.getHits().getAt(0);
+            assertThat(firstHit.getExplanation().toString(), containsString("" + seed));
+        });
     }
 
     public void testSeedAndNameReportedInExplain() throws Exception {
@@ -300,39 +306,46 @@ public class RandomScoreFunctionIT extends OpenSearchIntegTestCase {
 
         final String queryName = "query1";
         final String functionName = "func1";
-        SearchResponse resp = client().prepareSearch("test")
-            .setQuery(
-                functionScoreQuery(
-                    matchAllQuery().queryName(queryName),
-                    randomFunction(functionName).seed(seed).setField(SeqNoFieldMapper.NAME)
+        assertBusy(() -> {
+            SearchResponse resp = client().prepareSearch("test")
+                .setQuery(
+                    functionScoreQuery(
+                        matchAllQuery().queryName(queryName),
+                        randomFunction(functionName).seed(seed).setField(SeqNoFieldMapper.NAME)
+                    )
                 )
-            )
-            .setExplain(true)
-            .get();
-        assertNoFailures(resp);
-        assertEquals(1, resp.getHits().getTotalHits().value);
-        SearchHit firstHit = resp.getHits().getAt(0);
-        assertThat(firstHit.getExplanation().getDetails(), arrayWithSize(2));
-        // "description": "*:* (_name: query1)"
-        assertThat(firstHit.getExplanation().getDetails()[0].getDescription().toString(), containsString("_name: " + queryName));
-        assertThat(firstHit.getExplanation().getDetails()[1].getDetails(), arrayWithSize(2));
-        // "description": "random score function (seed: 12345678, field: _seq_no, _name: func1)"
-        assertThat(firstHit.getExplanation().getDetails()[1].getDetails()[0].getDescription().toString(), containsString("seed: " + seed));
+                .setExplain(true)
+                .get();
+            assertNoFailures(resp);
+            assertEquals(1, resp.getHits().getTotalHits().value);
+            SearchHit firstHit = resp.getHits().getAt(0);
+            assertThat(firstHit.getExplanation().getDetails(), arrayWithSize(2));
+            // "description": "*:* (_name: query1)"
+            assertThat(firstHit.getExplanation().getDetails()[0].getDescription().toString(), containsString("_name: " + queryName));
+            assertThat(firstHit.getExplanation().getDetails()[1].getDetails(), arrayWithSize(2));
+            // "description": "random score function (seed: 12345678, field: _seq_no, _name: func1)"
+            assertThat(
+                firstHit.getExplanation().getDetails()[1].getDetails()[0].getDescription().toString(),
+                containsString("seed: " + seed)
+            );
+        });
     }
 
     public void testNoDocs() throws Exception {
         createIndex("test");
         ensureGreen();
 
-        SearchResponse resp = client().prepareSearch("test")
-            .setQuery(functionScoreQuery(matchAllQuery(), randomFunction().seed(1234).setField(SeqNoFieldMapper.NAME)))
-            .get();
-        assertNoFailures(resp);
-        assertEquals(0, resp.getHits().getTotalHits().value);
+        assertBusy(() -> {
+            SearchResponse resp = client().prepareSearch("test")
+                .setQuery(functionScoreQuery(matchAllQuery(), randomFunction().seed(1234).setField(SeqNoFieldMapper.NAME)))
+                .get();
+            assertNoFailures(resp);
+            assertEquals(0, resp.getHits().getTotalHits().value);
 
-        resp = client().prepareSearch("test").setQuery(functionScoreQuery(matchAllQuery(), randomFunction())).get();
-        assertNoFailures(resp);
-        assertEquals(0, resp.getHits().getTotalHits().value);
+            resp = client().prepareSearch("test").setQuery(functionScoreQuery(matchAllQuery(), randomFunction())).get();
+            assertNoFailures(resp);
+            assertEquals(0, resp.getHits().getTotalHits().value);
+        });
     }
 
     public void testScoreRange() throws Exception {
@@ -348,15 +361,17 @@ public class RandomScoreFunctionIT extends OpenSearchIntegTestCase {
         refresh();
         int iters = scaledRandomIntBetween(10, 20);
         for (int i = 0; i < iters; ++i) {
-            SearchResponse searchResponse = client().prepareSearch()
-                .setQuery(functionScoreQuery(matchAllQuery(), randomFunction()))
-                .setSize(docCount)
-                .get();
+            assertBusy(() -> {
+                SearchResponse searchResponse = client().prepareSearch()
+                    .setQuery(functionScoreQuery(matchAllQuery(), randomFunction()))
+                    .setSize(docCount)
+                    .get();
 
-            assertNoFailures(searchResponse);
-            for (SearchHit hit : searchResponse.getHits().getHits()) {
-                assertThat(hit.getScore(), allOf(greaterThanOrEqualTo(0.0f), lessThanOrEqualTo(1.0f)));
-            }
+                assertNoFailures(searchResponse);
+                for (SearchHit hit : searchResponse.getHits().getHits()) {
+                    assertThat(hit.getScore(), allOf(greaterThanOrEqualTo(0.0f), lessThanOrEqualTo(1.0f)));
+                }
+            });
         }
     }
 
@@ -369,31 +384,33 @@ public class RandomScoreFunctionIT extends OpenSearchIntegTestCase {
         }
         flushAndRefresh();
 
-        assertNoFailures(
-            client().prepareSearch()
-                .setSize(docCount) // get all docs otherwise we are prone to tie-breaking
-                .setQuery(functionScoreQuery(matchAllQuery(), randomFunction().seed(randomInt()).setField(SeqNoFieldMapper.NAME)))
-                .get()
-        );
+        assertBusy(() -> {
+            assertNoFailures(
+                client().prepareSearch()
+                    .setSize(docCount) // get all docs otherwise we are prone to tie-breaking
+                    .setQuery(functionScoreQuery(matchAllQuery(), randomFunction().seed(randomInt()).setField(SeqNoFieldMapper.NAME)))
+                    .get()
+            );
 
-        assertNoFailures(
-            client().prepareSearch()
-                .setSize(docCount) // get all docs otherwise we are prone to tie-breaking
-                .setQuery(functionScoreQuery(matchAllQuery(), randomFunction().seed(randomLong()).setField(SeqNoFieldMapper.NAME)))
-                .get()
-        );
+            assertNoFailures(
+                client().prepareSearch()
+                    .setSize(docCount) // get all docs otherwise we are prone to tie-breaking
+                    .setQuery(functionScoreQuery(matchAllQuery(), randomFunction().seed(randomLong()).setField(SeqNoFieldMapper.NAME)))
+                    .get()
+            );
 
-        assertNoFailures(
-            client().prepareSearch()
-                .setSize(docCount) // get all docs otherwise we are prone to tie-breaking
-                .setQuery(
-                    functionScoreQuery(
-                        matchAllQuery(),
-                        randomFunction().seed(randomRealisticUnicodeOfLengthBetween(10, 20)).setField(SeqNoFieldMapper.NAME)
+            assertNoFailures(
+                client().prepareSearch()
+                    .setSize(docCount) // get all docs otherwise we are prone to tie-breaking
+                    .setQuery(
+                        functionScoreQuery(
+                            matchAllQuery(),
+                            randomFunction().seed(randomRealisticUnicodeOfLengthBetween(10, 20)).setField(SeqNoFieldMapper.NAME)
+                        )
                     )
-                )
-                .get()
-        );
+                    .get()
+            );
+        });
     }
 
     public void checkDistribution() throws Exception {

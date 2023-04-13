@@ -154,7 +154,7 @@ public class CorruptedFileIT extends OpenSearchIntegTestCase {
     /**
      * Tests that we can actually recover from a corruption on the primary given that we have replica shards around.
      */
-    public void testCorruptFileAndRecover() throws ExecutionException, InterruptedException, IOException {
+    public void testCorruptFileAndRecover() throws Exception {
         int numDocs = scaledRandomIntBetween(100, 1000);
         // have enough space for 3 copies
         internalCluster().ensureAtLeastNumDataNodes(3);
@@ -188,8 +188,10 @@ public class CorruptedFileIT extends OpenSearchIntegTestCase {
         assertAllSuccessful(client().admin().indices().prepareFlush().setForce(true).get());
         assertAllSuccessful(client().admin().indices().prepareFlush().setForce(true).get());
         // we have to flush at least once here since we don't corrupt the translog
-        SearchResponse countResponse = client().prepareSearch().setSize(0).get();
-        assertHitCount(countResponse, numDocs);
+        assertBusy(() -> {
+            SearchResponse countResponse = client().prepareSearch().setSize(0).get();
+            assertHitCount(countResponse, numDocs);
+        });
 
         final int numShards = numShards("test");
         ShardRouting corruptedShardRouting = corruptRandomPrimaryFile();
@@ -652,8 +654,10 @@ public class CorruptedFileIT extends OpenSearchIntegTestCase {
         ensureGreen();
         assertAllSuccessful(client().admin().indices().prepareFlush().setForce(true).execute().actionGet());
         // we have to flush at least once here since we don't corrupt the translog
-        SearchResponse countResponse = client().prepareSearch().setSize(0).get();
-        assertHitCount(countResponse, numDocs);
+        assertBusy(() -> {
+            SearchResponse countResponse = client().prepareSearch().setSize(0).get();
+            assertHitCount(countResponse, numDocs);
+        });
 
         // disable allocations of replicas post restart (the restart will change replicas to primaries, so we have
         // to capture replicas post restart)

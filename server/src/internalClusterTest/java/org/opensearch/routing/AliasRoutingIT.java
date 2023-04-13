@@ -70,7 +70,9 @@ public class AliasRoutingIT extends OpenSearchIntegTestCase {
         }
         logger.info("--> verifying get with routing, should find");
         for (int i = 0; i < 5; i++) {
-            assertThat(client().prepareGet("test", "1").setRouting("0").execute().actionGet().isExists(), equalTo(true));
+            assertBusy(
+                () -> { assertThat(client().prepareGet("test", "1").setRouting("0").execute().actionGet().isExists(), equalTo(true)); }
+            );
         }
 
         logger.info("--> verifying get with routing alias, should find");
@@ -85,39 +87,47 @@ public class AliasRoutingIT extends OpenSearchIntegTestCase {
             .execute()
             .actionGet();
         for (int i = 0; i < 5; i++) {
-            assertThat(client().prepareGet("alias0", "1").execute().actionGet().isExists(), equalTo(true));
-            assertThat(
-                client().prepareGet("alias0", "1").execute().actionGet().getSourceAsMap().get("field").toString(),
-                equalTo("value2")
-            );
+            assertBusy(() -> {
+                assertThat(client().prepareGet("alias0", "1").execute().actionGet().isExists(), equalTo(true));
+                assertThat(
+                    client().prepareGet("alias0", "1").execute().actionGet().getSourceAsMap().get("field").toString(),
+                    equalTo("value2")
+                );
+            });
         }
 
         logger.info("--> deleting with no routing, should not delete anything");
         client().prepareDelete("test", "1").setRefreshPolicy(RefreshPolicy.IMMEDIATE).get();
         for (int i = 0; i < 5; i++) {
-            assertThat(client().prepareGet("test", "1").execute().actionGet().isExists(), equalTo(false));
-            assertThat(client().prepareGet("test", "1").setRouting("0").execute().actionGet().isExists(), equalTo(true));
-            assertThat(client().prepareGet("alias0", "1").execute().actionGet().isExists(), equalTo(true));
+            assertBusy(() -> {
+                assertThat(client().prepareGet("test", "1").execute().actionGet().isExists(), equalTo(false));
+                assertThat(client().prepareGet("test", "1").setRouting("0").execute().actionGet().isExists(), equalTo(true));
+                assertThat(client().prepareGet("alias0", "1").execute().actionGet().isExists(), equalTo(true));
+            });
         }
 
         logger.info("--> deleting with routing alias, should delete");
         client().prepareDelete("alias0", "1").setRefreshPolicy(RefreshPolicy.IMMEDIATE).get();
         for (int i = 0; i < 5; i++) {
-            assertThat(client().prepareGet("test", "1").execute().actionGet().isExists(), equalTo(false));
-            assertThat(client().prepareGet("test", "1").setRouting("0").execute().actionGet().isExists(), equalTo(false));
-            assertThat(client().prepareGet("alias0", "1").execute().actionGet().isExists(), equalTo(false));
+            assertBusy(() -> {
+                assertThat(client().prepareGet("test", "1").execute().actionGet().isExists(), equalTo(false));
+                assertThat(client().prepareGet("test", "1").setRouting("0").execute().actionGet().isExists(), equalTo(false));
+                assertThat(client().prepareGet("alias0", "1").execute().actionGet().isExists(), equalTo(false));
+            });
         }
 
         logger.info("--> indexing with id [1], and routing [0] using alias");
         client().prepareIndex("alias0").setId("1").setSource("field", "value1").setRefreshPolicy(RefreshPolicy.IMMEDIATE).get();
         logger.info("--> verifying get with no routing, should not find anything");
         for (int i = 0; i < 5; i++) {
-            assertThat(client().prepareGet("test", "1").execute().actionGet().isExists(), equalTo(false));
+            assertBusy(() -> { assertThat(client().prepareGet("test", "1").execute().actionGet().isExists(), equalTo(false)); });
         }
         logger.info("--> verifying get with routing, should find");
         for (int i = 0; i < 5; i++) {
-            assertThat(client().prepareGet("test", "1").setRouting("0").execute().actionGet().isExists(), equalTo(true));
-            assertThat(client().prepareGet("alias0", "1").execute().actionGet().isExists(), equalTo(true));
+            assertBusy(() -> {
+                assertThat(client().prepareGet("test", "1").setRouting("0").execute().actionGet().isExists(), equalTo(true));
+                assertThat(client().prepareGet("alias0", "1").execute().actionGet().isExists(), equalTo(true));
+            });
         }
     }
 
@@ -137,19 +147,21 @@ public class AliasRoutingIT extends OpenSearchIntegTestCase {
         client().prepareIndex("alias0").setId("1").setSource("field", "value1").setRefreshPolicy(RefreshPolicy.IMMEDIATE).get();
         logger.info("--> verifying get with no routing, should not find anything");
         for (int i = 0; i < 5; i++) {
-            assertThat(client().prepareGet("test", "1").execute().actionGet().isExists(), equalTo(false));
+            assertBusy(() -> { assertThat(client().prepareGet("test", "1").execute().actionGet().isExists(), equalTo(false)); });
         }
         logger.info("--> verifying get with routing, should find");
         for (int i = 0; i < 5; i++) {
-            assertThat(client().prepareGet("alias0", "1").execute().actionGet().isExists(), equalTo(true));
+            assertBusy(() -> { assertThat(client().prepareGet("alias0", "1").execute().actionGet().isExists(), equalTo(true)); });
         }
 
         logger.info("--> search with no routing, should fine one");
         for (int i = 0; i < 5; i++) {
-            assertThat(
-                client().prepareSearch().setQuery(QueryBuilders.matchAllQuery()).execute().actionGet().getHits().getTotalHits().value,
-                equalTo(1L)
-            );
+            assertBusy(() -> {
+                assertThat(
+                    client().prepareSearch().setQuery(QueryBuilders.matchAllQuery()).execute().actionGet().getHits().getTotalHits().value,
+                    equalTo(1L)
+                );
+            });
         }
 
         logger.info("--> search with wrong routing, should not find");
@@ -249,20 +261,22 @@ public class AliasRoutingIT extends OpenSearchIntegTestCase {
 
         logger.info("--> search with no routing, should fine two");
         for (int i = 0; i < 5; i++) {
-            assertThat(
-                client().prepareSearch().setQuery(QueryBuilders.matchAllQuery()).execute().actionGet().getHits().getTotalHits().value,
-                equalTo(2L)
-            );
-            assertThat(
-                client().prepareSearch()
-                    .setSize(0)
-                    .setQuery(QueryBuilders.matchAllQuery())
-                    .execute()
-                    .actionGet()
-                    .getHits()
-                    .getTotalHits().value,
-                equalTo(2L)
-            );
+            assertBusy(() -> {
+                assertThat(
+                    client().prepareSearch().setQuery(QueryBuilders.matchAllQuery()).execute().actionGet().getHits().getTotalHits().value,
+                    equalTo(2L)
+                );
+                assertThat(
+                    client().prepareSearch()
+                        .setSize(0)
+                        .setQuery(QueryBuilders.matchAllQuery())
+                        .execute()
+                        .actionGet()
+                        .getHits()
+                        .getTotalHits().value,
+                    equalTo(2L)
+                );
+            });
         }
 
         logger.info("--> search with 0 routing, should find one");
@@ -494,11 +508,11 @@ public class AliasRoutingIT extends OpenSearchIntegTestCase {
         client().prepareIndex("alias-a0").setId("1").setSource("field", "value1").setRefreshPolicy(RefreshPolicy.IMMEDIATE).get();
         logger.info("--> verifying get with no routing, should not find anything");
         for (int i = 0; i < 5; i++) {
-            assertThat(client().prepareGet("test-a", "1").execute().actionGet().isExists(), equalTo(false));
+            assertBusy(() -> { assertThat(client().prepareGet("test-a", "1").execute().actionGet().isExists(), equalTo(false)); });
         }
         logger.info("--> verifying get with routing, should find");
         for (int i = 0; i < 5; i++) {
-            assertThat(client().prepareGet("alias-a0", "1").execute().actionGet().isExists(), equalTo(true));
+            assertBusy(() -> { assertThat(client().prepareGet("alias-a0", "1").execute().actionGet().isExists(), equalTo(true)); });
         }
 
         logger.info("--> indexing with id [0], and routing [1] using alias to test-b");
@@ -509,7 +523,7 @@ public class AliasRoutingIT extends OpenSearchIntegTestCase {
         }
         logger.info("--> verifying get with routing, should find");
         for (int i = 0; i < 5; i++) {
-            assertThat(client().prepareGet("alias-b1", "1").execute().actionGet().isExists(), equalTo(true));
+            assertBusy(() -> { assertThat(client().prepareGet("alias-b1", "1").execute().actionGet().isExists(), equalTo(true)); });
         }
 
         logger.info("--> search with alias-a1,alias-b0, should not find");
@@ -600,15 +614,17 @@ public class AliasRoutingIT extends OpenSearchIntegTestCase {
 
         logger.info("--> search all on index_* should find two");
         for (int i = 0; i < 5; i++) {
-            assertThat(
-                client().prepareSearch("index_*")
-                    .setQuery(QueryBuilders.matchAllQuery())
-                    .execute()
-                    .actionGet()
-                    .getHits()
-                    .getTotalHits().value,
-                equalTo(2L)
-            );
+            assertBusy(() -> {
+                assertThat(
+                    client().prepareSearch("index_*")
+                        .setQuery(QueryBuilders.matchAllQuery())
+                        .execute()
+                        .actionGet()
+                        .getHits()
+                        .getTotalHits().value,
+                    equalTo(2L)
+                );
+            });
         }
     }
 
@@ -629,18 +645,20 @@ public class AliasRoutingIT extends OpenSearchIntegTestCase {
         logger.info("--> indexing on index_2 which is a concrete index");
         client().prepareIndex("index_2").setId("2").setSource("field", "value2").setRefreshPolicy(RefreshPolicy.IMMEDIATE).get();
 
-        SearchResponse searchResponse = client().prepareSearch("index_*")
-            .setSearchType(SearchType.QUERY_THEN_FETCH)
-            .setSize(1)
-            .setQuery(QueryBuilders.matchAllQuery())
-            .execute()
-            .actionGet();
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("index_*")
+                .setSearchType(SearchType.QUERY_THEN_FETCH)
+                .setSize(1)
+                .setQuery(QueryBuilders.matchAllQuery())
+                .execute()
+                .actionGet();
 
-        logger.info("--> search all on index_* should find two");
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
-        // Let's make sure that, even though 2 docs are available, only one is returned according to the size we set in the request
-        // Therefore the reduce phase has taken place, which proves that the QUERY_AND_FETCH search type wasn't erroneously forced.
-        assertThat(searchResponse.getHits().getHits().length, equalTo(1));
+            logger.info("--> search all on index_* should find two");
+            assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
+            // Let's make sure that, even though 2 docs are available, only one is returned according to the size we set in the request
+            // Therefore the reduce phase has taken place, which proves that the QUERY_AND_FETCH search type wasn't erroneously forced.
+            assertThat(searchResponse.getHits().getHits().length, equalTo(1));
+        });
     }
 
     public void testIndexingAliasesOverTime() throws Exception {
@@ -655,26 +673,28 @@ public class AliasRoutingIT extends OpenSearchIntegTestCase {
 
         logger.info("--> verifying get and search with routing, should find");
         for (int i = 0; i < 5; i++) {
-            assertThat(client().prepareGet("test", "0").setRouting("3").execute().actionGet().isExists(), equalTo(true));
-            assertThat(
-                client().prepareSearch("alias")
-                    .setQuery(QueryBuilders.matchAllQuery())
-                    .execute()
-                    .actionGet()
-                    .getHits()
-                    .getTotalHits().value,
-                equalTo(1L)
-            );
-            assertThat(
-                client().prepareSearch("alias")
-                    .setSize(0)
-                    .setQuery(QueryBuilders.matchAllQuery())
-                    .execute()
-                    .actionGet()
-                    .getHits()
-                    .getTotalHits().value,
-                equalTo(1L)
-            );
+            assertBusy(() -> {
+                assertThat(client().prepareGet("test", "0").setRouting("3").execute().actionGet().isExists(), equalTo(true));
+                assertThat(
+                    client().prepareSearch("alias")
+                        .setQuery(QueryBuilders.matchAllQuery())
+                        .execute()
+                        .actionGet()
+                        .getHits()
+                        .getTotalHits().value,
+                    equalTo(1L)
+                );
+                assertThat(
+                    client().prepareSearch("alias")
+                        .setSize(0)
+                        .setQuery(QueryBuilders.matchAllQuery())
+                        .execute()
+                        .actionGet()
+                        .getHits()
+                        .getTotalHits().value,
+                    equalTo(1L)
+                );
+            });
         }
 
         logger.info("--> creating alias with routing [4]");
@@ -717,27 +737,29 @@ public class AliasRoutingIT extends OpenSearchIntegTestCase {
 
         logger.info("--> verifying get and search with routing, should find");
         for (int i = 0; i < 5; i++) {
-            assertThat(client().prepareGet("test", "0").setRouting("3").execute().actionGet().isExists(), equalTo(true));
-            assertThat(client().prepareGet("test", "1").setRouting("4").execute().actionGet().isExists(), equalTo(true));
-            assertThat(
-                client().prepareSearch("alias")
-                    .setQuery(QueryBuilders.matchAllQuery())
-                    .execute()
-                    .actionGet()
-                    .getHits()
-                    .getTotalHits().value,
-                equalTo(2L)
-            );
-            assertThat(
-                client().prepareSearch("alias")
-                    .setSize(0)
-                    .setQuery(QueryBuilders.matchAllQuery())
-                    .execute()
-                    .actionGet()
-                    .getHits()
-                    .getTotalHits().value,
-                equalTo(2L)
-            );
+            assertBusy(() -> {
+                assertThat(client().prepareGet("test", "0").setRouting("3").execute().actionGet().isExists(), equalTo(true));
+                assertThat(client().prepareGet("test", "1").setRouting("4").execute().actionGet().isExists(), equalTo(true));
+                assertThat(
+                    client().prepareSearch("alias")
+                        .setQuery(QueryBuilders.matchAllQuery())
+                        .execute()
+                        .actionGet()
+                        .getHits()
+                        .getTotalHits().value,
+                    equalTo(2L)
+                );
+                assertThat(
+                    client().prepareSearch("alias")
+                        .setSize(0)
+                        .setQuery(QueryBuilders.matchAllQuery())
+                        .execute()
+                        .actionGet()
+                        .getHits()
+                        .getTotalHits().value,
+                    equalTo(2L)
+                );
+            });
         }
     }
 

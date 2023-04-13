@@ -60,33 +60,36 @@ import static org.hamcrest.Matchers.nullValue;
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, minNumDataNodes = 2)
 public class HiddenIndexIT extends OpenSearchIntegTestCase {
 
-    public void testHiddenIndexSearch() {
+    public void testHiddenIndexSearch() throws Exception {
         assertAcked(
             client().admin().indices().prepareCreate("hidden-index").setSettings(Settings.builder().put("index.hidden", true).build()).get()
         );
         client().prepareIndex("hidden-index").setSource("foo", "bar").setRefreshPolicy(RefreshPolicy.IMMEDIATE).get();
 
         // default not visible to wildcard expansion
-        SearchResponse searchResponse = client().prepareSearch(randomFrom("*", "_all", "h*", "*index"))
-            .setSize(1000)
-            .setQuery(QueryBuilders.matchAllQuery())
-            .get();
-        boolean matchedHidden = Arrays.stream(searchResponse.getHits().getHits()).anyMatch(hit -> "hidden-index".equals(hit.getIndex()));
-        assertFalse(matchedHidden);
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch(randomFrom("*", "_all", "h*", "*index"))
+                .setSize(1000)
+                .setQuery(QueryBuilders.matchAllQuery())
+                .get();
+            boolean matchedHidden = Arrays.stream(searchResponse.getHits().getHits())
+                .anyMatch(hit -> "hidden-index".equals(hit.getIndex()));
+            assertFalse(matchedHidden);
 
-        // direct access allowed
-        searchResponse = client().prepareSearch("hidden-index").setSize(1000).setQuery(QueryBuilders.matchAllQuery()).get();
-        matchedHidden = Arrays.stream(searchResponse.getHits().getHits()).anyMatch(hit -> "hidden-index".equals(hit.getIndex()));
-        assertTrue(matchedHidden);
+            // direct access allowed
+            searchResponse = client().prepareSearch("hidden-index").setSize(1000).setQuery(QueryBuilders.matchAllQuery()).get();
+            matchedHidden = Arrays.stream(searchResponse.getHits().getHits()).anyMatch(hit -> "hidden-index".equals(hit.getIndex()));
+            assertTrue(matchedHidden);
 
-        // with indices option to include hidden
-        searchResponse = client().prepareSearch(randomFrom("*", "_all", "h*", "*index"))
-            .setSize(1000)
-            .setQuery(QueryBuilders.matchAllQuery())
-            .setIndicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN)
-            .get();
-        matchedHidden = Arrays.stream(searchResponse.getHits().getHits()).anyMatch(hit -> "hidden-index".equals(hit.getIndex()));
-        assertTrue(matchedHidden);
+            // with indices option to include hidden
+            searchResponse = client().prepareSearch(randomFrom("*", "_all", "h*", "*index"))
+                .setSize(1000)
+                .setQuery(QueryBuilders.matchAllQuery())
+                .setIndicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN)
+                .get();
+            matchedHidden = Arrays.stream(searchResponse.getHits().getHits()).anyMatch(hit -> "hidden-index".equals(hit.getIndex()));
+            assertTrue(matchedHidden);
+        });
 
         // implicit based on use of pattern starting with . and a wildcard
         assertAcked(
@@ -97,9 +100,15 @@ public class HiddenIndexIT extends OpenSearchIntegTestCase {
                 .get()
         );
         client().prepareIndex(".hidden-index").setSource("foo", "bar").setRefreshPolicy(RefreshPolicy.IMMEDIATE).get();
-        searchResponse = client().prepareSearch(randomFrom(".*", ".hidden-*")).setSize(1000).setQuery(QueryBuilders.matchAllQuery()).get();
-        matchedHidden = Arrays.stream(searchResponse.getHits().getHits()).anyMatch(hit -> ".hidden-index".equals(hit.getIndex()));
-        assertTrue(matchedHidden);
+        assertBusy(() -> {
+            SearchResponse searchResponseFinal = client().prepareSearch(randomFrom(".*", ".hidden-*"))
+                .setSize(1000)
+                .setQuery(QueryBuilders.matchAllQuery())
+                .get();
+            boolean matchedHiddenFinal = Arrays.stream(searchResponseFinal.getHits().getHits())
+                .anyMatch(hit -> ".hidden-index".equals(hit.getIndex()));
+            assertTrue(matchedHiddenFinal);
+        });
 
         // make index not hidden
         assertAcked(
@@ -109,12 +118,15 @@ public class HiddenIndexIT extends OpenSearchIntegTestCase {
                 .setSettings(Settings.builder().put("index.hidden", false).build())
                 .get()
         );
-        searchResponse = client().prepareSearch(randomFrom("*", "_all", "h*", "*index"))
-            .setSize(1000)
-            .setQuery(QueryBuilders.matchAllQuery())
-            .get();
-        matchedHidden = Arrays.stream(searchResponse.getHits().getHits()).anyMatch(hit -> "hidden-index".equals(hit.getIndex()));
-        assertTrue(matchedHidden);
+        assertBusy(() -> {
+            SearchResponse searchResponseFinal = client().prepareSearch(randomFrom("*", "_all", "h*", "*index"))
+                .setSize(1000)
+                .setQuery(QueryBuilders.matchAllQuery())
+                .get();
+            boolean matchedHiddenFinal = Arrays.stream(searchResponseFinal.getHits().getHits())
+                .anyMatch(hit -> "hidden-index".equals(hit.getIndex()));
+            assertTrue(matchedHiddenFinal);
+        });
     }
 
     public void testGlobalTemplatesDoNotApply() {

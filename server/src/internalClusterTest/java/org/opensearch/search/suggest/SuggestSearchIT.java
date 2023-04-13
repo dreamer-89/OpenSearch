@@ -59,7 +59,6 @@ import org.opensearch.test.OpenSearchIntegTestCase;
 import org.opensearch.test.hamcrest.OpenSearchAssertions;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -358,11 +357,12 @@ public class SuggestSearchIT extends OpenSearchIntegTestCase {
         TermSuggestionBuilder termSuggest = termSuggestion("text").suggestMode(SuggestMode.ALWAYS) // Always, otherwise the results can vary
                                                                                                    // between requests.
             .text("abcd");
+        assertBusy(() -> {
+            Suggest suggest = searchSuggest("test", termSuggest);
+            assertSuggestion(suggest, 0, "test", "aacd", "abbd", "abcc");
+            assertThat(suggest.getSuggestion("test").getEntries().get(0).getText().string(), equalTo("abcd"));
+        });
         Suggest suggest = searchSuggest("test", termSuggest);
-        assertSuggestion(suggest, 0, "test", "aacd", "abbd", "abcc");
-        assertThat(suggest.getSuggestion("test").getEntries().get(0).getText().string(), equalTo("abcd"));
-
-        suggest = searchSuggest("test", termSuggest);
         assertSuggestion(suggest, 0, "test", "aacd", "abbd", "abcc");
         assertThat(suggest.getSuggestion("test").getEntries().get(0).getText().string(), equalTo("abcd"));
     }
@@ -474,7 +474,7 @@ public class SuggestSearchIT extends OpenSearchIntegTestCase {
         }
         refresh();
 
-        Map<String, SuggestionBuilder<?>> suggestions = new HashMap<>();
+        final Map<String, SuggestionBuilder<?>> suggestions = new HashMap<>();
         suggestions.put("size3SortScoreFirst", termSuggestion("field1").size(3).minDocFreq(0).suggestMode(SuggestMode.ALWAYS));
         suggestions.put(
             "size10SortScoreFirst",
@@ -488,27 +488,30 @@ public class SuggestSearchIT extends OpenSearchIntegTestCase {
             "size10SortFrequencyFirst",
             termSuggestion("field1").size(10).sort(SortBy.FREQUENCY).shardSize(1000).minDocFreq(0).suggestMode(SuggestMode.ALWAYS)
         );
-        Suggest suggest = searchSuggest("prefix_abcd", 0, suggestions);
+        assertBusy(() -> {
+            Suggest suggest = searchSuggest("prefix_abcd", 0, suggestions);
 
-        // The commented out assertions fail sometimes because suggestions are based off of shard frequencies instead of index frequencies.
-        assertSuggestion(suggest, 0, "size3SortScoreFirst", "prefix_aacd", "prefix_abcc", "prefix_accd");
-        assertSuggestion(suggest, 0, "size10SortScoreFirst", 10, "prefix_aacd", "prefix_abcc", "prefix_accd" /*, "prefix_aaad" */);
-        assertSuggestion(suggest, 0, "size3SortScoreFirstMaxEdits1", "prefix_aacd", "prefix_abcc", "prefix_accd");
-        assertSuggestion(
-            suggest,
-            0,
-            "size10SortFrequencyFirst",
-            "prefix_aaad",
-            "prefix_abbb",
-            "prefix_aaca",
-            "prefix_abba",
-            "prefix_accc",
-            "prefix_addd",
-            "prefix_abaa",
-            "prefix_dbca",
-            "prefix_cbad",
-            "prefix_aacd"
-        );
+            // The commented out assertions fail sometimes because suggestions are based off of shard frequencies instead of index
+            // frequencies.
+            assertSuggestion(suggest, 0, "size3SortScoreFirst", "prefix_aacd", "prefix_abcc", "prefix_accd");
+            assertSuggestion(suggest, 0, "size10SortScoreFirst", 10, "prefix_aacd", "prefix_abcc", "prefix_accd" /*, "prefix_aaad" */);
+            assertSuggestion(suggest, 0, "size3SortScoreFirstMaxEdits1", "prefix_aacd", "prefix_abcc", "prefix_accd");
+            assertSuggestion(
+                suggest,
+                0,
+                "size10SortFrequencyFirst",
+                "prefix_aaad",
+                "prefix_abbb",
+                "prefix_aaca",
+                "prefix_abba",
+                "prefix_accc",
+                "prefix_addd",
+                "prefix_abaa",
+                "prefix_dbca",
+                "prefix_cbad",
+                "prefix_aacd"
+            );
+        });
 
         // assertThat(suggest.get(3).getSuggestedWords().get("prefix_abcd").get(4).getTerm(), equalTo("prefix_abcc"));
         // assertThat(suggest.get(3).getSuggestedWords().get("prefix_abcd").get(4).getTerm(), equalTo("prefix_accd"));
@@ -591,7 +594,7 @@ public class SuggestSearchIT extends OpenSearchIntegTestCase {
         assertSuggestion(searchSuggest, 0, "simple_phrase", "hello world");
     }
 
-    public void testBasicPhraseSuggest() throws IOException, URISyntaxException {
+    public void testBasicPhraseSuggest() throws Exception {
         CreateIndexRequestBuilder builder = prepareCreate("test").setSettings(
             Settings.builder()
                 .put(indexSettings())
@@ -644,26 +647,31 @@ public class SuggestSearchIT extends OpenSearchIntegTestCase {
         }
         refresh();
 
-        PhraseSuggestionBuilder phraseSuggest = phraseSuggestion("bigram").gramSize(2)
+        final PhraseSuggestionBuilder phraseSuggest = phraseSuggestion("bigram").gramSize(2)
             .analyzer("body")
             .addCandidateGenerator(candidateGenerator("body").minWordLength(1).suggestMode("always"))
             .size(1);
-        Suggest searchSuggest = searchSuggest("Frank's Wise", "simple_phrase", phraseSuggest);
-        assertSuggestion(searchSuggest, 0, "simple_phrase", "frank's wife");
-        assertThat(searchSuggest.getSuggestion("simple_phrase").getEntries().get(0).getText().string(), equalTo("Frank's Wise"));
+        assertBusy(() -> {
+            Suggest searchSuggest = searchSuggest("Frank's Wise", "simple_phrase", phraseSuggest);
+            assertSuggestion(searchSuggest, 0, "simple_phrase", "frank's wife");
+            assertThat(searchSuggest.getSuggestion("simple_phrase").getEntries().get(0).getText().string(), equalTo("Frank's Wise"));
+        });
 
         phraseSuggest.realWordErrorLikelihood(0.95f);
-        searchSuggest = searchSuggest("Artur, Kinh of the Britons", "simple_phrase", phraseSuggest);
-        assertSuggestion(searchSuggest, 0, "simple_phrase", "arthur king of the britons");
-        // Check the "text" field this one time.
-        assertThat(
-            searchSuggest.getSuggestion("simple_phrase").getEntries().get(0).getText().string(),
-            equalTo("Artur, Kinh of the Britons")
-        );
+        final PhraseSuggestionBuilder finalPhraseSuggest = phraseSuggest;
+        assertBusy(() -> {
+            Suggest finalSearchSuggest = searchSuggest("Artur, Kinh of the Britons", "simple_phrase", finalPhraseSuggest);
+            assertSuggestion(finalSearchSuggest, 0, "simple_phrase", "arthur king of the britons");
+            // Check the "text" field this one time.
+            assertThat(
+                finalSearchSuggest.getSuggestion("simple_phrase").getEntries().get(0).getText().string(),
+                equalTo("Artur, Kinh of the Britons")
+            );
+        });
 
         // Ask for highlighting
         phraseSuggest.highlight("<em>", "</em>");
-        searchSuggest = searchSuggest("Artur, King of the Britns", "simple_phrase", phraseSuggest);
+        Suggest searchSuggest = searchSuggest("Artur, King of the Britns", "simple_phrase", phraseSuggest);
         assertSuggestion(searchSuggest, 0, "simple_phrase", "arthur king of the britons");
         assertThat(
             searchSuggest.getSuggestion("simple_phrase").getEntries().get(0).getOptions().get(0).getHighlighted().string(),
@@ -733,7 +741,7 @@ public class SuggestSearchIT extends OpenSearchIntegTestCase {
         );
     }
 
-    public void testSizeParam() throws IOException {
+    public void testSizeParam() throws Exception {
         CreateIndexRequestBuilder builder = prepareCreate("test").setSettings(
             Settings.builder()
                 .put(SETTING_NUMBER_OF_SHARDS, 1)
@@ -784,8 +792,11 @@ public class SuggestSearchIT extends OpenSearchIntegTestCase {
             .addCandidateGenerator(
                 candidateGenerator("body").minWordLength(1).prefixLength(1).suggestMode("always").size(2).accuracy(0.1f)
             );
-        searchSuggest = searchSuggest("Xorr the Gut-Jewel", "simple_phrase", phraseSuggestion);
-        assertSuggestion(searchSuggest, 0, "simple_phrase", "xorr the god jewel");
+        final PhraseSuggestionBuilder finalPhraseSuggestion = phraseSuggestion;
+        assertBusy(() -> {
+            Suggest finalSearchSuggest = searchSuggest("Xorr the Gut-Jewel", "simple_phrase", finalPhraseSuggestion);
+            assertSuggestion(finalSearchSuggest, 0, "simple_phrase", "xorr the god jewel");
+        });
     }
 
     public void testDifferentShardSize() throws Exception {
@@ -798,12 +809,14 @@ public class SuggestSearchIT extends OpenSearchIntegTestCase {
             client().prepareIndex("test").setId("3").setSource("field1", "foobar3").setRouting("3")
         );
 
-        Suggest suggest = searchSuggest(
-            "foobar",
-            "simple",
-            termSuggestion("field1").size(10).minDocFreq(0).suggestMode(SuggestMode.ALWAYS)
-        );
-        OpenSearchAssertions.assertSuggestionSize(suggest, 0, 3, "simple");
+        assertBusy(() -> {
+            Suggest suggest = searchSuggest(
+                "foobar",
+                "simple",
+                termSuggestion("field1").size(10).minDocFreq(0).suggestMode(SuggestMode.ALWAYS)
+            );
+            OpenSearchAssertions.assertSuggestionSize(suggest, 0, 3, "simple");
+        });
     }
 
     // see #3469
@@ -1258,7 +1271,7 @@ public class SuggestSearchIT extends OpenSearchIntegTestCase {
         }
     }
 
-    public void testPhraseSuggesterCollate() throws InterruptedException, ExecutionException, IOException {
+    public void testPhraseSuggesterCollate() throws Exception {
         CreateIndexRequestBuilder builder = prepareCreate("test").setSettings(
             Settings.builder()
                 .put(indexSettings())
@@ -1299,11 +1312,13 @@ public class SuggestSearchIT extends OpenSearchIntegTestCase {
         indexRandom(true, builders);
 
         // suggest without collate
-        PhraseSuggestionBuilder suggest = phraseSuggestion("title").addCandidateGenerator(
+        final PhraseSuggestionBuilder suggest = phraseSuggestion("title").addCandidateGenerator(
             new DirectCandidateGeneratorBuilder("title").suggestMode("always").maxTermFreq(.99f).size(10).maxInspections(200)
         ).confidence(0f).maxErrors(2f).shardSize(30000).size(10);
-        Suggest searchSuggest = searchSuggest("united states house of representatives elections in washington 2006", "title", suggest);
-        assertSuggestionSize(searchSuggest, 0, 10, "title");
+        assertBusy(() -> {
+            Suggest searchSuggest = searchSuggest("united states house of representatives elections in washington 2006", "title", suggest);
+            assertSuggestionSize(searchSuggest, 0, 10, "title");
+        });
 
         // suggest with collate
         String filterString = Strings.toString(
@@ -1316,7 +1331,11 @@ public class SuggestSearchIT extends OpenSearchIntegTestCase {
         );
         PhraseSuggestionBuilder filteredQuerySuggest = suggest.collateQuery(filterString);
         filteredQuerySuggest.collateParams(Collections.singletonMap("field", "title"));
-        searchSuggest = searchSuggest("united states house of representatives elections in washington 2006", "title", filteredQuerySuggest);
+        Suggest searchSuggest = searchSuggest(
+            "united states house of representatives elections in washington 2006",
+            "title",
+            filteredQuerySuggest
+        );
         assertSuggestionSize(searchSuggest, 0, 2, "title");
 
         // collate suggest with no result (boundary case)

@@ -32,6 +32,7 @@
 
 package org.opensearch.snapshots;
 
+import org.opensearch.OpenSearchException;
 import org.opensearch.action.DocWriteResponse;
 import org.opensearch.action.admin.cluster.snapshots.restore.RestoreSnapshotResponse;
 import org.opensearch.action.admin.cluster.snapshots.status.SnapshotStats;
@@ -203,9 +204,19 @@ public class BlobStoreIncrementalityIT extends AbstractSnapshotIntegTestCase {
         final SnapshotStats firstSnapshotShardStatus = getStats(repo, snapshot1).getIndices().get(indexName).getShards().get(0).getStats();
         final int totalFilesInShard = firstSnapshotShardStatus.getTotalFileCount();
         assertThat(totalFilesInShard, greaterThan(0));
-        final SnapshotStats secondSnapshotShardStatus = getStats(repo, snapshot2).getIndices().get(indexName).getShards().get(0).getStats();
-        assertThat(secondSnapshotShardStatus.getTotalFileCount(), is(totalFilesInShard));
-        assertThat(secondSnapshotShardStatus.getIncrementalFileCount(), is(0));
+        try {
+            assertBusy(() -> {
+                final SnapshotStats secondSnapshotShardStatus = getStats(repo, snapshot2).getIndices()
+                    .get(indexName)
+                    .getShards()
+                    .get(0)
+                    .getStats();
+                assertThat(secondSnapshotShardStatus.getTotalFileCount(), is(totalFilesInShard));
+                assertThat(secondSnapshotShardStatus.getIncrementalFileCount(), is(0));
+            });
+        } catch (Exception e) {
+            throw new OpenSearchException("assertTwoIdenticalShardSnapshots failed", e);
+        }
     }
 
     private SnapshotStatus getStats(String repository, String snapshot) {

@@ -222,7 +222,11 @@ public class SimpleSortIT extends OpenSearchIntegTestCase {
         });
 
         size = 1 + random.nextInt(10);
-        SearchResponse searchResponse = client().prepareSearch().setQuery(matchAllQuery()).setSize(size).addSort("str_value", SortOrder.DESC).get();
+        SearchResponse searchResponse = client().prepareSearch()
+            .setQuery(matchAllQuery())
+            .setSize(size)
+            .addSort("str_value", SortOrder.DESC)
+            .get();
 
         assertHitCount(searchResponse, 10);
         assertThat(searchResponse.getHits().getHits().length, equalTo(size));

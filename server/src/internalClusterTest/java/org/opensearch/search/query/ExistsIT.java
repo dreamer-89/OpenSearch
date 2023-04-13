@@ -56,6 +56,7 @@ import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertAcked;
 import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertHitCount;
 import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertSearchResponse;
 
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, minNumDataNodes = 2)
 public class ExistsIT extends OpenSearchIntegTestCase {
 
     // TODO: move this to a unit test somewhere...
@@ -243,8 +244,10 @@ public class ExistsIT extends OpenSearchIntegTestCase {
         indexRequests.add(client().prepareIndex("idx").setSource("foo", 43));
         indexRandom(true, false, indexRequests);
 
-        SearchResponse response = client().prepareSearch("idx").setQuery(QueryBuilders.existsQuery("foo-alias")).get();
-        assertSearchResponse(response);
-        assertHitCount(response, 2);
+        assertBusy(() -> {
+            SearchResponse response = client().prepareSearch("idx").setQuery(QueryBuilders.existsQuery("foo-alias")).get();
+            assertSearchResponse(response);
+            assertHitCount(response, 2);
+        });
     }
 }

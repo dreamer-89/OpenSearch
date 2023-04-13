@@ -194,23 +194,29 @@ public class ScriptQuerySearchIT extends OpenSearchIntegTestCase {
         refresh();
 
         logger.info("running doc['num1'].value > 1");
-        SearchResponse response = client().prepareSearch()
-            .setQuery(scriptQuery(new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "doc['num1'].value > 1", Collections.emptyMap())))
-            .addSort("num1", SortOrder.ASC)
-            .addScriptField("sNum1", new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "doc['num1'].value", Collections.emptyMap()))
-            .get();
+        assertBusy(() -> {
+            SearchResponse response = client().prepareSearch()
+                .setQuery(
+                    scriptQuery(new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "doc['num1'].value > 1", Collections.emptyMap()))
+                )
+                .addSort("num1", SortOrder.ASC)
+                .addScriptField(
+                    "sNum1",
+                    new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "doc['num1'].value", Collections.emptyMap())
+                )
+                .get();
 
-        assertThat(response.getHits().getTotalHits().value, equalTo(2L));
-        assertThat(response.getHits().getAt(0).getId(), equalTo("2"));
-        assertThat(response.getHits().getAt(0).getFields().get("sNum1").getValues().get(0), equalTo(2.0));
-        assertThat(response.getHits().getAt(1).getId(), equalTo("3"));
-        assertThat(response.getHits().getAt(1).getFields().get("sNum1").getValues().get(0), equalTo(3.0));
-
+            assertThat(response.getHits().getTotalHits().value, equalTo(2L));
+            assertThat(response.getHits().getAt(0).getId(), equalTo("2"));
+            assertThat(response.getHits().getAt(0).getFields().get("sNum1").getValues().get(0), equalTo(2.0));
+            assertThat(response.getHits().getAt(1).getId(), equalTo("3"));
+            assertThat(response.getHits().getAt(1).getFields().get("sNum1").getValues().get(0), equalTo(3.0));
+        });
         Map<String, Object> params = new HashMap<>();
         params.put("param1", 2);
 
         logger.info("running doc['num1'].value > param1");
-        response = client().prepareSearch()
+        SearchResponse response = client().prepareSearch()
             .setQuery(scriptQuery(new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "doc['num1'].value > param1", params)))
             .addSort("num1", SortOrder.ASC)
             .addScriptField("sNum1", new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "doc['num1'].value", Collections.emptyMap()))

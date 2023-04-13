@@ -87,6 +87,7 @@ import static org.hamcrest.Matchers.notNullValue;
 /**
  * Tests for scrolling.
  */
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, minNumDataNodes = 2)
 public class SearchScrollIT extends OpenSearchIntegTestCase {
     @After
     public void cleanup() throws Exception {
@@ -235,23 +236,25 @@ public class SearchScrollIT extends OpenSearchIntegTestCase {
 
         client().admin().indices().prepareRefresh().get();
 
-        assertThat(client().prepareSearch().setSize(0).setQuery(matchAllQuery()).get().getHits().getTotalHits().value, equalTo(500L));
-        assertThat(
-            client().prepareSearch().setSize(0).setQuery(termQuery("message", "test")).get().getHits().getTotalHits().value,
-            equalTo(500L)
-        );
-        assertThat(
-            client().prepareSearch().setSize(0).setQuery(termQuery("message", "test")).get().getHits().getTotalHits().value,
-            equalTo(500L)
-        );
-        assertThat(
-            client().prepareSearch().setSize(0).setQuery(termQuery("message", "update")).get().getHits().getTotalHits().value,
-            equalTo(0L)
-        );
-        assertThat(
-            client().prepareSearch().setSize(0).setQuery(termQuery("message", "update")).get().getHits().getTotalHits().value,
-            equalTo(0L)
-        );
+        assertBusy(() -> {
+            assertThat(client().prepareSearch().setSize(0).setQuery(matchAllQuery()).get().getHits().getTotalHits().value, equalTo(500L));
+            assertThat(
+                client().prepareSearch().setSize(0).setQuery(termQuery("message", "test")).get().getHits().getTotalHits().value,
+                equalTo(500L)
+            );
+            assertThat(
+                client().prepareSearch().setSize(0).setQuery(termQuery("message", "test")).get().getHits().getTotalHits().value,
+                equalTo(500L)
+            );
+            assertThat(
+                client().prepareSearch().setSize(0).setQuery(termQuery("message", "update")).get().getHits().getTotalHits().value,
+                equalTo(0L)
+            );
+            assertThat(
+                client().prepareSearch().setSize(0).setQuery(termQuery("message", "update")).get().getHits().getTotalHits().value,
+                equalTo(0L)
+            );
+        });
 
         SearchResponse searchResponse = client().prepareSearch()
             .setQuery(queryStringQuery("user:foobar"))
@@ -570,24 +573,26 @@ public class SearchScrollIT extends OpenSearchIntegTestCase {
         assertThat(response.getHits().getHits().length, equalTo(0));
     }
 
-    public void testCloseAndReopenOrDeleteWithActiveScroll() {
+    public void testCloseAndReopenOrDeleteWithActiveScroll() throws Exception {
         createIndex("test");
         for (int i = 0; i < 100; i++) {
             client().prepareIndex("test").setId(Integer.toString(i)).setSource("field", i).get();
         }
         refresh();
-        SearchResponse searchResponse = client().prepareSearch()
-            .setQuery(matchAllQuery())
-            .setSize(35)
-            .setScroll(TimeValue.timeValueMinutes(2))
-            .addSort("field", SortOrder.ASC)
-            .get();
-        long counter = 0;
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(100L));
-        assertThat(searchResponse.getHits().getHits().length, equalTo(35));
-        for (SearchHit hit : searchResponse.getHits()) {
-            assertThat(((Number) hit.getSortValues()[0]).longValue(), equalTo(counter++));
-        }
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch()
+                .setQuery(matchAllQuery())
+                .setSize(35)
+                .setScroll(TimeValue.timeValueMinutes(2))
+                .addSort("field", SortOrder.ASC)
+                .get();
+            long counter = 0;
+            assertThat(searchResponse.getHits().getTotalHits().value, equalTo(100L));
+            assertThat(searchResponse.getHits().getHits().length, equalTo(35));
+            for (SearchHit hit : searchResponse.getHits()) {
+                assertThat(((Number) hit.getSortValues()[0]).longValue(), equalTo(counter++));
+            }
+        });
         if (randomBoolean()) {
             assertAcked(client().admin().indices().prepareClose("test"));
             assertAcked(client().admin().indices().prepareOpen("test"));

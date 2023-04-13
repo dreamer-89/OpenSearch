@@ -244,8 +244,10 @@ public class ExistsIT extends OpenSearchIntegTestCase {
         indexRequests.add(client().prepareIndex("idx").setSource("foo", 43));
         indexRandom(true, false, indexRequests);
 
-        SearchResponse response = client().prepareSearch("idx").setQuery(QueryBuilders.existsQuery("foo-alias")).get();
-        assertSearchResponse(response);
-        assertHitCount(response, 2);
+        assertBusy(() -> {
+            SearchResponse response = client().prepareSearch("idx").setQuery(QueryBuilders.existsQuery("foo-alias")).get();
+            assertSearchResponse(response);
+            assertHitCount(response, 2);
+        });
     }
 }

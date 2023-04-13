@@ -76,9 +76,11 @@ public class DateMathIndexExpressionsIntegrationIT extends OpenSearchIntegTestCa
         client().prepareIndex(dateMathExp3).setId("3").setSource("{}", XContentType.JSON).get();
         refresh();
 
-        SearchResponse searchResponse = client().prepareSearch(dateMathExp1, dateMathExp2, dateMathExp3).get();
-        assertBusy(() -> assertHitCount(searchResponse, 3));
-        assertSearchHits(searchResponse, "1", "2", "3");
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch(dateMathExp1, dateMathExp2, dateMathExp3).get();
+            assertHitCount(searchResponse, 3);
+            assertSearchHits(searchResponse, "1", "2", "3");
+        });
 
         GetResponse getResponse = client().prepareGet(dateMathExp1, "1").get();
         assertThat(getResponse.isExists(), is(true));
@@ -136,9 +138,11 @@ public class DateMathIndexExpressionsIntegrationIT extends OpenSearchIntegTestCa
         client().prepareIndex(dateMathExp3).setId("3").setSource("{}", XContentType.JSON).get();
         refresh();
 
-        SearchResponse searchResponse = client().prepareSearch(dateMathExp1, dateMathExp2, dateMathExp3).get();
-        assertBusy(() -> assertHitCount(searchResponse, 3));
-        assertSearchHits(searchResponse, "1", "2", "3");
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch(dateMathExp1, dateMathExp2, dateMathExp3).get();
+            assertHitCount(searchResponse, 3);
+            assertSearchHits(searchResponse, "1", "2", "3");
+        });
 
         IndicesStatsResponse indicesStatsResponse = client().admin().indices().prepareStats(dateMathExp1, dateMathExp2, dateMathExp3).get();
         assertThat(indicesStatsResponse.getIndex(index1), notNullValue());

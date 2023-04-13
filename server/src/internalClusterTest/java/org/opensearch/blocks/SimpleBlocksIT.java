@@ -318,8 +318,10 @@ public class SimpleBlocksIT extends OpenSearchIntegTestCase {
             disableIndexBlock(indexName, block);
         }
 
-        client().admin().indices().prepareRefresh(indexName).get();
-        assertHitCount(client().prepareSearch(indexName).setSize(0).get(), nbDocs);
+        assertBusy(() -> {
+            client().admin().indices().prepareRefresh(indexName).get();
+            assertHitCount(client().prepareSearch(indexName).setSize(0).get(), nbDocs);
+        });
     }
 
     public void testSameBlockTwice() throws Exception {

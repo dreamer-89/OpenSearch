@@ -40,6 +40,7 @@ import org.opensearch.action.support.IndicesOptions;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.index.query.RangeQueryBuilder;
+import org.opensearch.indices.replication.SegmentReplicationBaseIT;
 import org.opensearch.plugins.Plugin;
 import org.opensearch.script.MockScriptPlugin;
 import org.opensearch.script.Script;
@@ -53,7 +54,6 @@ import org.opensearch.search.aggregations.bucket.range.RangeAggregationBuilder;
 import org.opensearch.search.aggregations.bucket.terms.Terms;
 import org.opensearch.search.aggregations.bucket.terms.TermsAggregatorFactory;
 import org.opensearch.search.aggregations.metrics.Sum;
-import org.opensearch.test.OpenSearchIntegTestCase;
 import org.junit.After;
 import org.junit.Before;
 
@@ -87,7 +87,7 @@ import static org.hamcrest.core.IsNull.notNullValue;
  * Additional tests that aim at testing more complex aggregation trees on larger random datasets, so that things like
  * the growth of dynamic arrays is tested.
  */
-public class EquivalenceIT extends OpenSearchIntegTestCase {
+public class EquivalenceIT extends SegmentReplicationBaseIT {
 
     @Override
     protected Collection<Class<? extends Plugin>> nodePlugins() {
@@ -195,6 +195,7 @@ public class EquivalenceIT extends OpenSearchIntegTestCase {
             reqBuilder = reqBuilder.addAggregation(filter("filter" + i, filter));
         }
 
+        verifyStoreContent();
         SearchResponse resp = reqBuilder.get();
         Range range = resp.getAggregations().get("range");
         List<? extends Bucket> buckets = range.getBuckets();
@@ -431,6 +432,7 @@ public class EquivalenceIT extends OpenSearchIntegTestCase {
         }
         indexRandom(true, indexingRequests);
 
+        verifyStoreContent();
         SearchResponse response = client().prepareSearch("idx")
             .addAggregation(
                 terms("terms").field("double_value")
@@ -447,6 +449,7 @@ public class EquivalenceIT extends OpenSearchIntegTestCase {
         createIndex("idx");
         final int value = randomIntBetween(0, 10);
         indexRandom(true, client().prepareIndex("idx").setSource("f", value));
+        verifyStoreContent();
         SearchResponse response = client().prepareSearch("idx")
             .addAggregation(
                 filter("filter", QueryBuilders.matchAllQuery()).subAggregation(

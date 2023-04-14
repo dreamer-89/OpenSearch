@@ -62,8 +62,8 @@ import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.internal.io.Streams;
 import org.opensearch.index.query.QueryBuilders;
+import org.opensearch.indices.replication.SegmentReplicationBaseIT;
 import org.opensearch.search.SearchHit;
-import org.opensearch.test.OpenSearchIntegTestCase;
 import org.opensearch.test.VersionUtils;
 
 import org.junit.BeforeClass;
@@ -95,7 +95,7 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
 
-public class GeoFilterIT extends OpenSearchIntegTestCase {
+public class GeoFilterIT extends SegmentReplicationBaseIT {
 
     @Override
     protected boolean forbidPrivateIndexSettings() {
@@ -246,6 +246,7 @@ public class GeoFilterIT extends OpenSearchIntegTestCase {
 
         client().prepareIndex("shapes").setId("1").setSource(data, XContentType.JSON).get();
         client().admin().indices().prepareRefresh().get();
+        verifyStoreContent();
 
         // Point in polygon
         SearchResponse result = client().prepareSearch()
@@ -416,6 +417,7 @@ public class GeoFilterIT extends OpenSearchIntegTestCase {
 
         client().admin().indices().prepareRefresh().get();
         String key = "DE";
+        verifyStoreContent();
 
         SearchResponse searchResponse = client().prepareSearch().setQuery(matchQuery("_id", key)).get();
 

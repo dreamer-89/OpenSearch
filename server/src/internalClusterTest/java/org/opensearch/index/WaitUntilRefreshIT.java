@@ -43,19 +43,18 @@ import org.opensearch.action.support.WriteRequest.RefreshPolicy;
 import org.opensearch.action.update.UpdateResponse;
 import org.opensearch.client.Requests;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.indices.replication.SegmentReplicationBaseIT;
 import org.opensearch.plugins.Plugin;
 import org.opensearch.rest.RestStatus;
 import org.opensearch.script.MockScriptPlugin;
 import org.opensearch.script.Script;
 import org.opensearch.script.ScriptType;
-import org.opensearch.test.OpenSearchIntegTestCase;
 
 import org.junit.Before;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 
 import static java.util.Collections.emptyMap;
@@ -69,7 +68,7 @@ import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertSearchHits
 /**
  * Tests that requests with RefreshPolicy.WAIT_UNTIL will be visible when they return.
  */
-public class WaitUntilRefreshIT extends OpenSearchIntegTestCase {
+public class WaitUntilRefreshIT extends SegmentReplicationBaseIT {
 
     @Override
     public Settings indexSettings() {
@@ -82,7 +81,7 @@ public class WaitUntilRefreshIT extends OpenSearchIntegTestCase {
         createIndex("test");
     }
 
-    public void testIndex() {
+    public void testIndex() throws Exception {
         IndexResponse index = client().prepareIndex("test")
             .setId("1")
             .setSource("foo", "bar")
@@ -90,24 +89,28 @@ public class WaitUntilRefreshIT extends OpenSearchIntegTestCase {
             .get();
         assertEquals(RestStatus.CREATED, index.status());
         assertFalse("request shouldn't have forced a refresh", index.forcedRefresh());
+        verifyStoreContent();
         assertSearchHits(client().prepareSearch("test").setQuery(matchQuery("foo", "bar")).get(), "1");
     }
 
-    public void testDelete() throws InterruptedException, ExecutionException {
+    public void testDelete() throws Exception {
         // Index normally
         indexRandom(true, client().prepareIndex("test").setId("1").setSource("foo", "bar"));
+        verifyStoreContent();
         assertSearchHits(client().prepareSearch("test").setQuery(matchQuery("foo", "bar")).get(), "1");
 
         // Now delete with blockUntilRefresh
         DeleteResponse delete = client().prepareDelete("test", "1").setRefreshPolicy(RefreshPolicy.WAIT_UNTIL).get();
+        verifyStoreContent();
         assertEquals(DocWriteResponse.Result.DELETED, delete.getResult());
         assertFalse("request shouldn't have forced a refresh", delete.forcedRefresh());
         assertNoSearchHits(client().prepareSearch("test").setQuery(matchQuery("foo", "bar")).get());
     }
 
-    public void testUpdate() throws InterruptedException, ExecutionException {
+    public void testUpdate() throws Exception {
         // Index normally
         indexRandom(true, client().prepareIndex("test").setId("1").setSource("foo", "bar"));
+        verifyStoreContent();
         assertSearchHits(client().prepareSearch("test").setQuery(matchQuery("foo", "bar")).get(), "1");
 
         // Update with RefreshPolicy.WAIT_UNTIL
@@ -115,6 +118,7 @@ public class WaitUntilRefreshIT extends OpenSearchIntegTestCase {
             .setDoc(Requests.INDEX_CONTENT_TYPE, "foo", "baz")
             .setRefreshPolicy(RefreshPolicy.WAIT_UNTIL)
             .get();
+        verifyStoreContent();
         assertEquals(2, update.getVersion());
         assertFalse("request shouldn't have forced a refresh", update.forcedRefresh());
         assertSearchHits(client().prepareSearch("test").setQuery(matchQuery("foo", "baz")).get(), "1");
@@ -125,6 +129,7 @@ public class WaitUntilRefreshIT extends OpenSearchIntegTestCase {
             .setDoc(Requests.INDEX_CONTENT_TYPE, "foo", "cat")
             .setRefreshPolicy(RefreshPolicy.WAIT_UNTIL)
             .get();
+        verifyStoreContent();
         assertEquals(1, update.getVersion());
         assertFalse("request shouldn't have forced a refresh", update.forcedRefresh());
         assertSearchHits(client().prepareSearch("test").setQuery(matchQuery("foo", "cat")).get(), "2");
@@ -134,33 +139,38 @@ public class WaitUntilRefreshIT extends OpenSearchIntegTestCase {
             .setScript(new Script(ScriptType.INLINE, "mockscript", "delete_plz", emptyMap()))
             .setRefreshPolicy(RefreshPolicy.WAIT_UNTIL)
             .get();
+        verifyStoreContent();
         assertEquals(2, update.getVersion());
         assertFalse("request shouldn't have forced a refresh", update.forcedRefresh());
         assertNoSearchHits(client().prepareSearch("test").setQuery(matchQuery("foo", "cat")).get());
     }
 
-    public void testBulk() {
+    public void testBulk() throws Exception {
         // Index by bulk with RefreshPolicy.WAIT_UNTIL
         BulkRequestBuilder bulk = client().prepareBulk().setRefreshPolicy(RefreshPolicy.WAIT_UNTIL);
         bulk.add(client().prepareIndex("test").setId("1").setSource("foo", "bar"));
         assertBulkSuccess(bulk.get());
+        verifyStoreContent();
         assertSearchHits(client().prepareSearch("test").setQuery(matchQuery("foo", "bar")).get(), "1");
 
         // Update by bulk with RefreshPolicy.WAIT_UNTIL
         bulk = client().prepareBulk().setRefreshPolicy(RefreshPolicy.WAIT_UNTIL);
         bulk.add(client().prepareUpdate("test", "1").setDoc(Requests.INDEX_CONTENT_TYPE, "foo", "baz"));
         assertBulkSuccess(bulk.get());
+        verifyStoreContent();
         assertSearchHits(client().prepareSearch("test").setQuery(matchQuery("foo", "baz")).get(), "1");
 
         // Delete by bulk with RefreshPolicy.WAIT_UNTIL
         bulk = client().prepareBulk().setRefreshPolicy(RefreshPolicy.WAIT_UNTIL);
         bulk.add(client().prepareDelete("test", "1"));
         assertBulkSuccess(bulk.get());
+        verifyStoreContent();
         assertNoSearchHits(client().prepareSearch("test").setQuery(matchQuery("foo", "bar")).get());
 
         // Update makes a noop
         bulk = client().prepareBulk().setRefreshPolicy(RefreshPolicy.WAIT_UNTIL);
         bulk.add(client().prepareDelete("test", "1"));
+        verifyStoreContent();
         assertBulkSuccess(bulk.get());
     }
 
@@ -168,7 +178,7 @@ public class WaitUntilRefreshIT extends OpenSearchIntegTestCase {
      * Tests that an explicit request makes block_until_refresh return. It doesn't check that block_until_refresh doesn't return until the
      * explicit refresh if the interval is -1 because we don't have that kind of control over refresh. It can happen all on its own.
      */
-    public void testNoRefreshInterval() throws InterruptedException, ExecutionException {
+    public void testNoRefreshInterval() throws Exception {
         client().admin().indices().prepareUpdateSettings("test").setSettings(singletonMap("index.refresh_interval", -1)).get();
         ActionFuture<IndexResponse> index = client().prepareIndex("test")
             .setId("1")
@@ -180,6 +190,7 @@ public class WaitUntilRefreshIT extends OpenSearchIntegTestCase {
         }
         assertEquals(RestStatus.CREATED, index.get().status());
         assertFalse("request shouldn't have forced a refresh", index.get().forcedRefresh());
+        verifyStoreContent();
         assertSearchHits(client().prepareSearch("test").setQuery(matchQuery("foo", "bar")).get(), "1");
     }
 

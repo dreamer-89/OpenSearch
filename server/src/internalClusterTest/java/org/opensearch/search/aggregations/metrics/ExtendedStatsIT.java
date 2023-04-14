@@ -51,6 +51,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.opensearch.index.query.QueryBuilders.matchAllQuery;
 import static org.opensearch.index.query.QueryBuilders.termQuery;
@@ -115,37 +116,39 @@ public class ExtendedStatsIT extends AbstractNumericTestCase {
 
     @Override
     public void testEmptyAggregation() throws Exception {
-        SearchResponse searchResponse = client().prepareSearch("empty_bucket_idx")
-            .setQuery(matchAllQuery())
-            .addAggregation(
-                histogram("histo").field("value").interval(1L).minDocCount(0).subAggregation(extendedStats("stats").field("value"))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("empty_bucket_idx")
+                .setQuery(matchAllQuery())
+                .addAggregation(
+                    histogram("histo").field("value").interval(1L).minDocCount(0).subAggregation(extendedStats("stats").field("value"))
+                )
+                .get();
 
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
-        Histogram histo = searchResponse.getAggregations().get("histo");
-        assertThat(histo, notNullValue());
-        Histogram.Bucket bucket = histo.getBuckets().get(1);
-        assertThat(bucket, notNullValue());
+            assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
+            Histogram histo = searchResponse.getAggregations().get("histo");
+            assertThat(histo, notNullValue());
+            Histogram.Bucket bucket = histo.getBuckets().get(1);
+            assertThat(bucket, notNullValue());
 
-        ExtendedStats stats = bucket.getAggregations().get("stats");
-        assertThat(stats, notNullValue());
-        assertThat(stats.getName(), equalTo("stats"));
-        assertThat(stats.getSumOfSquares(), equalTo(0.0));
-        assertThat(stats.getCount(), equalTo(0L));
-        assertThat(stats.getSum(), equalTo(0.0));
-        assertThat(stats.getMin(), equalTo(Double.POSITIVE_INFINITY));
-        assertThat(stats.getMax(), equalTo(Double.NEGATIVE_INFINITY));
-        assertThat(Double.isNaN(stats.getStdDeviation()), is(true));
-        assertThat(Double.isNaN(stats.getStdDeviationPopulation()), is(true));
-        assertThat(Double.isNaN(stats.getStdDeviationSampling()), is(true));
-        assertThat(Double.isNaN(stats.getAvg()), is(true));
-        assertThat(Double.isNaN(stats.getStdDeviationBound(Bounds.UPPER)), is(true));
-        assertThat(Double.isNaN(stats.getStdDeviationBound(Bounds.LOWER)), is(true));
-        assertThat(Double.isNaN(stats.getStdDeviationBound(Bounds.UPPER_POPULATION)), is(true));
-        assertThat(Double.isNaN(stats.getStdDeviationBound(Bounds.LOWER_POPULATION)), is(true));
-        assertThat(Double.isNaN(stats.getStdDeviationBound(Bounds.UPPER_SAMPLING)), is(true));
-        assertThat(Double.isNaN(stats.getStdDeviationBound(Bounds.LOWER_SAMPLING)), is(true));
+            ExtendedStats stats = bucket.getAggregations().get("stats");
+            assertThat(stats, notNullValue());
+            assertThat(stats.getName(), equalTo("stats"));
+            assertThat(stats.getSumOfSquares(), equalTo(0.0));
+            assertThat(stats.getCount(), equalTo(0L));
+            assertThat(stats.getSum(), equalTo(0.0));
+            assertThat(stats.getMin(), equalTo(Double.POSITIVE_INFINITY));
+            assertThat(stats.getMax(), equalTo(Double.NEGATIVE_INFINITY));
+            assertThat(Double.isNaN(stats.getStdDeviation()), is(true));
+            assertThat(Double.isNaN(stats.getStdDeviationPopulation()), is(true));
+            assertThat(Double.isNaN(stats.getStdDeviationSampling()), is(true));
+            assertThat(Double.isNaN(stats.getAvg()), is(true));
+            assertThat(Double.isNaN(stats.getStdDeviationBound(Bounds.UPPER)), is(true));
+            assertThat(Double.isNaN(stats.getStdDeviationBound(Bounds.LOWER)), is(true));
+            assertThat(Double.isNaN(stats.getStdDeviationBound(Bounds.UPPER_POPULATION)), is(true));
+            assertThat(Double.isNaN(stats.getStdDeviationBound(Bounds.LOWER_POPULATION)), is(true));
+            assertThat(Double.isNaN(stats.getStdDeviationBound(Bounds.UPPER_SAMPLING)), is(true));
+            assertThat(Double.isNaN(stats.getStdDeviationBound(Bounds.LOWER_SAMPLING)), is(true));
+        }, 30, TimeUnit.SECONDS);
     }
 
     @Override

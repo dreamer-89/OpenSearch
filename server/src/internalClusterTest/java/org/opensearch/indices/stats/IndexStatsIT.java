@@ -418,10 +418,18 @@ public class IndexStatsIT extends OpenSearchIntegTestCase {
             equalTo(0L)
         );
         for (int i = 0; i < 10; i++) {
-            assertThat(
-                client().prepareSearch("idx").setSearchType(SearchType.QUERY_THEN_FETCH).setSize(0).get().getHits().getTotalHits().value,
-                equalTo((long) numDocs)
-            );
+            final int numberOfDocs = numDocs;
+            assertBusy(() -> {
+                assertThat(
+                    client().prepareSearch("idx")
+                        .setSearchType(SearchType.QUERY_THEN_FETCH)
+                        .setSize(0)
+                        .get()
+                        .getHits()
+                        .getTotalHits().value,
+                    equalTo((long) numberOfDocs)
+                );
+            });
             assertThat(
                 client().admin()
                     .indices()
@@ -652,122 +660,124 @@ public class IndexStatsIT extends OpenSearchIntegTestCase {
         long test2ExpectedWrites = test2.dataCopies;
         long totalExpectedWrites = test1ExpectedWrites + test2ExpectedWrites;
 
-        IndicesStatsResponse stats = client().admin().indices().prepareStats().execute().actionGet();
-        assertThat(stats.getPrimaries().getDocs().getCount(), equalTo(3L));
-        assertThat(stats.getTotal().getDocs().getCount(), equalTo(totalExpectedWrites));
-        assertThat(stats.getPrimaries().getIndexing().getTotal().getIndexCount(), equalTo(3L));
-        assertThat(stats.getPrimaries().getIndexing().getTotal().getIndexFailedCount(), equalTo(0L));
-        assertThat(stats.getPrimaries().getIndexing().getTotal().isThrottled(), equalTo(false));
-        assertThat(stats.getPrimaries().getIndexing().getTotal().getThrottleTime().millis(), equalTo(0L));
-        assertThat(stats.getTotal().getIndexing().getTotal().getIndexCount(), equalTo(totalExpectedWrites));
-        assertThat(stats.getTotal().getStore(), notNullValue());
-        assertThat(stats.getTotal().getMerge(), notNullValue());
-        assertThat(stats.getTotal().getFlush(), notNullValue());
-        assertThat(stats.getTotal().getRefresh(), notNullValue());
+        assertBusy(() -> {
+            IndicesStatsResponse stats = client().admin().indices().prepareStats().execute().actionGet();
+            assertThat(stats.getPrimaries().getDocs().getCount(), equalTo(3L));
+            assertThat(stats.getTotal().getDocs().getCount(), equalTo(totalExpectedWrites));
+            assertThat(stats.getPrimaries().getIndexing().getTotal().getIndexCount(), equalTo(3L));
+            assertThat(stats.getPrimaries().getIndexing().getTotal().getIndexFailedCount(), equalTo(0L));
+            assertThat(stats.getPrimaries().getIndexing().getTotal().isThrottled(), equalTo(false));
+            assertThat(stats.getPrimaries().getIndexing().getTotal().getThrottleTime().millis(), equalTo(0L));
+            assertThat(stats.getTotal().getIndexing().getTotal().getIndexCount(), equalTo(totalExpectedWrites));
+            assertThat(stats.getTotal().getStore(), notNullValue());
+            assertThat(stats.getTotal().getMerge(), notNullValue());
+            assertThat(stats.getTotal().getFlush(), notNullValue());
+            assertThat(stats.getTotal().getRefresh(), notNullValue());
 
-        assertThat(stats.getIndex("test1").getPrimaries().getDocs().getCount(), equalTo(2L));
-        assertThat(stats.getIndex("test1").getTotal().getDocs().getCount(), equalTo(test1ExpectedWrites));
-        assertThat(stats.getIndex("test1").getPrimaries().getStore(), notNullValue());
-        assertThat(stats.getIndex("test1").getPrimaries().getMerge(), notNullValue());
-        assertThat(stats.getIndex("test1").getPrimaries().getFlush(), notNullValue());
-        assertThat(stats.getIndex("test1").getPrimaries().getRefresh(), notNullValue());
+            assertThat(stats.getIndex("test1").getPrimaries().getDocs().getCount(), equalTo(2L));
+            assertThat(stats.getIndex("test1").getTotal().getDocs().getCount(), equalTo(test1ExpectedWrites));
+            assertThat(stats.getIndex("test1").getPrimaries().getStore(), notNullValue());
+            assertThat(stats.getIndex("test1").getPrimaries().getMerge(), notNullValue());
+            assertThat(stats.getIndex("test1").getPrimaries().getFlush(), notNullValue());
+            assertThat(stats.getIndex("test1").getPrimaries().getRefresh(), notNullValue());
 
-        assertThat(stats.getIndex("test2").getPrimaries().getDocs().getCount(), equalTo(1L));
-        assertThat(stats.getIndex("test2").getTotal().getDocs().getCount(), equalTo(test2ExpectedWrites));
+            assertThat(stats.getIndex("test2").getPrimaries().getDocs().getCount(), equalTo(1L));
+            assertThat(stats.getIndex("test2").getTotal().getDocs().getCount(), equalTo(test2ExpectedWrites));
 
-        // make sure that number of requests in progress is 0
-        assertThat(stats.getIndex("test1").getTotal().getIndexing().getTotal().getIndexCurrent(), equalTo(0L));
-        assertThat(stats.getIndex("test1").getTotal().getIndexing().getTotal().getDeleteCurrent(), equalTo(0L));
-        assertThat(stats.getIndex("test1").getTotal().getSearch().getTotal().getFetchCurrent(), equalTo(0L));
-        assertThat(stats.getIndex("test1").getTotal().getSearch().getTotal().getQueryCurrent(), equalTo(0L));
-        assertThat(stats.getIndex("test2").getTotal().getIndexing().getTotal().getIndexCurrent(), equalTo(0L));
-        assertThat(stats.getIndex("test2").getTotal().getIndexing().getTotal().getDeleteCurrent(), equalTo(0L));
-        assertThat(stats.getIndex("test2").getTotal().getSearch().getTotal().getFetchCurrent(), equalTo(0L));
-        assertThat(stats.getIndex("test2").getTotal().getSearch().getTotal().getQueryCurrent(), equalTo(0L));
+            // make sure that number of requests in progress is 0
+            assertThat(stats.getIndex("test1").getTotal().getIndexing().getTotal().getIndexCurrent(), equalTo(0L));
+            assertThat(stats.getIndex("test1").getTotal().getIndexing().getTotal().getDeleteCurrent(), equalTo(0L));
+            assertThat(stats.getIndex("test1").getTotal().getSearch().getTotal().getFetchCurrent(), equalTo(0L));
+            assertThat(stats.getIndex("test1").getTotal().getSearch().getTotal().getQueryCurrent(), equalTo(0L));
+            assertThat(stats.getIndex("test2").getTotal().getIndexing().getTotal().getIndexCurrent(), equalTo(0L));
+            assertThat(stats.getIndex("test2").getTotal().getIndexing().getTotal().getDeleteCurrent(), equalTo(0L));
+            assertThat(stats.getIndex("test2").getTotal().getSearch().getTotal().getFetchCurrent(), equalTo(0L));
+            assertThat(stats.getIndex("test2").getTotal().getSearch().getTotal().getQueryCurrent(), equalTo(0L));
 
-        // check flags
-        stats = client().admin().indices().prepareStats().clear().setFlush(true).setRefresh(true).setMerge(true).execute().actionGet();
+            // check flags
+            stats = client().admin().indices().prepareStats().clear().setFlush(true).setRefresh(true).setMerge(true).execute().actionGet();
 
-        assertThat(stats.getTotal().getDocs(), nullValue());
-        assertThat(stats.getTotal().getStore(), nullValue());
-        assertThat(stats.getTotal().getIndexing(), nullValue());
-        assertThat(stats.getTotal().getMerge(), notNullValue());
-        assertThat(stats.getTotal().getFlush(), notNullValue());
-        assertThat(stats.getTotal().getRefresh(), notNullValue());
+            assertThat(stats.getTotal().getDocs(), nullValue());
+            assertThat(stats.getTotal().getStore(), nullValue());
+            assertThat(stats.getTotal().getIndexing(), nullValue());
+            assertThat(stats.getTotal().getMerge(), notNullValue());
+            assertThat(stats.getTotal().getFlush(), notNullValue());
+            assertThat(stats.getTotal().getRefresh(), notNullValue());
 
-        // check get
-        GetResponse getResponse = client().prepareGet("test2", "1").execute().actionGet();
-        assertThat(getResponse.isExists(), equalTo(true));
+            // check get
+            GetResponse getResponse = client().prepareGet("test2", "1").execute().actionGet();
+            assertThat(getResponse.isExists(), equalTo(true));
 
-        stats = client().admin().indices().prepareStats().execute().actionGet();
-        assertThat(stats.getTotal().getGet().getCount(), equalTo(1L));
-        assertThat(stats.getTotal().getGet().getExistsCount(), equalTo(1L));
-        assertThat(stats.getTotal().getGet().getMissingCount(), equalTo(0L));
+            stats = client().admin().indices().prepareStats().execute().actionGet();
+            assertThat(stats.getTotal().getGet().getCount(), equalTo(1L));
+            assertThat(stats.getTotal().getGet().getExistsCount(), equalTo(1L));
+            assertThat(stats.getTotal().getGet().getMissingCount(), equalTo(0L));
 
-        // missing get
-        getResponse = client().prepareGet("test2", "2").execute().actionGet();
-        assertThat(getResponse.isExists(), equalTo(false));
+            // missing get
+            getResponse = client().prepareGet("test2", "2").execute().actionGet();
+            assertThat(getResponse.isExists(), equalTo(false));
 
-        stats = client().admin().indices().prepareStats().execute().actionGet();
-        assertThat(stats.getTotal().getGet().getCount(), equalTo(2L));
-        assertThat(stats.getTotal().getGet().getExistsCount(), equalTo(1L));
-        assertThat(stats.getTotal().getGet().getMissingCount(), equalTo(1L));
+            stats = client().admin().indices().prepareStats().execute().actionGet();
+            assertThat(stats.getTotal().getGet().getCount(), equalTo(2L));
+            assertThat(stats.getTotal().getGet().getExistsCount(), equalTo(1L));
+            assertThat(stats.getTotal().getGet().getMissingCount(), equalTo(1L));
 
-        // clear all
-        stats = client().admin()
-            .indices()
-            .prepareStats()
-            .setDocs(false)
-            .setStore(false)
-            .setIndexing(false)
-            .setFlush(true)
-            .setRefresh(true)
-            .setMerge(true)
-            .clear() // reset defaults
-            .execute()
-            .actionGet();
-
-        assertThat(stats.getTotal().getDocs(), nullValue());
-        assertThat(stats.getTotal().getStore(), nullValue());
-        assertThat(stats.getTotal().getIndexing(), nullValue());
-        assertThat(stats.getTotal().getGet(), nullValue());
-        assertThat(stats.getTotal().getSearch(), nullValue());
-
-        // index failed
-        try {
-            client().prepareIndex("test1")
-                .setId(Integer.toString(1))
-                .setSource("field", "value")
-                .setVersion(1)
-                .setVersionType(VersionType.EXTERNAL)
+            // clear all
+            stats = client().admin()
+                .indices()
+                .prepareStats()
+                .setDocs(false)
+                .setStore(false)
+                .setIndexing(false)
+                .setFlush(true)
+                .setRefresh(true)
+                .setMerge(true)
+                .clear() // reset defaults
                 .execute()
                 .actionGet();
-            fail("Expected a version conflict");
-        } catch (VersionConflictEngineException e) {}
-        try {
-            client().prepareIndex("test2")
-                .setId(Integer.toString(1))
-                .setSource("field", "value")
-                .setVersion(1)
-                .setVersionType(VersionType.EXTERNAL)
-                .execute()
-                .actionGet();
-            fail("Expected a version conflict");
-        } catch (VersionConflictEngineException e) {}
-        try {
-            client().prepareIndex("test2")
-                .setId(Integer.toString(1))
-                .setSource("field", "value")
-                .setVersion(1)
-                .setVersionType(VersionType.EXTERNAL)
-                .execute()
-                .actionGet();
-            fail("Expected a version conflict");
-        } catch (VersionConflictEngineException e) {}
 
-        stats = client().admin().indices().prepareStats().execute().actionGet();
-        assertThat(stats.getIndex("test2").getPrimaries().getIndexing().getTotal().getIndexFailedCount(), equalTo(2L));
-        assertThat(stats.getPrimaries().getIndexing().getTotal().getIndexFailedCount(), equalTo(3L));
+            assertThat(stats.getTotal().getDocs(), nullValue());
+            assertThat(stats.getTotal().getStore(), nullValue());
+            assertThat(stats.getTotal().getIndexing(), nullValue());
+            assertThat(stats.getTotal().getGet(), nullValue());
+            assertThat(stats.getTotal().getSearch(), nullValue());
+
+            // index failed
+            try {
+                client().prepareIndex("test1")
+                    .setId(Integer.toString(1))
+                    .setSource("field", "value")
+                    .setVersion(1)
+                    .setVersionType(VersionType.EXTERNAL)
+                    .execute()
+                    .actionGet();
+                fail("Expected a version conflict");
+            } catch (VersionConflictEngineException e) {}
+            try {
+                client().prepareIndex("test2")
+                    .setId(Integer.toString(1))
+                    .setSource("field", "value")
+                    .setVersion(1)
+                    .setVersionType(VersionType.EXTERNAL)
+                    .execute()
+                    .actionGet();
+                fail("Expected a version conflict");
+            } catch (VersionConflictEngineException e) {}
+            try {
+                client().prepareIndex("test2")
+                    .setId(Integer.toString(1))
+                    .setSource("field", "value")
+                    .setVersion(1)
+                    .setVersionType(VersionType.EXTERNAL)
+                    .execute()
+                    .actionGet();
+                fail("Expected a version conflict");
+            } catch (VersionConflictEngineException e) {}
+
+            stats = client().admin().indices().prepareStats().execute().actionGet();
+            assertThat(stats.getIndex("test2").getPrimaries().getIndexing().getTotal().getIndexFailedCount(), equalTo(2L));
+            assertThat(stats.getPrimaries().getIndexing().getTotal().getIndexFailedCount(), equalTo(3L));
+        });
     }
 
     public void testMergeStats() {
@@ -806,7 +816,7 @@ public class IndexStatsIT extends OpenSearchIntegTestCase {
         assertThat(stats.getTotal().getMerge().getTotal(), greaterThan(0L));
     }
 
-    public void testSegmentsStats() {
+    public void testSegmentsStats() throws Exception {
         assertAcked(
             prepareCreate("test_index").setSettings(
                 Settings.builder()
@@ -822,17 +832,19 @@ public class IndexStatsIT extends OpenSearchIntegTestCase {
             index("test_index", "_doc", Integer.toString(i), "field", "value");
         }
 
-        IndicesStatsResponse stats = client().admin().indices().prepareStats().setSegments(true).get();
-        assertThat(stats.getTotal().getSegments().getIndexWriterMemoryInBytes(), greaterThan(0L));
-        assertThat(stats.getTotal().getSegments().getVersionMapMemoryInBytes(), greaterThan(0L));
+        assertBusy(() -> {
+            IndicesStatsResponse stats = client().admin().indices().prepareStats().setSegments(true).get();
+            assertThat(stats.getTotal().getSegments().getIndexWriterMemoryInBytes(), greaterThan(0L));
+            assertThat(stats.getTotal().getSegments().getVersionMapMemoryInBytes(), greaterThan(0L));
 
-        client().admin().indices().prepareFlush().get();
-        client().admin().indices().prepareForceMerge().setMaxNumSegments(1).execute().actionGet();
-        client().admin().indices().prepareRefresh().get();
-        stats = client().admin().indices().prepareStats().setSegments(true).get();
+            client().admin().indices().prepareFlush().get();
+            client().admin().indices().prepareForceMerge().setMaxNumSegments(1).execute().actionGet();
+            client().admin().indices().prepareRefresh().get();
+            stats = client().admin().indices().prepareStats().setSegments(true).get();
 
-        assertThat(stats.getTotal().getSegments(), notNullValue());
-        assertThat(stats.getTotal().getSegments().getCount(), equalTo((long) test1.totalNumShards));
+            assertThat(stats.getTotal().getSegments(), notNullValue());
+            assertThat(stats.getTotal().getSegments().getCount(), equalTo((long) test1.totalNumShards));
+        });
     }
 
     public void testAllFlags() throws Exception {

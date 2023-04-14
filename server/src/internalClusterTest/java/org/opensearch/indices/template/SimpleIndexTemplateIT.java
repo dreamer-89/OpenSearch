@@ -546,32 +546,34 @@ public class SimpleIndexTemplateIT extends OpenSearchIntegTestCase {
 
         refresh();
 
-        SearchResponse searchResponse = client().prepareSearch("test_index").get();
-        assertHitCount(searchResponse, 5L);
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test_index").get();
+            assertHitCount(searchResponse, 5L);
 
-        searchResponse = client().prepareSearch("simple_alias").get();
-        assertHitCount(searchResponse, 5L);
+            searchResponse = client().prepareSearch("simple_alias").get();
+            assertHitCount(searchResponse, 5L);
 
-        searchResponse = client().prepareSearch("templated_alias-test_index").get();
-        assertHitCount(searchResponse, 5L);
+            searchResponse = client().prepareSearch("templated_alias-test_index").get();
+            assertHitCount(searchResponse, 5L);
 
-        searchResponse = client().prepareSearch("filtered_alias").get();
-        assertHitCount(searchResponse, 1L);
-        assertThat(searchResponse.getHits().getAt(0).getSourceAsMap().get("type"), equalTo("type2"));
+            searchResponse = client().prepareSearch("filtered_alias").get();
+            assertHitCount(searchResponse, 1L);
+            assertThat(searchResponse.getHits().getAt(0).getSourceAsMap().get("type"), equalTo("type2"));
 
-        // Search the complex filter alias
-        searchResponse = client().prepareSearch("complex_filtered_alias").get();
-        assertHitCount(searchResponse, 3L);
+            // Search the complex filter alias
+            searchResponse = client().prepareSearch("complex_filtered_alias").get();
+            assertHitCount(searchResponse, 3L);
 
-        Set<String> types = new HashSet<>();
-        for (SearchHit searchHit : searchResponse.getHits().getHits()) {
-            types.add(searchHit.getSourceAsMap().get("type").toString());
-        }
-        assertThat(types.size(), equalTo(3));
-        assertThat(types, containsInAnyOrder("typeX", "typeY", "typeZ"));
+            Set<String> types = new HashSet<>();
+            for (SearchHit searchHit : searchResponse.getHits().getHits()) {
+                types.add(searchHit.getSourceAsMap().get("type").toString());
+            }
+            assertThat(types.size(), equalTo(3));
+            assertThat(types, containsInAnyOrder("typeX", "typeY", "typeZ"));
+        });
     }
 
-    public void testIndexTemplateWithAliasesInSource() {
+    public void testIndexTemplateWithAliasesInSource() throws Exception {
         client().admin()
             .indices()
             .preparePutTemplate("template_1")
@@ -605,15 +607,17 @@ public class SimpleIndexTemplateIT extends OpenSearchIntegTestCase {
         client().prepareIndex("test_index").setId("2").setSource("field", "value2").get();
         refresh();
 
-        SearchResponse searchResponse = client().prepareSearch("test_index").get();
-        assertHitCount(searchResponse, 2L);
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test_index").get();
+            assertHitCount(searchResponse, 2L);
 
-        searchResponse = client().prepareSearch("my_alias").get();
-        assertHitCount(searchResponse, 1L);
-        assertThat(searchResponse.getHits().getAt(0).getSourceAsMap().get("field"), equalTo("value2"));
+            searchResponse = client().prepareSearch("my_alias").get();
+            assertHitCount(searchResponse, 1L);
+            assertThat(searchResponse.getHits().getAt(0).getSourceAsMap().get("field"), equalTo("value2"));
+        });
     }
 
-    public void testIndexTemplateWithAliasesSource() {
+    public void testIndexTemplateWithAliasesSource() throws Exception {
         client().admin()
             .indices()
             .preparePutTemplate("template_1")
@@ -644,15 +648,17 @@ public class SimpleIndexTemplateIT extends OpenSearchIntegTestCase {
         client().prepareIndex("test_index").setId("2").setSource("field", "value2").get();
         refresh();
 
-        SearchResponse searchResponse = client().prepareSearch("test_index").get();
-        assertHitCount(searchResponse, 2L);
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test_index").get();
+            assertHitCount(searchResponse, 2L);
 
-        searchResponse = client().prepareSearch("alias1").get();
-        assertHitCount(searchResponse, 2L);
+            searchResponse = client().prepareSearch("alias1").get();
+            assertHitCount(searchResponse, 2L);
 
-        searchResponse = client().prepareSearch("alias2").get();
-        assertHitCount(searchResponse, 1L);
-        assertThat(searchResponse.getHits().getAt(0).getSourceAsMap().get("field"), equalTo("value2"));
+            searchResponse = client().prepareSearch("alias2").get();
+            assertHitCount(searchResponse, 1L);
+            assertThat(searchResponse.getHits().getAt(0).getSourceAsMap().get("field"), equalTo("value2"));
+        });
     }
 
     public void testDuplicateAlias() throws Exception {

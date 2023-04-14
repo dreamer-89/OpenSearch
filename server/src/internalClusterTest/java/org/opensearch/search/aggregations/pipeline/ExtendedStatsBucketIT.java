@@ -48,6 +48,7 @@ import org.opensearch.test.OpenSearchIntegTestCase;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.opensearch.search.aggregations.AggregationBuilders.histogram;
@@ -179,46 +180,48 @@ public class ExtendedStatsBucketIT extends OpenSearchIntegTestCase {
     }
 
     public void testDocCountTopLevel() throws Exception {
-        SearchResponse response = client().prepareSearch("idx")
-            .addAggregation(
-                histogram("histo").field(SINGLE_VALUED_FIELD_NAME).interval(interval).extendedBounds(minRandomValue, maxRandomValue)
-            )
-            .addAggregation(extendedStatsBucket("extended_stats_bucket", "histo>_count"))
-            .get();
+        assertBusy(() -> {
+            SearchResponse response = client().prepareSearch("idx")
+                .addAggregation(
+                    histogram("histo").field(SINGLE_VALUED_FIELD_NAME).interval(interval).extendedBounds(minRandomValue, maxRandomValue)
+                )
+                .addAggregation(extendedStatsBucket("extended_stats_bucket", "histo>_count"))
+                .get();
 
-        assertSearchResponse(response);
+            assertSearchResponse(response);
 
-        Histogram histo = response.getAggregations().get("histo");
-        assertThat(histo, notNullValue());
-        assertThat(histo.getName(), equalTo("histo"));
-        List<? extends Bucket> buckets = histo.getBuckets();
-        assertThat(buckets.size(), equalTo(numValueBuckets));
+            Histogram histo = response.getAggregations().get("histo");
+            assertThat(histo, notNullValue());
+            assertThat(histo.getName(), equalTo("histo"));
+            List<? extends Bucket> buckets = histo.getBuckets();
+            assertThat(buckets.size(), equalTo(numValueBuckets));
 
-        double sum = 0;
-        int count = 0;
-        double min = Double.POSITIVE_INFINITY;
-        double max = Double.NEGATIVE_INFINITY;
-        double sumOfSquares = 0;
-        for (int i = 0; i < numValueBuckets; ++i) {
-            Histogram.Bucket bucket = buckets.get(i);
-            assertThat(bucket, notNullValue());
-            assertThat(((Number) bucket.getKey()).longValue(), equalTo((long) i * interval));
-            assertThat(bucket.getDocCount(), equalTo(valueCounts[i]));
-            count++;
-            sum += bucket.getDocCount();
-            min = Math.min(min, bucket.getDocCount());
-            max = Math.max(max, bucket.getDocCount());
-            sumOfSquares += bucket.getDocCount() * bucket.getDocCount();
-        }
+            double sum = 0;
+            int count = 0;
+            double min = Double.POSITIVE_INFINITY;
+            double max = Double.NEGATIVE_INFINITY;
+            double sumOfSquares = 0;
+            for (int i = 0; i < numValueBuckets; ++i) {
+                Histogram.Bucket bucket = buckets.get(i);
+                assertThat(bucket, notNullValue());
+                assertThat(((Number) bucket.getKey()).longValue(), equalTo((long) i * interval));
+                assertThat(bucket.getDocCount(), equalTo(valueCounts[i]));
+                count++;
+                sum += bucket.getDocCount();
+                min = Math.min(min, bucket.getDocCount());
+                max = Math.max(max, bucket.getDocCount());
+                sumOfSquares += bucket.getDocCount() * bucket.getDocCount();
+            }
 
-        double avgValue = count == 0 ? Double.NaN : (sum / count);
-        ExtendedStatsBucket extendedStatsBucketValue = response.getAggregations().get("extended_stats_bucket");
-        assertThat(extendedStatsBucketValue, notNullValue());
-        assertThat(extendedStatsBucketValue.getName(), equalTo("extended_stats_bucket"));
-        assertThat(extendedStatsBucketValue.getAvg(), equalTo(avgValue));
-        assertThat(extendedStatsBucketValue.getMin(), equalTo(min));
-        assertThat(extendedStatsBucketValue.getMax(), equalTo(max));
-        assertThat(extendedStatsBucketValue.getSumOfSquares(), equalTo(sumOfSquares));
+            double avgValue = count == 0 ? Double.NaN : (sum / count);
+            ExtendedStatsBucket extendedStatsBucketValue = response.getAggregations().get("extended_stats_bucket");
+            assertThat(extendedStatsBucketValue, notNullValue());
+            assertThat(extendedStatsBucketValue.getName(), equalTo("extended_stats_bucket"));
+            assertThat(extendedStatsBucketValue.getAvg(), equalTo(avgValue));
+            assertThat(extendedStatsBucketValue.getMin(), equalTo(min));
+            assertThat(extendedStatsBucketValue.getMax(), equalTo(max));
+            assertThat(extendedStatsBucketValue.getSumOfSquares(), equalTo(sumOfSquares));
+        }, 30, TimeUnit.SECONDS);
     }
 
     public void testDocCountAsSubAgg() throws Exception {

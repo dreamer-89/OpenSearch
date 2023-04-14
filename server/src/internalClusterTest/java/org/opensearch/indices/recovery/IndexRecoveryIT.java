@@ -342,10 +342,7 @@ public class IndexRecoveryIT extends OpenSearchIntegTestCase {
         }
 
         refresh(INDEX_NAME);
-        assertBusy(() -> {
-            assertHitCount(client().prepareSearch(INDEX_NAME).setSize(0).get(), numOfDocs);
-        });
-
+        assertBusy(() -> { assertHitCount(client().prepareSearch(INDEX_NAME).setSize(0).get(), numOfDocs); });
 
         final boolean closedIndex = randomBoolean();
         if (closedIndex) {
@@ -395,9 +392,7 @@ public class IndexRecoveryIT extends OpenSearchIntegTestCase {
         if (closedIndex) {
             assertAcked(client().admin().indices().prepareOpen(INDEX_NAME));
         }
-        assertBusy(() -> {
-            assertHitCount(client().prepareSearch(INDEX_NAME).setSize(0).get(), numOfDocs);
-        });
+        assertBusy(() -> { assertHitCount(client().prepareSearch(INDEX_NAME).setSize(0).get(), numOfDocs); });
     }
 
     public void testCancelNewShardRecoveryAndUsesExistingShardCopy() throws Exception {

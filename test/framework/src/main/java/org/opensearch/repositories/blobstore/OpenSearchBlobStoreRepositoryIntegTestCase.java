@@ -336,11 +336,15 @@ public abstract class OpenSearchBlobStoreRepositoryIntegTestCase extends OpenSea
             // Wait for green so the close does not fail in the edge case of coinciding with a shard recovery that hasn't fully synced yet
             ensureGreen();
             logger.info("-->  close indices {}", closeIndices);
-            assertAcked(client().admin().indices().prepareClose(closeIndices.toArray(new String[closeIndices.size()])));
+            assertBusy(
+                () -> { assertAcked(client().admin().indices().prepareClose(closeIndices.toArray(new String[closeIndices.size()]))); }
+            );
         }
 
         logger.info("--> restore all indices from the snapshot");
-        assertSuccessfulRestore(client().admin().cluster().prepareRestoreSnapshot(repoName, snapshotName).setWaitForCompletion(true));
+        assertBusy(() -> {
+            assertSuccessfulRestore(client().admin().cluster().prepareRestoreSnapshot(repoName, snapshotName).setWaitForCompletion(true));
+        });
 
         // higher timeout since we can have quite a few shards and a little more data here
         ensureGreen(TimeValue.timeValueSeconds(120));
@@ -353,17 +357,22 @@ public abstract class OpenSearchBlobStoreRepositoryIntegTestCase extends OpenSea
         logger.info("-->  delete snapshot {}:{}", repoName, snapshotName);
         assertAcked(client().admin().cluster().prepareDeleteSnapshot(repoName, snapshotName).get());
 
-        expectThrows(
-            SnapshotMissingException.class,
-            () -> client().admin().cluster().prepareGetSnapshots(repoName).setSnapshots(snapshotName).get()
-        );
+        assertBusy(() -> {
+            expectThrows(
+                SnapshotMissingException.class,
+                () -> client().admin().cluster().prepareGetSnapshots(repoName).setSnapshots(snapshotName).get()
+            );
 
-        expectThrows(SnapshotMissingException.class, () -> client().admin().cluster().prepareDeleteSnapshot(repoName, snapshotName).get());
+            expectThrows(
+                SnapshotMissingException.class,
+                () -> client().admin().cluster().prepareDeleteSnapshot(repoName, snapshotName).get()
+            );
 
-        expectThrows(
-            SnapshotRestoreException.class,
-            () -> client().admin().cluster().prepareRestoreSnapshot(repoName, snapshotName).setWaitForCompletion(randomBoolean()).get()
-        );
+            expectThrows(
+                SnapshotRestoreException.class,
+                () -> client().admin().cluster().prepareRestoreSnapshot(repoName, snapshotName).setWaitForCompletion(randomBoolean()).get()
+            );
+        });
     }
 
     public void testMultipleSnapshotAndRollback() throws Exception {
@@ -383,7 +392,7 @@ public abstract class OpenSearchBlobStoreRepositoryIntegTestCase extends OpenSea
                         int doc = randomIntBetween(0, docCount - 1);
                         client().prepareDelete(indexName, Integer.toString(doc)).get();
                     }
-                    client().admin().indices().prepareRefresh(indexName).get();
+                    assertBusy(() -> { client().admin().indices().prepareRefresh(indexName).get(); });
                 }
             } else {
                 int docCount = randomIntBetween(10, 1000);
@@ -425,8 +434,9 @@ public abstract class OpenSearchBlobStoreRepositoryIntegTestCase extends OpenSea
         }
 
         for (int i = 0; i < iterationCount; i++) {
+            int j = i;
             logger.info("-->  delete snapshot {}:{}", repoName, snapshotName + "-" + i);
-            assertAcked(client().admin().cluster().prepareDeleteSnapshot(repoName, snapshotName + "-" + i).get());
+            assertBusy(() -> { assertAcked(client().admin().cluster().prepareDeleteSnapshot(repoName, snapshotName + "-" + j).get()); });
         }
     }
 
@@ -460,39 +470,46 @@ public abstract class OpenSearchBlobStoreRepositoryIntegTestCase extends OpenSea
         }
 
         logger.info("--> take another snapshot with only 2 of the 3 indices");
-        createSnapshotResponse = client.admin()
-            .cluster()
-            .prepareCreateSnapshot(repoName, "test-snap2")
-            .setWaitForCompletion(true)
-            .setIndices("test-idx-1", "test-idx-2")
-            .get();
-        assertEquals(createSnapshotResponse.getSnapshotInfo().successfulShards(), createSnapshotResponse.getSnapshotInfo().totalShards());
+        assertBusy(() -> {
+            CreateSnapshotResponse createSnapshotResponseFinal = client.admin()
+                .cluster()
+                .prepareCreateSnapshot(repoName, "test-snap2")
+                .setWaitForCompletion(true)
+                .setIndices("test-idx-1", "test-idx-2")
+                .get();
+            assertEquals(
+                createSnapshotResponseFinal.getSnapshotInfo().successfulShards(),
+                createSnapshotResponseFinal.getSnapshotInfo().totalShards()
+            );
+        });
 
         logger.info("--> delete a snapshot");
         assertAcked(client().admin().cluster().prepareDeleteSnapshot(repoName, "test-snap").get());
 
         logger.info("--> verify index folder deleted from blob container");
-        RepositoriesService repositoriesSvc = internalCluster().getInstance(
-            RepositoriesService.class,
-            internalCluster().getClusterManagerName()
-        );
-        ThreadPool threadPool = internalCluster().getInstance(ThreadPool.class, internalCluster().getClusterManagerName());
-        BlobStoreRepository repository = (BlobStoreRepository) repositoriesSvc.repository(repoName);
+        assertBusy(() -> {
+            RepositoriesService repositoriesSvc = internalCluster().getInstance(
+                RepositoriesService.class,
+                internalCluster().getClusterManagerName()
+            );
+            ThreadPool threadPool = internalCluster().getInstance(ThreadPool.class, internalCluster().getClusterManagerName());
+            BlobStoreRepository repository = (BlobStoreRepository) repositoriesSvc.repository(repoName);
 
-        final SetOnce<BlobContainer> indicesBlobContainer = new SetOnce<>();
-        final PlainActionFuture<RepositoryData> repositoryData = PlainActionFuture.newFuture();
-        threadPool.executor(ThreadPool.Names.SNAPSHOT).execute(() -> {
-            indicesBlobContainer.set(repository.blobStore().blobContainer(repository.basePath().add("indices")));
-            repository.getRepositoryData(repositoryData);
-        });
+            final SetOnce<BlobContainer> indicesBlobContainer = new SetOnce<>();
+            final PlainActionFuture<RepositoryData> repositoryData = PlainActionFuture.newFuture();
+            threadPool.executor(ThreadPool.Names.SNAPSHOT).execute(() -> {
+                indicesBlobContainer.set(repository.blobStore().blobContainer(repository.basePath().add("indices")));
+                repository.getRepositoryData(repositoryData);
+            });
 
-        for (IndexId indexId : repositoryData.actionGet().getIndices().values()) {
-            if (indexId.getName().equals("test-idx-3")) {
-                assertFalse(indicesBlobContainer.get().blobExists(indexId.getId())); // deleted index
+            for (IndexId indexId : repositoryData.actionGet().getIndices().values()) {
+                if (indexId.getName().equals("test-idx-3")) {
+                    assertFalse(indicesBlobContainer.get().blobExists(indexId.getId())); // deleted index
+                }
             }
-        }
 
-        assertAcked(client().admin().cluster().prepareDeleteSnapshot(repoName, "test-snap2").get());
+            assertAcked(client().admin().cluster().prepareDeleteSnapshot(repoName, "test-snap2").get());
+        });
     }
 
     protected void addRandomDocuments(String name, int numDocs) throws InterruptedException {

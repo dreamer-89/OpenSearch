@@ -188,7 +188,9 @@ public class RelocationIT extends OpenSearchIntegTestCase {
 
         logger.info("--> verifying count again...");
         client().admin().indices().prepareRefresh().execute().actionGet();
-        assertBusy(() -> {assertThat(client().prepareSearch("test").setSize(0).execute().actionGet().getHits().getTotalHits().value, equalTo(20L));});
+        assertBusy(() -> {
+            assertThat(client().prepareSearch("test").setSize(0).execute().actionGet().getHits().getTotalHits().value, equalTo(20L));
+        });
     }
 
     @AwaitsFix(bugUrl = "https://github.com/opensearch-project/OpenSearch/issues/2063")

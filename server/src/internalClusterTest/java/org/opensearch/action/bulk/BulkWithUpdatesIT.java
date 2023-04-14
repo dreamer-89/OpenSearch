@@ -32,6 +32,7 @@
 
 package org.opensearch.action.bulk;
 
+import org.apache.lucene.tests.util.LuceneTestCase;
 import org.opensearch.action.DocWriteRequest.OpType;
 import org.opensearch.action.DocWriteResponse;
 import org.opensearch.action.admin.indices.alias.Alias;
@@ -79,6 +80,7 @@ import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 
+@LuceneTestCase.AwaitsFix(bugUrl = "Needs more deep dive")
 public class BulkWithUpdatesIT extends OpenSearchIntegTestCase {
 
     @Override

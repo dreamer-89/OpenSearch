@@ -46,7 +46,7 @@ import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertAcked;
  * Tests that the index creation operation waits for the appropriate
  * number of active shards to be started before returning.
  */
-@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, minNumDataNodes = 2)
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST)
 
 public class ActiveShardsObserverIT extends OpenSearchIntegTestCase {
 

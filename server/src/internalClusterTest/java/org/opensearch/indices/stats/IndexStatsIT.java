@@ -836,11 +836,13 @@ public class IndexStatsIT extends OpenSearchIntegTestCase {
             IndicesStatsResponse stats = client().admin().indices().prepareStats().setSegments(true).get();
             assertThat(stats.getTotal().getSegments().getIndexWriterMemoryInBytes(), greaterThan(0L));
             assertThat(stats.getTotal().getSegments().getVersionMapMemoryInBytes(), greaterThan(0L));
+        });
 
-            client().admin().indices().prepareFlush().get();
-            client().admin().indices().prepareForceMerge().setMaxNumSegments(1).execute().actionGet();
-            client().admin().indices().prepareRefresh().get();
-            stats = client().admin().indices().prepareStats().setSegments(true).get();
+        client().admin().indices().prepareFlush().get();
+        client().admin().indices().prepareForceMerge().setMaxNumSegments(1).execute().actionGet();
+        client().admin().indices().prepareRefresh().get();
+        assertBusy(() -> {
+            IndicesStatsResponse stats = client().admin().indices().prepareStats().setSegments(true).get();
 
             assertThat(stats.getTotal().getSegments(), notNullValue());
             assertThat(stats.getTotal().getSegments().getCount(), equalTo((long) test1.totalNumShards));

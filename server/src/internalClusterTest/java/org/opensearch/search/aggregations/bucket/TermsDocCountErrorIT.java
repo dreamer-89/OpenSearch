@@ -47,6 +47,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.opensearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.opensearch.search.aggregations.AggregationBuilders.sum;
@@ -204,75 +205,81 @@ public class TermsDocCountErrorIT extends OpenSearchIntegTestCase {
         ensureSearchable();
     }
 
-    private void assertDocCountErrorWithinBounds(int size, SearchResponse accurateResponse, SearchResponse testResponse) {
-        Terms accurateTerms = accurateResponse.getAggregations().get("terms");
-        assertThat(accurateTerms, notNullValue());
-        assertThat(accurateTerms.getName(), equalTo("terms"));
-        assertThat(accurateTerms.getDocCountError(), equalTo(0L));
+    private void assertDocCountErrorWithinBounds(int size, SearchResponse accurateResponse, SearchResponse testResponse) throws Exception {
+        assertBusy(() -> {
+            Terms accurateTerms = accurateResponse.getAggregations().get("terms");
+            assertThat(accurateTerms, notNullValue());
+            assertThat(accurateTerms.getName(), equalTo("terms"));
+            assertThat(accurateTerms.getDocCountError(), equalTo(0L));
 
-        Terms testTerms = testResponse.getAggregations().get("terms");
-        assertThat(testTerms, notNullValue());
-        assertThat(testTerms.getName(), equalTo("terms"));
-        assertThat(testTerms.getDocCountError(), greaterThanOrEqualTo(0L));
-        List<? extends Bucket> testBuckets = testTerms.getBuckets();
-        assertThat(testBuckets.size(), lessThanOrEqualTo(size));
-        assertThat(accurateTerms.getBuckets().size(), greaterThanOrEqualTo(testBuckets.size()));
+            Terms testTerms = testResponse.getAggregations().get("terms");
+            assertThat(testTerms, notNullValue());
+            assertThat(testTerms.getName(), equalTo("terms"));
+            assertThat(testTerms.getDocCountError(), greaterThanOrEqualTo(0L));
+            List<? extends Bucket> testBuckets = testTerms.getBuckets();
+            assertThat(testBuckets.size(), lessThanOrEqualTo(size));
+            assertThat(accurateTerms.getBuckets().size(), greaterThanOrEqualTo(testBuckets.size()));
 
-        for (Terms.Bucket testBucket : testBuckets) {
-            assertThat(testBucket, notNullValue());
-            Terms.Bucket accurateBucket = accurateTerms.getBucketByKey(testBucket.getKeyAsString());
-            assertThat(accurateBucket, notNullValue());
-            assertThat(accurateBucket.getDocCountError(), equalTo(0L));
-            assertThat(testBucket.getDocCountError(), lessThanOrEqualTo(testTerms.getDocCountError()));
-            assertThat(testBucket.getDocCount() + testBucket.getDocCountError(), greaterThanOrEqualTo(accurateBucket.getDocCount()));
-            assertThat(testBucket.getDocCount() - testBucket.getDocCountError(), lessThanOrEqualTo(accurateBucket.getDocCount()));
-        }
-
-        for (Terms.Bucket accurateBucket : accurateTerms.getBuckets()) {
-            assertThat(accurateBucket, notNullValue());
-            Terms.Bucket testBucket = accurateTerms.getBucketByKey(accurateBucket.getKeyAsString());
-            if (testBucket == null) {
-                assertThat(accurateBucket.getDocCount(), lessThanOrEqualTo(testTerms.getDocCountError()));
+            for (Terms.Bucket testBucket : testBuckets) {
+                assertThat(testBucket, notNullValue());
+                Terms.Bucket accurateBucket = accurateTerms.getBucketByKey(testBucket.getKeyAsString());
+                assertThat(accurateBucket, notNullValue());
+                assertThat(accurateBucket.getDocCountError(), equalTo(0L));
+                assertThat(testBucket.getDocCountError(), lessThanOrEqualTo(testTerms.getDocCountError()));
+                assertThat(testBucket.getDocCount() + testBucket.getDocCountError(), greaterThanOrEqualTo(accurateBucket.getDocCount()));
+                assertThat(testBucket.getDocCount() - testBucket.getDocCountError(), lessThanOrEqualTo(accurateBucket.getDocCount()));
             }
 
-        }
+            for (Terms.Bucket accurateBucket : accurateTerms.getBuckets()) {
+                assertThat(accurateBucket, notNullValue());
+                Terms.Bucket testBucket = accurateTerms.getBucketByKey(accurateBucket.getKeyAsString());
+                if (testBucket == null) {
+                    assertThat(accurateBucket.getDocCount(), lessThanOrEqualTo(testTerms.getDocCountError()));
+                }
+
+            }
+        }, 30, TimeUnit.SECONDS);
     }
 
-    private void assertNoDocCountError(int size, SearchResponse accurateResponse, SearchResponse testResponse) {
-        Terms accurateTerms = accurateResponse.getAggregations().get("terms");
-        assertThat(accurateTerms, notNullValue());
-        assertThat(accurateTerms.getName(), equalTo("terms"));
-        assertThat(accurateTerms.getDocCountError(), equalTo(0L));
+    private void assertNoDocCountError(int size, SearchResponse accurateResponse, SearchResponse testResponse) throws Exception {
+        assertBusy(() -> {
+            Terms accurateTerms = accurateResponse.getAggregations().get("terms");
+            assertThat(accurateTerms, notNullValue());
+            assertThat(accurateTerms.getName(), equalTo("terms"));
+            assertThat(accurateTerms.getDocCountError(), equalTo(0L));
 
-        Terms testTerms = testResponse.getAggregations().get("terms");
-        assertThat(testTerms, notNullValue());
-        assertThat(testTerms.getName(), equalTo("terms"));
-        assertThat(testTerms.getDocCountError(), equalTo(0L));
-        List<? extends Bucket> testBuckets = testTerms.getBuckets();
-        assertThat(testBuckets.size(), lessThanOrEqualTo(size));
-        assertThat(accurateTerms.getBuckets().size(), greaterThanOrEqualTo(testBuckets.size()));
+            Terms testTerms = testResponse.getAggregations().get("terms");
+            assertThat(testTerms, notNullValue());
+            assertThat(testTerms.getName(), equalTo("terms"));
+            assertThat(testTerms.getDocCountError(), equalTo(0L));
+            List<? extends Bucket> testBuckets = testTerms.getBuckets();
+            assertThat(testBuckets.size(), lessThanOrEqualTo(size));
+            assertThat(accurateTerms.getBuckets().size(), greaterThanOrEqualTo(testBuckets.size()));
 
-        for (Terms.Bucket testBucket : testBuckets) {
-            assertThat(testBucket, notNullValue());
-            Terms.Bucket accurateBucket = accurateTerms.getBucketByKey(testBucket.getKeyAsString());
-            assertThat(accurateBucket, notNullValue());
-            assertThat(accurateBucket.getDocCountError(), equalTo(0L));
-            assertThat(testBucket.getDocCountError(), equalTo(0L));
-        }
+            for (Terms.Bucket testBucket : testBuckets) {
+                assertThat(testBucket, notNullValue());
+                Terms.Bucket accurateBucket = accurateTerms.getBucketByKey(testBucket.getKeyAsString());
+                assertThat(accurateBucket, notNullValue());
+                assertThat(accurateBucket.getDocCountError(), equalTo(0L));
+                assertThat(testBucket.getDocCountError(), equalTo(0L));
+            }
+        });
     }
 
-    private void assertNoDocCountErrorSingleResponse(int size, SearchResponse testResponse) {
-        Terms testTerms = testResponse.getAggregations().get("terms");
-        assertThat(testTerms, notNullValue());
-        assertThat(testTerms.getName(), equalTo("terms"));
-        assertThat(testTerms.getDocCountError(), equalTo(0L));
-        List<? extends Bucket> testBuckets = testTerms.getBuckets();
-        assertThat(testBuckets.size(), lessThanOrEqualTo(size));
+    private void assertNoDocCountErrorSingleResponse(int size, SearchResponse testResponse) throws Exception {
+        assertBusy(() -> {
+            Terms testTerms = testResponse.getAggregations().get("terms");
+            assertThat(testTerms, notNullValue());
+            assertThat(testTerms.getName(), equalTo("terms"));
+            assertThat(testTerms.getDocCountError(), equalTo(0L));
+            List<? extends Bucket> testBuckets = testTerms.getBuckets();
+            assertThat(testBuckets.size(), lessThanOrEqualTo(size));
 
-        for (Terms.Bucket testBucket : testBuckets) {
-            assertThat(testBucket, notNullValue());
-            assertThat(testBucket.getDocCountError(), equalTo(0L));
-        }
+            for (Terms.Bucket testBucket : testBuckets) {
+                assertThat(testBucket, notNullValue());
+                assertThat(testBucket.getDocCountError(), equalTo(0L));
+            }
+        });
     }
 
     private void assertUnboundedDocCountError(int size, SearchResponse accurateResponse, SearchResponse testResponse) throws Exception {
@@ -303,778 +310,826 @@ public class TermsDocCountErrorIT extends OpenSearchIntegTestCase {
     public void testStringValueField() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(STRING_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(STRING_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(STRING_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(STRING_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertDocCountErrorWithinBounds(size, accurateResponse, testResponse);
+            assertDocCountErrorWithinBounds(size, accurateResponse, testResponse);
+        });
     }
 
     public void testStringValueFieldSingleShard() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(STRING_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(STRING_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(STRING_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(STRING_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertNoDocCountError(size, accurateResponse, testResponse);
+            assertNoDocCountError(size, accurateResponse, testResponse);
+        });
     }
 
     public void testStringValueFieldWithRouting() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
 
-        SearchResponse testResponse = client().prepareSearch("idx_with_routing")
-            .setRouting(String.valueOf(between(1, numRoutingValues)))
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(STRING_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse testResponse = client().prepareSearch("idx_with_routing")
+                .setRouting(String.valueOf(between(1, numRoutingValues)))
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(STRING_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertNoDocCountErrorSingleResponse(size, testResponse);
+            assertNoDocCountErrorSingleResponse(size, testResponse);
+        });
     }
 
     public void testStringValueFieldDocCountAsc() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(STRING_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .order(BucketOrder.count(true))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(STRING_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .order(BucketOrder.count(true))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(STRING_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .order(BucketOrder.count(true))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(STRING_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .order(BucketOrder.count(true))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertUnboundedDocCountError(size, accurateResponse, testResponse);
+            assertUnboundedDocCountError(size, accurateResponse, testResponse);
+        });
     }
 
     public void testStringValueFieldTermSortAsc() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(STRING_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .order(BucketOrder.key(true))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(STRING_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .order(BucketOrder.key(true))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(STRING_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .order(BucketOrder.key(true))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(STRING_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .order(BucketOrder.key(true))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertNoDocCountError(size, accurateResponse, testResponse);
+            assertNoDocCountError(size, accurateResponse, testResponse);
+        });
     }
 
     public void testStringValueFieldTermSortDesc() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(STRING_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .order(BucketOrder.key(false))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(STRING_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .order(BucketOrder.key(false))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(STRING_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .order(BucketOrder.key(false))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(STRING_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .order(BucketOrder.key(false))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertNoDocCountError(size, accurateResponse, testResponse);
+            assertNoDocCountError(size, accurateResponse, testResponse);
+        });
     }
 
     public void testStringValueFieldSubAggAsc() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(STRING_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .order(BucketOrder.aggregation("sortAgg", true))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-                    .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(STRING_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .order(BucketOrder.aggregation("sortAgg", true))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                        .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(STRING_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .order(BucketOrder.aggregation("sortAgg", true))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-                    .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(STRING_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .order(BucketOrder.aggregation("sortAgg", true))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                        .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertUnboundedDocCountError(size, accurateResponse, testResponse);
+            assertUnboundedDocCountError(size, accurateResponse, testResponse);
+        });
     }
 
     public void testStringValueFieldSubAggDesc() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(STRING_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .order(BucketOrder.aggregation("sortAgg", false))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-                    .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(STRING_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .order(BucketOrder.aggregation("sortAgg", false))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                        .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(STRING_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .order(BucketOrder.aggregation("sortAgg", false))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-                    .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(STRING_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .order(BucketOrder.aggregation("sortAgg", false))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                        .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertUnboundedDocCountError(size, accurateResponse, testResponse);
+            assertUnboundedDocCountError(size, accurateResponse, testResponse);
+        });
     }
 
     public void testLongValueField() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(LONG_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(LONG_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(LONG_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(LONG_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertDocCountErrorWithinBounds(size, accurateResponse, testResponse);
+            assertDocCountErrorWithinBounds(size, accurateResponse, testResponse);
+        });
     }
 
     public void testLongValueFieldSingleShard() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(LONG_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(LONG_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(LONG_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(LONG_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertNoDocCountError(size, accurateResponse, testResponse);
+            assertNoDocCountError(size, accurateResponse, testResponse);
+        });
     }
 
     public void testLongValueFieldWithRouting() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
 
-        SearchResponse testResponse = client().prepareSearch("idx_with_routing")
-            .setRouting(String.valueOf(between(1, numRoutingValues)))
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(LONG_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse testResponse = client().prepareSearch("idx_with_routing")
+                .setRouting(String.valueOf(between(1, numRoutingValues)))
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(LONG_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertNoDocCountErrorSingleResponse(size, testResponse);
+            assertNoDocCountErrorSingleResponse(size, testResponse);
+        });
     }
 
     public void testLongValueFieldDocCountAsc() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(LONG_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .order(BucketOrder.count(true))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(LONG_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .order(BucketOrder.count(true))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(LONG_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .order(BucketOrder.count(true))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(LONG_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .order(BucketOrder.count(true))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertUnboundedDocCountError(size, accurateResponse, testResponse);
+            assertUnboundedDocCountError(size, accurateResponse, testResponse);
+        });
     }
 
     public void testLongValueFieldTermSortAsc() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(LONG_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .order(BucketOrder.key(true))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(LONG_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .order(BucketOrder.key(true))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(LONG_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .order(BucketOrder.key(true))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(LONG_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .order(BucketOrder.key(true))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertNoDocCountError(size, accurateResponse, testResponse);
+            assertNoDocCountError(size, accurateResponse, testResponse);
+        });
     }
 
     public void testLongValueFieldTermSortDesc() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(LONG_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .order(BucketOrder.key(false))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(LONG_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .order(BucketOrder.key(false))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(LONG_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .order(BucketOrder.key(false))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(LONG_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .order(BucketOrder.key(false))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertNoDocCountError(size, accurateResponse, testResponse);
+            assertNoDocCountError(size, accurateResponse, testResponse);
+        });
     }
 
     public void testLongValueFieldSubAggAsc() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(LONG_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .order(BucketOrder.aggregation("sortAgg", true))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-                    .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(LONG_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .order(BucketOrder.aggregation("sortAgg", true))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                        .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(LONG_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .order(BucketOrder.aggregation("sortAgg", true))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-                    .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(LONG_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .order(BucketOrder.aggregation("sortAgg", true))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                        .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertUnboundedDocCountError(size, accurateResponse, testResponse);
+            assertUnboundedDocCountError(size, accurateResponse, testResponse);
+        });
     }
 
     public void testLongValueFieldSubAggDesc() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(LONG_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .order(BucketOrder.aggregation("sortAgg", false))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-                    .subAggregation(sum("sortAgg").field(DOUBLE_FIELD_NAME))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(LONG_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .order(BucketOrder.aggregation("sortAgg", false))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                        .subAggregation(sum("sortAgg").field(DOUBLE_FIELD_NAME))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(LONG_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .order(BucketOrder.aggregation("sortAgg", false))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-                    .subAggregation(sum("sortAgg").field(DOUBLE_FIELD_NAME))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(LONG_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .order(BucketOrder.aggregation("sortAgg", false))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                        .subAggregation(sum("sortAgg").field(DOUBLE_FIELD_NAME))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertUnboundedDocCountError(size, accurateResponse, testResponse);
+            assertUnboundedDocCountError(size, accurateResponse, testResponse);
+        });
     }
 
     public void testDoubleValueField() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(DOUBLE_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(DOUBLE_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(DOUBLE_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(DOUBLE_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertDocCountErrorWithinBounds(size, accurateResponse, testResponse);
+            assertDocCountErrorWithinBounds(size, accurateResponse, testResponse);
+        });
     }
 
     public void testDoubleValueFieldSingleShard() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(DOUBLE_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(DOUBLE_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(DOUBLE_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(DOUBLE_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertNoDocCountError(size, accurateResponse, testResponse);
+            assertNoDocCountError(size, accurateResponse, testResponse);
+        });
     }
 
     public void testDoubleValueFieldWithRouting() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
 
-        SearchResponse testResponse = client().prepareSearch("idx_with_routing")
-            .setRouting(String.valueOf(between(1, numRoutingValues)))
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(DOUBLE_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse testResponse = client().prepareSearch("idx_with_routing")
+                .setRouting(String.valueOf(between(1, numRoutingValues)))
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(DOUBLE_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertNoDocCountErrorSingleResponse(size, testResponse);
+            assertNoDocCountErrorSingleResponse(size, testResponse);
+        });
     }
 
     public void testDoubleValueFieldDocCountAsc() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(DOUBLE_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .order(BucketOrder.count(true))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(DOUBLE_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .order(BucketOrder.count(true))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(DOUBLE_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .order(BucketOrder.count(true))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(DOUBLE_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .order(BucketOrder.count(true))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertUnboundedDocCountError(size, accurateResponse, testResponse);
+            assertUnboundedDocCountError(size, accurateResponse, testResponse);
+        });
     }
 
     public void testDoubleValueFieldTermSortAsc() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(DOUBLE_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .order(BucketOrder.key(true))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(DOUBLE_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .order(BucketOrder.key(true))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(DOUBLE_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .order(BucketOrder.key(true))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(DOUBLE_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .order(BucketOrder.key(true))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertNoDocCountError(size, accurateResponse, testResponse);
+            assertNoDocCountError(size, accurateResponse, testResponse);
+        });
     }
 
     public void testDoubleValueFieldTermSortDesc() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(DOUBLE_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .order(BucketOrder.key(false))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(DOUBLE_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .order(BucketOrder.key(false))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(DOUBLE_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .order(BucketOrder.key(false))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(DOUBLE_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .order(BucketOrder.key(false))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertNoDocCountError(size, accurateResponse, testResponse);
+            assertNoDocCountError(size, accurateResponse, testResponse);
+        });
     }
 
     public void testDoubleValueFieldSubAggAsc() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(DOUBLE_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .order(BucketOrder.aggregation("sortAgg", true))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-                    .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(DOUBLE_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .order(BucketOrder.aggregation("sortAgg", true))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                        .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(DOUBLE_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .order(BucketOrder.aggregation("sortAgg", true))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-                    .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(DOUBLE_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .order(BucketOrder.aggregation("sortAgg", true))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                        .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertUnboundedDocCountError(size, accurateResponse, testResponse);
+            assertUnboundedDocCountError(size, accurateResponse, testResponse);
+        });
     }
 
     public void testDoubleValueFieldSubAggDesc() throws Exception {
         int size = randomIntBetween(1, 20);
         int shardSize = randomIntBetween(size, size * 2);
-        SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(DOUBLE_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(10000)
-                    .shardSize(10000)
-                    .order(BucketOrder.aggregation("sortAgg", false))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-                    .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse accurateResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(DOUBLE_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(10000)
+                        .shardSize(10000)
+                        .order(BucketOrder.aggregation("sortAgg", false))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                        .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
+                )
+                .get();
 
-        assertSearchResponse(accurateResponse);
+            assertSearchResponse(accurateResponse);
 
-        SearchResponse testResponse = client().prepareSearch("idx_single_shard")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(DOUBLE_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(size)
-                    .shardSize(shardSize)
-                    .order(BucketOrder.aggregation("sortAgg", false))
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-                    .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
-            )
-            .get();
+            SearchResponse testResponse = client().prepareSearch("idx_single_shard")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(DOUBLE_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(size)
+                        .shardSize(shardSize)
+                        .order(BucketOrder.aggregation("sortAgg", false))
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                        .subAggregation(sum("sortAgg").field(LONG_FIELD_NAME))
+                )
+                .get();
 
-        assertSearchResponse(testResponse);
+            assertSearchResponse(testResponse);
 
-        assertUnboundedDocCountError(size, accurateResponse, testResponse);
+            assertUnboundedDocCountError(size, accurateResponse, testResponse);
+        });
     }
 
     /**
@@ -1083,54 +1138,56 @@ public class TermsDocCountErrorIT extends OpenSearchIntegTestCase {
      * 3 one-shard indices.
      */
     public void testFixedDocs() throws Exception {
-        SearchResponse response = client().prepareSearch("idx_fixed_docs_0", "idx_fixed_docs_1", "idx_fixed_docs_2")
-            .addAggregation(
-                terms("terms").executionHint(randomExecutionHint())
-                    .field(STRING_FIELD_NAME)
-                    .showTermDocCountError(true)
-                    .size(5)
-                    .shardSize(5)
-                    .collectMode(randomFrom(SubAggCollectionMode.values()))
-            )
-            .get();
-        assertSearchResponse(response);
+        assertBusy(() -> {
+            SearchResponse response = client().prepareSearch("idx_fixed_docs_0", "idx_fixed_docs_1", "idx_fixed_docs_2")
+                .addAggregation(
+                    terms("terms").executionHint(randomExecutionHint())
+                        .field(STRING_FIELD_NAME)
+                        .showTermDocCountError(true)
+                        .size(5)
+                        .shardSize(5)
+                        .collectMode(randomFrom(SubAggCollectionMode.values()))
+                )
+                .get();
+            assertSearchResponse(response);
 
-        Terms terms = response.getAggregations().get("terms");
-        assertThat(terms, notNullValue());
-        assertThat(terms.getDocCountError(), equalTo(46L));
-        List<? extends Bucket> buckets = terms.getBuckets();
-        assertThat(buckets, notNullValue());
-        assertThat(buckets.size(), equalTo(5));
+            Terms terms = response.getAggregations().get("terms");
+            assertThat(terms, notNullValue());
+            assertThat(terms.getDocCountError(), equalTo(46L));
+            List<? extends Bucket> buckets = terms.getBuckets();
+            assertThat(buckets, notNullValue());
+            assertThat(buckets.size(), equalTo(5));
 
-        Bucket bucket = buckets.get(0);
-        assertThat(bucket, notNullValue());
-        assertThat(bucket.getKey(), equalTo("A"));
-        assertThat(bucket.getDocCount(), equalTo(100L));
-        assertThat(bucket.getDocCountError(), equalTo(0L));
+            Bucket bucket = buckets.get(0);
+            assertThat(bucket, notNullValue());
+            assertThat(bucket.getKey(), equalTo("A"));
+            assertThat(bucket.getDocCount(), equalTo(100L));
+            assertThat(bucket.getDocCountError(), equalTo(0L));
 
-        bucket = buckets.get(1);
-        assertThat(bucket, notNullValue());
-        assertThat(bucket.getKey(), equalTo("Z"));
-        assertThat(bucket.getDocCount(), equalTo(52L));
-        assertThat(bucket.getDocCountError(), equalTo(2L));
+            bucket = buckets.get(1);
+            assertThat(bucket, notNullValue());
+            assertThat(bucket.getKey(), equalTo("Z"));
+            assertThat(bucket.getDocCount(), equalTo(52L));
+            assertThat(bucket.getDocCountError(), equalTo(2L));
 
-        bucket = buckets.get(2);
-        assertThat(bucket, notNullValue());
-        assertThat(bucket.getKey(), equalTo("C"));
-        assertThat(bucket.getDocCount(), equalTo(50L));
-        assertThat(bucket.getDocCountError(), equalTo(15L));
+            bucket = buckets.get(2);
+            assertThat(bucket, notNullValue());
+            assertThat(bucket.getKey(), equalTo("C"));
+            assertThat(bucket.getDocCount(), equalTo(50L));
+            assertThat(bucket.getDocCountError(), equalTo(15L));
 
-        bucket = buckets.get(3);
-        assertThat(bucket, notNullValue());
-        assertThat(bucket.getKey(), equalTo("G"));
-        assertThat(bucket.getDocCount(), equalTo(45L));
-        assertThat(bucket.getDocCountError(), equalTo(2L));
+            bucket = buckets.get(3);
+            assertThat(bucket, notNullValue());
+            assertThat(bucket.getKey(), equalTo("G"));
+            assertThat(bucket.getDocCount(), equalTo(45L));
+            assertThat(bucket.getDocCountError(), equalTo(2L));
 
-        bucket = buckets.get(4);
-        assertThat(bucket, notNullValue());
-        assertThat(bucket.getKey(), equalTo("B"));
-        assertThat(bucket.getDocCount(), equalTo(43L));
-        assertThat(bucket.getDocCountError(), equalTo(29L));
+            bucket = buckets.get(4);
+            assertThat(bucket, notNullValue());
+            assertThat(bucket.getKey(), equalTo("B"));
+            assertThat(bucket.getDocCount(), equalTo(43L));
+            assertThat(bucket.getDocCountError(), equalTo(29L));
+        }, 30, TimeUnit.SECONDS);
     }
 
 }

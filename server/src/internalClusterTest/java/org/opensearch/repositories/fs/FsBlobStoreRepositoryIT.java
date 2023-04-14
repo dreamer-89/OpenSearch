@@ -42,7 +42,6 @@ import org.opensearch.common.unit.ByteSizeValue;
 import org.opensearch.core.internal.io.IOUtils;
 import org.opensearch.repositories.blobstore.OpenSearchBlobStoreRepositoryIntegTestCase;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -71,7 +70,7 @@ public class FsBlobStoreRepositoryIT extends OpenSearchBlobStoreRepositoryIntegT
         return settings.build();
     }
 
-    public void testMissingDirectoriesNotCreatedInReadonlyRepository() throws IOException, InterruptedException {
+    public void testMissingDirectoriesNotCreatedInReadonlyRepository() throws Exception {
         final String repoName = randomName();
         final Path repoPath = randomRepoPath();
 
@@ -94,13 +93,15 @@ public class FsBlobStoreRepositoryIT extends OpenSearchBlobStoreRepositoryIntegT
         int docCount = iterations(10, 1000);
         logger.info("-->  create random index {} with {} records", indexName, docCount);
         addRandomDocuments(indexName, docCount);
-        assertHitCount(client().prepareSearch(indexName).setSize(0).get(), docCount);
+        assertBusy(() -> { assertHitCount(client().prepareSearch(indexName).setSize(0).get(), docCount); });
 
         final String snapshotName = randomName();
         logger.info("-->  create snapshot {}:{}", repoName, snapshotName);
-        assertSuccessfulSnapshot(
-            client().admin().cluster().prepareCreateSnapshot(repoName, snapshotName).setWaitForCompletion(true).setIndices(indexName)
-        );
+        assertBusy(() -> {
+            assertSuccessfulSnapshot(
+                client().admin().cluster().prepareCreateSnapshot(repoName, snapshotName).setWaitForCompletion(true).setIndices(indexName)
+            );
+        });
 
         assertAcked(client().admin().indices().prepareDelete(indexName));
         assertAcked(client().admin().cluster().prepareDeleteRepository(repoName));
@@ -121,13 +122,15 @@ public class FsBlobStoreRepositoryIT extends OpenSearchBlobStoreRepositoryIntegT
                 .setSettings(Settings.builder().put("location", repoPath).put("readonly", true))
         );
 
-        final OpenSearchException exception = expectThrows(
-            OpenSearchException.class,
-            () -> client().admin().cluster().prepareRestoreSnapshot(repoName, snapshotName).setWaitForCompletion(randomBoolean()).get()
-        );
-        assertThat(exception.getRootCause(), instanceOf(NoSuchFileException.class));
+        assertBusy(() -> {
+            final OpenSearchException exception = expectThrows(
+                OpenSearchException.class,
+                () -> client().admin().cluster().prepareRestoreSnapshot(repoName, snapshotName).setWaitForCompletion(randomBoolean()).get()
+            );
+            assertThat(exception.getRootCause(), instanceOf(NoSuchFileException.class));
 
-        assertFalse("deleted path is not recreated in readonly repository", Files.exists(deletedPath));
+            assertFalse("deleted path is not recreated in readonly repository", Files.exists(deletedPath));
+        });
     }
 
     public void testReadOnly() throws Exception {
@@ -156,10 +159,12 @@ public class FsBlobStoreRepositoryIT extends OpenSearchBlobStoreRepositoryIntegT
             assertTrue(Files.exists(storePath));
             assertTrue(Files.isDirectory(storePath));
 
-            byte[] data = randomBytes(randomIntBetween(10, scaledRandomIntBetween(1024, 1 << 16)));
-            writeBlob(container, "test", new BytesArray(data));
-            assertArrayEquals(readBlobFully(container, "test", data.length), data);
-            assertTrue(container.blobExists("test"));
+            assertBusy(() -> {
+                byte[] data = randomBytes(randomIntBetween(10, scaledRandomIntBetween(1024, 1 << 16)));
+                writeBlob(container, "test", new BytesArray(data));
+                assertArrayEquals(readBlobFully(container, "test", data.length), data);
+                assertTrue(container.blobExists("test"));
+            });
         }
     }
 }

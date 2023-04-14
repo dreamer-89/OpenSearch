@@ -85,22 +85,24 @@ public class IpTermsIT extends AbstractTermsTestCase {
         );
 
         Script script = new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "doc['ip'].value", Collections.emptyMap());
-        SearchResponse response = client().prepareSearch("index")
-            .addAggregation(AggregationBuilders.terms("my_terms").script(script).executionHint(randomExecutionHint()))
-            .get();
-        assertSearchResponse(response);
-        Terms terms = response.getAggregations().get("my_terms");
-        assertEquals(2, terms.getBuckets().size());
+        assertBusy(() -> {
+            SearchResponse response = client().prepareSearch("index")
+                .addAggregation(AggregationBuilders.terms("my_terms").script(script).executionHint(randomExecutionHint()))
+                .get();
+            assertSearchResponse(response);
+            Terms terms = response.getAggregations().get("my_terms");
+            assertEquals(2, terms.getBuckets().size());
 
-        Terms.Bucket bucket1 = terms.getBuckets().get(0);
-        assertEquals(2, bucket1.getDocCount());
-        assertEquals("192.168.1.7", bucket1.getKey());
-        assertEquals("192.168.1.7", bucket1.getKeyAsString());
+            Terms.Bucket bucket1 = terms.getBuckets().get(0);
+            assertEquals(2, bucket1.getDocCount());
+            assertEquals("192.168.1.7", bucket1.getKey());
+            assertEquals("192.168.1.7", bucket1.getKeyAsString());
 
-        Terms.Bucket bucket2 = terms.getBuckets().get(1);
-        assertEquals(1, bucket2.getDocCount());
-        assertEquals("2001:db8::2:1", bucket2.getKey());
-        assertEquals("2001:db8::2:1", bucket2.getKeyAsString());
+            Terms.Bucket bucket2 = terms.getBuckets().get(1);
+            assertEquals(1, bucket2.getDocCount());
+            assertEquals("2001:db8::2:1", bucket2.getKey());
+            assertEquals("2001:db8::2:1", bucket2.getKeyAsString());
+        });
     }
 
     public void testScriptValues() throws Exception {
@@ -113,22 +115,24 @@ public class IpTermsIT extends AbstractTermsTestCase {
         );
 
         Script script = new Script(ScriptType.INLINE, CustomScriptPlugin.NAME, "doc['ip']", Collections.emptyMap());
-        SearchResponse response = client().prepareSearch("index")
-            .addAggregation(AggregationBuilders.terms("my_terms").script(script).executionHint(randomExecutionHint()))
-            .get();
-        assertSearchResponse(response);
-        Terms terms = response.getAggregations().get("my_terms");
-        assertEquals(2, terms.getBuckets().size());
+        assertBusy(() -> {
+            SearchResponse response = client().prepareSearch("index")
+                .addAggregation(AggregationBuilders.terms("my_terms").script(script).executionHint(randomExecutionHint()))
+                .get();
+            assertSearchResponse(response);
+            Terms terms = response.getAggregations().get("my_terms");
+            assertEquals(2, terms.getBuckets().size());
 
-        Terms.Bucket bucket1 = terms.getBuckets().get(0);
-        assertEquals(2, bucket1.getDocCount());
-        assertEquals("192.168.1.7", bucket1.getKey());
-        assertEquals("192.168.1.7", bucket1.getKeyAsString());
+            Terms.Bucket bucket1 = terms.getBuckets().get(0);
+            assertEquals(2, bucket1.getDocCount());
+            assertEquals("192.168.1.7", bucket1.getKey());
+            assertEquals("192.168.1.7", bucket1.getKeyAsString());
 
-        Terms.Bucket bucket2 = terms.getBuckets().get(1);
-        assertEquals(1, bucket2.getDocCount());
-        assertEquals("2001:db8::2:1", bucket2.getKey());
-        assertEquals("2001:db8::2:1", bucket2.getKeyAsString());
+            Terms.Bucket bucket2 = terms.getBuckets().get(1);
+            assertEquals(1, bucket2.getDocCount());
+            assertEquals("2001:db8::2:1", bucket2.getKey());
+            assertEquals("2001:db8::2:1", bucket2.getKeyAsString());
+        });
     }
 
     public void testMissingValue() throws Exception {

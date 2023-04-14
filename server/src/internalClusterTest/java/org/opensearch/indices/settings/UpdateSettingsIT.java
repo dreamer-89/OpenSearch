@@ -83,20 +83,29 @@ public class UpdateSettingsIT extends OpenSearchIntegTestCase {
         assertEquals(exception.getMessage(), "Unknown char_filter type [invalid] for [invalid_char]");
     }
 
-    public void testInvalidDynamicUpdate() {
+    public void testInvalidDynamicUpdate() throws Exception {
         createIndex("test");
-        IllegalArgumentException exception = expectThrows(
-            IllegalArgumentException.class,
-            () -> client().admin()
-                .indices()
-                .prepareUpdateSettings("test")
-                .setSettings(Settings.builder().put("index.dummy", "boom"))
+        assertBusy(() -> {
+            IllegalArgumentException exception = expectThrows(
+                IllegalArgumentException.class,
+                () -> client().admin()
+                    .indices()
+                    .prepareUpdateSettings("test")
+                    .setSettings(Settings.builder().put("index.dummy", "boom"))
+                    .execute()
+                    .actionGet()
+            );
+            assertEquals(exception.getCause().getMessage(), "this setting goes boom");
+            IndexMetadata indexMetadata = client().admin()
+                .cluster()
+                .prepareState()
                 .execute()
                 .actionGet()
-        );
-        assertEquals(exception.getCause().getMessage(), "this setting goes boom");
-        IndexMetadata indexMetadata = client().admin().cluster().prepareState().execute().actionGet().getState().metadata().index("test");
-        assertNotEquals(indexMetadata.getSettings().get("index.dummy"), "invalid dynamic value");
+                .getState()
+                .metadata()
+                .index("test");
+            assertNotEquals(indexMetadata.getSettings().get("index.dummy"), "invalid dynamic value");
+        });
     }
 
     @Override

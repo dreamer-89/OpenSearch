@@ -46,6 +46,7 @@ import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertAcked;
 import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertSearchResponse;
 import static org.hamcrest.Matchers.is;
 
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST)
 public abstract class ShardSizeTestCase extends OpenSearchIntegTestCase {
 
     @Override

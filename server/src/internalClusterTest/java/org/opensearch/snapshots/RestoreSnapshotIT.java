@@ -50,6 +50,7 @@ import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.indices.InvalidIndexNameException;
 import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.rest.RestStatus;
+import org.opensearch.test.OpenSearchIntegTestCase;
 
 import java.nio.file.Path;
 import java.util.Collections;
@@ -80,6 +81,7 @@ import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertIndexTempl
 import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertIndexTemplateMissing;
 import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertRequestBuilderThrows;
 
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST)
 public class RestoreSnapshotIT extends AbstractSnapshotIntegTestCase {
 
     public void testParallelRestoreOperations() {

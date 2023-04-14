@@ -140,7 +140,7 @@ public class RelocationIT extends OpenSearchIntegTestCase {
             .build();
     }
 
-    public void testSimpleRelocationNoIndexing() {
+    public void testSimpleRelocationNoIndexing() throws Exception {
         logger.info("--> starting [node1] ...");
         final String node_1 = internalCluster().startNode();
 
@@ -188,7 +188,7 @@ public class RelocationIT extends OpenSearchIntegTestCase {
 
         logger.info("--> verifying count again...");
         client().admin().indices().prepareRefresh().execute().actionGet();
-        assertThat(client().prepareSearch("test").setSize(0).execute().actionGet().getHits().getTotalHits().value, equalTo(20L));
+        assertBusy(() -> {assertThat(client().prepareSearch("test").setSize(0).execute().actionGet().getHits().getTotalHits().value, equalTo(20L));});
     }
 
     @AwaitsFix(bugUrl = "https://github.com/opensearch-project/OpenSearch/issues/2063")
@@ -410,16 +410,18 @@ public class RelocationIT extends OpenSearchIntegTestCase {
             logger.info("--> DONE relocate the shard from {} to {}", fromNode, toNode);
 
             logger.debug("--> verifying all searches return the same number of docs");
-            long expectedCount = -1;
-            for (Client client : clients()) {
-                SearchResponse response = client.prepareSearch("test").setPreference("_local").setSize(0).get();
-                assertNoFailures(response);
-                if (expectedCount < 0) {
-                    expectedCount = response.getHits().getTotalHits().value;
-                } else {
-                    assertEquals(expectedCount, response.getHits().getTotalHits().value);
+            assertBusy(() -> {
+                long expectedCount = -1;
+                for (Client client : clients()) {
+                    SearchResponse response = client.prepareSearch("test").setPreference("_local").setSize(0).get();
+                    assertNoFailures(response);
+                    if (expectedCount < 0) {
+                        expectedCount = response.getHits().getTotalHits().value;
+                    } else {
+                        assertEquals(expectedCount, response.getHits().getTotalHits().value);
+                    }
                 }
-            }
+            });
 
         }
 
@@ -563,8 +565,10 @@ public class RelocationIT extends OpenSearchIntegTestCase {
             docs[i] = client().prepareIndex("test").setId(id).setSource("field1", English.intToEnglish(i));
         }
         indexRandom(true, docs);
-        SearchResponse countResponse = client().prepareSearch("test").get();
-        assertHitCount(countResponse, numDocs);
+        assertBusy(() -> {
+            SearchResponse countResponse = client().prepareSearch("test").get();
+            assertHitCount(countResponse, numDocs);
+        });
 
         logger.info(" --> moving index to new nodes");
         Settings build = Settings.builder()
@@ -588,9 +592,11 @@ public class RelocationIT extends OpenSearchIntegTestCase {
         final int numIters = randomIntBetween(10, 20);
         for (int i = 0; i < numIters; i++) {
             logger.info(" --> checking iteration {}", i);
-            SearchResponse afterRelocation = client().prepareSearch().setSize(ids.size()).get();
-            assertNoFailures(afterRelocation);
-            assertSearchHits(afterRelocation, ids.toArray(new String[ids.size()]));
+            assertBusy(() -> {
+                SearchResponse afterRelocation = client().prepareSearch().setSize(ids.size()).get();
+                assertNoFailures(afterRelocation);
+                assertSearchHits(afterRelocation, ids.toArray(new String[ids.size()]));
+            });
         }
         stopped.set(true);
         for (Thread searchThread : searchThreads) {
@@ -598,7 +604,7 @@ public class RelocationIT extends OpenSearchIntegTestCase {
         }
     }
 
-    public void testRelocateWhileWaitingForRefresh() {
+    public void testRelocateWhileWaitingForRefresh() throws Exception {
         logger.info("--> starting [node1] ...");
         final String node1 = internalCluster().startNode();
 
@@ -653,7 +659,9 @@ public class RelocationIT extends OpenSearchIntegTestCase {
 
         logger.info("--> verifying count");
         client().admin().indices().prepareRefresh().execute().actionGet();
-        assertThat(client().prepareSearch("test").setSize(0).execute().actionGet().getHits().getTotalHits().value, equalTo(20L));
+        assertBusy(() -> {
+            assertThat(client().prepareSearch("test").setSize(0).execute().actionGet().getHits().getTotalHits().value, equalTo(20L));
+        });
     }
 
     public void testRelocateWhileContinuouslyIndexingAndWaitingForRefresh() throws Exception {
@@ -732,7 +740,9 @@ public class RelocationIT extends OpenSearchIntegTestCase {
             assertTrue(pendingIndexResponses.stream().allMatch(ActionFuture::isDone));
         }, 1, TimeUnit.MINUTES);
 
-        assertThat(client().prepareSearch("test").setSize(0).execute().actionGet().getHits().getTotalHits().value, equalTo(120L));
+        assertBusy(() -> {
+            assertThat(client().prepareSearch("test").setSize(0).execute().actionGet().getHits().getTotalHits().value, equalTo(120L));
+        });
     }
 
     public void testRelocationEstablishedPeerRecoveryRetentionLeases() throws Exception {

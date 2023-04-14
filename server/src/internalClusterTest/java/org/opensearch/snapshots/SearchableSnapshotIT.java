@@ -53,7 +53,6 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.opensearch.action.admin.cluster.node.stats.NodesStatsRequest.Metric.FS;
 import static org.opensearch.common.util.CollectionUtils.iterableAsArrayList;
 
-@LuceneTestCase.AwaitsFix(bugUrl = "https://github.com/opensearch-project/OpenSearch/issues/2515")
 @ThreadLeakFilters(filters = CleanerDaemonThreadLeakFilter.class)
 public final class SearchableSnapshotIT extends AbstractSnapshotIntegTestCase {
 

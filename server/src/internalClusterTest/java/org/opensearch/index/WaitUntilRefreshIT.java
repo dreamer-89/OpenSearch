@@ -54,6 +54,7 @@ import org.opensearch.script.Script;
 import org.opensearch.script.ScriptType;
 
 import org.junit.Before;
+import org.opensearch.test.OpenSearchIntegTestCase;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -71,6 +72,7 @@ import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertSearchHits
 /**
  * Tests that requests with RefreshPolicy.WAIT_UNTIL will be visible when they return.
  */
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST)
 public class WaitUntilRefreshIT extends SegmentReplicationBaseIT {
 
     @Override

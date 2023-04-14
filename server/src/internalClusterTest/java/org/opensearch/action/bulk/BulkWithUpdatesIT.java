@@ -32,7 +32,6 @@
 
 package org.opensearch.action.bulk;
 
-import org.apache.lucene.tests.util.LuceneTestCase;
 import org.opensearch.action.DocWriteRequest.OpType;
 import org.opensearch.action.DocWriteResponse;
 import org.opensearch.action.admin.indices.alias.Alias;

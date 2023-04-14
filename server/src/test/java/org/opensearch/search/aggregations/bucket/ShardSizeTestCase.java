@@ -46,7 +46,6 @@ import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertAcked;
 import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertSearchResponse;
 import static org.hamcrest.Matchers.is;
 
-
 public abstract class ShardSizeTestCase extends OpenSearchIntegTestCase {
 
     @Override

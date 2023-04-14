@@ -35,6 +35,7 @@ import org.opensearch.action.search.SearchResponse;
 import org.opensearch.search.aggregations.Aggregator.SubAggCollectionMode;
 import org.opensearch.search.aggregations.bucket.terms.Terms;
 import org.opensearch.search.aggregations.BucketOrder;
+import org.opensearch.test.OpenSearchIntegTestCase;
 
 import java.util.HashMap;
 import java.util.List;
@@ -44,6 +45,7 @@ import static org.opensearch.index.query.QueryBuilders.matchAllQuery;
 import static org.opensearch.search.aggregations.AggregationBuilders.terms;
 import static org.hamcrest.Matchers.equalTo;
 
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST)
 public class ShardSizeTermsIT extends ShardSizeTestCase {
     public void testNoShardSizeString() throws Exception {
         createIdx("type=keyword");

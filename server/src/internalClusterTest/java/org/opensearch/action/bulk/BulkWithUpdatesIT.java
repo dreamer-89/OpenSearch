@@ -80,7 +80,6 @@ import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 
-@LuceneTestCase.AwaitsFix(bugUrl = "Needs more deep dive")
 public class BulkWithUpdatesIT extends OpenSearchIntegTestCase {
 
     @Override

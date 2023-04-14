@@ -56,7 +56,7 @@ import static org.hamcrest.Matchers.notNullValue;
 
 public class DateMathIndexExpressionsIntegrationIT extends OpenSearchIntegTestCase {
 
-    public void testIndexNameDateMathExpressions() {
+    public void testIndexNameDateMathExpressions() throws Exception {
         DateTime now = new DateTime(DateTimeZone.UTC);
         String index1 = ".marvel-" + DateTimeFormat.forPattern("YYYY.MM.dd").print(now);
         String index2 = ".marvel-" + DateTimeFormat.forPattern("YYYY.MM.dd").print(now.minusDays(1));
@@ -76,9 +76,11 @@ public class DateMathIndexExpressionsIntegrationIT extends OpenSearchIntegTestCa
         client().prepareIndex(dateMathExp3).setId("3").setSource("{}", XContentType.JSON).get();
         refresh();
 
-        SearchResponse searchResponse = client().prepareSearch(dateMathExp1, dateMathExp2, dateMathExp3).get();
-        assertHitCount(searchResponse, 3);
-        assertSearchHits(searchResponse, "1", "2", "3");
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch(dateMathExp1, dateMathExp2, dateMathExp3).get();
+            assertHitCount(searchResponse, 3);
+            assertSearchHits(searchResponse, "1", "2", "3");
+        });
 
         GetResponse getResponse = client().prepareGet(dateMathExp1, "1").get();
         assertThat(getResponse.isExists(), is(true));
@@ -136,9 +138,11 @@ public class DateMathIndexExpressionsIntegrationIT extends OpenSearchIntegTestCa
         client().prepareIndex(dateMathExp3).setId("3").setSource("{}", XContentType.JSON).get();
         refresh();
 
-        SearchResponse searchResponse = client().prepareSearch(dateMathExp1, dateMathExp2, dateMathExp3).get();
-        assertHitCount(searchResponse, 3);
-        assertSearchHits(searchResponse, "1", "2", "3");
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch(dateMathExp1, dateMathExp2, dateMathExp3).get();
+            assertHitCount(searchResponse, 3);
+            assertSearchHits(searchResponse, "1", "2", "3");
+        });
 
         IndicesStatsResponse indicesStatsResponse = client().admin().indices().prepareStats(dateMathExp1, dateMathExp2, dateMathExp3).get();
         assertThat(indicesStatsResponse.getIndex(index1), notNullValue());

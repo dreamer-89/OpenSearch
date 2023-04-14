@@ -46,6 +46,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - [Refactor] XContent base classes from xcontent to core library ([#5902](https://github.com/opensearch-project/OpenSearch/pull/5902))
 - Added a new field type: flat_object ([#6507](https://github.com/opensearch-project/OpenSearch/pull/6507))
 - Changed `opensearch-env` to respect already set `OPENSEARCH_HOME` environment variable ([#6956](https://github.com/opensearch-project/OpenSearch/pull/6956/))
+- Increased visibility of BaseRestHandler’s `unrecognized` method using a new public `unrecognizedStrings` method. ([#7125](https://github.com/opensearch-project/OpenSearch/pull/7125))
 
 ### Deprecated
 - Map, List, and Set in org.opensearch.common.collect ([#6609](https://github.com/opensearch-project/OpenSearch/pull/6609))
@@ -57,7 +58,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Added equals/hashcode for named DocValueFormat.DateTime inner class ([#6357](https://github.com/opensearch-project/OpenSearch/pull/6357))
 - Fixed bug for searchable snapshot to take 'base_path' of blob into account ([#6558](https://github.com/opensearch-project/OpenSearch/pull/6558))
 - Fix fuzziness validation ([#5805](https://github.com/opensearch-project/OpenSearch/pull/5805))
+- Avoid negative memory result in IndicesQueryCache stats calculation ([#6917](https://github.com/opensearch-project/OpenSearch/pull/6917))
 - Fix GetSnapshots to not return non-existent snapshots with ignore_unavailable=true ([#6839](https://github.com/opensearch-project/OpenSearch/pull/6839))
+- Fix GlobalAggregation with profile option enabled returns incorrect result ([#7114](https://github.com/opensearch-project/OpenSearch/pull/7114))
 
 ### Security
 

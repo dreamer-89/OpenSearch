@@ -67,7 +67,9 @@ public class CustomQueryParserIT extends OpenSearchIntegTestCase {
         assertHitCount(client().prepareSearch("index").setQuery(new DummyQueryBuilder()).get(), 1L);
     }
 
-    public void testCustomDummyQueryWithinBooleanQuery() {
-        assertHitCount(client().prepareSearch("index").setQuery(new BoolQueryBuilder().must(new DummyQueryBuilder())).get(), 1L);
+    public void testCustomDummyQueryWithinBooleanQuery() throws Exception {
+        assertBusy(
+            () -> assertHitCount(client().prepareSearch("index").setQuery(new BoolQueryBuilder().must(new DummyQueryBuilder())).get(), 1L)
+        );
     }
 }

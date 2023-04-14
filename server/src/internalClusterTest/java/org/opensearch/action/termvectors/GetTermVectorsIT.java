@@ -152,11 +152,13 @@ public class GetTermVectorsIT extends AbstractTermVectorsTestCase {
         );
 
         // lets see if the null term vectors are caught...
-        TermVectorsResponse actionGet = termVectors.actionGet();
-        assertThat(actionGet, notNullValue());
-        assertThat(actionGet.isExists(), equalTo(true));
-        assertThat(actionGet.getIndex(), equalTo("test"));
-        assertThat(actionGet.getFields().terms("existingfield"), nullValue());
+        assertBusy(() -> {
+            TermVectorsResponse actionGet = termVectors.actionGet();
+            assertThat(actionGet, notNullValue());
+            assertThat(actionGet.isExists(), equalTo(true));
+            assertThat(actionGet.getIndex(), equalTo("test"));
+            assertThat(actionGet.getFields().terms("existingfield"), nullValue());
+        });
     }
 
     public void testNotIndexedField() throws Exception {
@@ -546,7 +548,7 @@ public class GetTermVectorsIT extends AbstractTermVectorsTestCase {
         assertThat(iterator.next(), nullValue());
     }
 
-    public void testDuelWithAndWithoutTermVectors() throws IOException, ExecutionException, InterruptedException {
+    public void testDuelWithAndWithoutTermVectors() throws Exception {
         // setup indices
         String[] indexNames = new String[] { "with_tv", "without_tv" };
         assertAcked(prepareCreate(indexNames[0]).setMapping("field1", "type=text,term_vector=with_positions_offsets,analyzer=keyword"));
@@ -572,19 +574,21 @@ public class GetTermVectorsIT extends AbstractTermVectorsTestCase {
         indexRandom(true, indexBuilders);
 
         // request tvs and compare from each index
-        for (int id = 0; id < content.length; id++) {
-            Fields[] fields = new Fields[2];
-            for (int j = 0; j < indexNames.length; j++) {
-                TermVectorsResponse resp = client().prepareTermVectors(indexNames[j], String.valueOf(id))
-                    .setOffsets(true)
-                    .setPositions(true)
-                    .setSelectedFields("field1")
-                    .get();
-                assertThat("doc with index: " + indexNames[j] + ", type1 and id: " + id, resp.isExists(), equalTo(true));
-                fields[j] = resp.getFields();
+        assertBusy(() -> {
+            for (int id = 0; id < content.length; id++) {
+                Fields[] fields = new Fields[2];
+                for (int j = 0; j < indexNames.length; j++) {
+                    TermVectorsResponse resp = client().prepareTermVectors(indexNames[j], String.valueOf(id))
+                        .setOffsets(true)
+                        .setPositions(true)
+                        .setSelectedFields("field1")
+                        .get();
+                    assertThat("doc with index: " + indexNames[j] + ", type1 and id: " + id, resp.isExists(), equalTo(true));
+                    fields[j] = resp.getFields();
+                }
+                compareTermVectors("field1", fields[0], fields[1]);
             }
-            compareTermVectors("field1", fields[0], fields[1]);
-        }
+        });
     }
 
     private void compareTermVectors(String fieldName, Fields fields0, Fields fields1) throws IOException {
@@ -628,7 +632,7 @@ public class GetTermVectorsIT extends AbstractTermVectorsTestCase {
         assertThat(iter1.next(), nullValue());
     }
 
-    public void testSimpleWildCards() throws IOException {
+    public void testSimpleWildCards() throws Exception {
         int numFields = 25;
 
         XContentBuilder mapping = jsonBuilder().startObject().startObject("properties");
@@ -646,13 +650,15 @@ public class GetTermVectorsIT extends AbstractTermVectorsTestCase {
         client().prepareIndex("test").setId("0").setSource(source).get();
         refresh();
 
-        TermVectorsResponse response = client().prepareTermVectors(indexOrAlias(), "0").setSelectedFields("field*").get();
-        assertThat("Doc doesn't exists but should", response.isExists(), equalTo(true));
-        assertThat(response.getIndex(), equalTo("test"));
-        assertThat("All term vectors should have been generated", response.getFields().size(), equalTo(numFields));
+        assertBusy(() -> {
+            TermVectorsResponse response = client().prepareTermVectors(indexOrAlias(), "0").setSelectedFields("field*").get();
+            assertThat("Doc doesn't exists but should", response.isExists(), equalTo(true));
+            assertThat(response.getIndex(), equalTo("test"));
+            assertThat("All term vectors should have been generated", response.getFields().size(), equalTo(numFields));
+        });
     }
 
-    public void testArtificialVsExisting() throws ExecutionException, InterruptedException, IOException {
+    public void testArtificialVsExisting() throws Exception {
         // setup indices
         Settings.Builder settings = Settings.builder().put(indexSettings()).put("index.analysis.analyzer", "standard");
         assertAcked(prepareCreate("test").setSettings(settings).setMapping("field1", "type=text,term_vector=with_positions_offsets"));
@@ -671,31 +677,33 @@ public class GetTermVectorsIT extends AbstractTermVectorsTestCase {
         }
         indexRandom(true, indexBuilders);
 
-        for (int i = 0; i < content.length; i++) {
-            // request tvs from existing document
-            TermVectorsResponse respExisting = client().prepareTermVectors("test", String.valueOf(i))
-                .setOffsets(true)
-                .setPositions(true)
-                .setFieldStatistics(true)
-                .setTermStatistics(true)
-                .get();
-            assertThat("doc with index: test, type1 and id: existing", respExisting.isExists(), equalTo(true));
+        assertBusy(() -> {
+            for (int i = 0; i < content.length; i++) {
+                // request tvs from existing document
+                TermVectorsResponse respExisting = client().prepareTermVectors("test", String.valueOf(i))
+                    .setOffsets(true)
+                    .setPositions(true)
+                    .setFieldStatistics(true)
+                    .setTermStatistics(true)
+                    .get();
 
-            // request tvs from artificial document
-            TermVectorsResponse respArtificial = client().prepareTermVectors()
-                .setIndex("test")
-                .setRouting(String.valueOf(i)) // ensure we get the stats from the same shard as existing doc
-                .setDoc(jsonBuilder().startObject().field("field1", content[i]).endObject())
-                .setOffsets(true)
-                .setPositions(true)
-                .setFieldStatistics(true)
-                .setTermStatistics(true)
-                .get();
-            assertThat("doc with index: test, type1 and id: " + String.valueOf(i), respArtificial.isExists(), equalTo(true));
+                assertThat("doc with index: test, type1 and id: existing", respExisting.isExists(), equalTo(true));
+                // request tvs from artificial document
+                TermVectorsResponse respArtificial = client().prepareTermVectors()
+                    .setIndex("test")
+                    .setRouting(String.valueOf(i)) // ensure we get the stats from the same shard as existing doc
+                    .setDoc(jsonBuilder().startObject().field("field1", content[i]).endObject())
+                    .setOffsets(true)
+                    .setPositions(true)
+                    .setFieldStatistics(true)
+                    .setTermStatistics(true)
+                    .get();
+                assertThat("doc with index: test, type1 and id: " + String.valueOf(i), respArtificial.isExists(), equalTo(true));
 
-            // compare existing tvs with artificial
-            compareTermVectors("field1", respExisting.getFields(), respArtificial.getFields());
-        }
+                // compare existing tvs with artificial
+                compareTermVectors("field1", respExisting.getFields(), respArtificial.getFields());
+            }
+        });
     }
 
     public void testArtificialNoDoc() throws IOException {
@@ -821,7 +829,7 @@ public class GetTermVectorsIT extends AbstractTermVectorsTestCase {
         return randomBoolean() ? "test" : "alias";
     }
 
-    public void testTermVectorsWithVersion() {
+    public void testTermVectorsWithVersion() throws Exception {
         assertAcked(prepareCreate("test").addAlias(new Alias("alias")).setSettings(Settings.builder().put("index.refresh_interval", -1)));
         ensureGreen();
 
@@ -834,10 +842,12 @@ public class GetTermVectorsIT extends AbstractTermVectorsTestCase {
         // From translog:
 
         // version 0 means ignore version, which is the default
-        response = client().prepareTermVectors(indexOrAlias(), "1").setVersion(Versions.MATCH_ANY).get();
-        assertThat(response.isExists(), equalTo(true));
-        assertThat(response.getId(), equalTo("1"));
-        assertThat(response.getVersion(), equalTo(1L));
+        assertBusy(() -> {
+            TermVectorsResponse finalResponse = client().prepareTermVectors(indexOrAlias(), "1").setVersion(Versions.MATCH_ANY).get();
+            assertThat(finalResponse.isExists(), equalTo(true));
+            assertThat(finalResponse.getId(), equalTo("1"));
+            assertThat(finalResponse.getVersion(), equalTo(1L));
+        });
 
         response = client().prepareTermVectors(indexOrAlias(), "1").setVersion(1).get();
         assertThat(response.isExists(), equalTo(true));

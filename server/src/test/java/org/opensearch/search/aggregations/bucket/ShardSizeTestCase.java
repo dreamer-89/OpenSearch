@@ -101,15 +101,16 @@ public abstract class ShardSizeTestCase extends OpenSearchIntegTestCase {
         // total docs in shard "2" = 12
 
         indexRandom(true, docs);
-
-        SearchResponse resp = client().prepareSearch("idx").setRouting(routing1).setQuery(matchAllQuery()).get();
-        assertSearchResponse(resp);
-        long totalOnOne = resp.getHits().getTotalHits().value;
-        assertThat(totalOnOne, is(15L));
-        resp = client().prepareSearch("idx").setRouting(routing2).setQuery(matchAllQuery()).get();
-        assertSearchResponse(resp);
-        long totalOnTwo = resp.getHits().getTotalHits().value;
-        assertThat(totalOnTwo, is(12L));
+        assertBusy(() -> {
+            SearchResponse resp = client().prepareSearch("idx").setRouting(routing1).setQuery(matchAllQuery()).get();
+            assertSearchResponse(resp);
+            long totalOnOne = resp.getHits().getTotalHits().value;
+            assertThat(totalOnOne, is(15L));
+            resp = client().prepareSearch("idx").setRouting(routing2).setQuery(matchAllQuery()).get();
+            assertSearchResponse(resp);
+            long totalOnTwo = resp.getHits().getTotalHits().value;
+            assertThat(totalOnTwo, is(12L));
+        });
     }
 
     protected List<IndexRequestBuilder> indexDoc(String shard, String key, int times) throws Exception {

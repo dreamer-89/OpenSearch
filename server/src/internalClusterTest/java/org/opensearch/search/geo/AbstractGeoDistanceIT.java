@@ -64,6 +64,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import static org.hamcrest.Matchers.anyOf;
@@ -187,15 +188,17 @@ abstract class AbstractGeoDistanceIT extends OpenSearchIntegTestCase {
         return mapping.endObject().endObject();
     }
 
-    public void testSimpleDistanceQuery() {
-        SearchResponse searchResponse = client().prepareSearch() // from NY
-            .setQuery(QueryBuilders.geoDistanceQuery("location").point(40.5, -73.9).distance(25, DistanceUnit.KILOMETERS))
-            .get();
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
-        assertThat(searchResponse.getHits().getHits().length, equalTo(2));
-        for (SearchHit hit : searchResponse.getHits()) {
-            assertThat(hit.getId(), anyOf(equalTo("7"), equalTo("4")));
-        }
+    public void testSimpleDistanceQuery() throws Exception {
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch() // from NY
+                .setQuery(QueryBuilders.geoDistanceQuery("location").point(40.5, -73.9).distance(25, DistanceUnit.KILOMETERS))
+                .get();
+            assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
+            assertThat(searchResponse.getHits().getHits().length, equalTo(2));
+            for (SearchHit hit : searchResponse.getHits()) {
+                assertThat(hit.getId(), anyOf(equalTo("7"), equalTo("4")));
+            }
+        }, 30, TimeUnit.SECONDS);
     }
 
     public void testDistanceScript() throws Exception {

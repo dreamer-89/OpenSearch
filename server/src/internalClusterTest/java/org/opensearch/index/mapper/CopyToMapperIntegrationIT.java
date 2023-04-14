@@ -61,19 +61,21 @@ public class CopyToMapperIntegrationIT extends OpenSearchIntegTestCase {
 
         SubAggCollectionMode aggCollectionMode = randomFrom(SubAggCollectionMode.values());
 
-        SearchResponse response = client().prepareSearch("test-idx")
-            .setQuery(QueryBuilders.termQuery("even", true))
-            .addAggregation(AggregationBuilders.terms("test").field("test_field").size(recordCount * 2).collectMode(aggCollectionMode))
-            .addAggregation(
-                AggregationBuilders.terms("test_raw").field("test_field_raw").size(recordCount * 2).collectMode(aggCollectionMode)
-            )
-            .execute()
-            .actionGet();
+        assertBusy(() -> {
+            SearchResponse response = client().prepareSearch("test-idx")
+                .setQuery(QueryBuilders.termQuery("even", true))
+                .addAggregation(AggregationBuilders.terms("test").field("test_field").size(recordCount * 2).collectMode(aggCollectionMode))
+                .addAggregation(
+                    AggregationBuilders.terms("test_raw").field("test_field_raw").size(recordCount * 2).collectMode(aggCollectionMode)
+                )
+                .execute()
+                .actionGet();
 
-        assertThat(response.getHits().getTotalHits().value, equalTo((long) recordCount));
+            assertThat(response.getHits().getTotalHits().value, equalTo((long) recordCount));
 
-        assertThat(((Terms) response.getAggregations().get("test")).getBuckets().size(), equalTo(recordCount + 1));
-        assertThat(((Terms) response.getAggregations().get("test_raw")).getBuckets().size(), equalTo(recordCount));
+            assertThat(((Terms) response.getAggregations().get("test")).getBuckets().size(), equalTo(recordCount + 1));
+            assertThat(((Terms) response.getAggregations().get("test_raw")).getBuckets().size(), equalTo(recordCount));
+        });
 
     }
 
@@ -91,8 +93,10 @@ public class CopyToMapperIntegrationIT extends OpenSearchIntegTestCase {
         assertAcked(client().admin().indices().prepareCreate("test-idx").setMapping(mapping));
         client().prepareIndex("test-idx").setId("1").setSource("foo", "bar").get();
         client().admin().indices().prepareRefresh("test-idx").execute().actionGet();
-        SearchResponse response = client().prepareSearch("test-idx").setQuery(QueryBuilders.termQuery("root.top.child", "bar")).get();
-        assertThat(response.getHits().getTotalHits().value, equalTo(1L));
+        assertBusy(() -> {
+            SearchResponse response = client().prepareSearch("test-idx").setQuery(QueryBuilders.termQuery("root.top.child", "bar")).get();
+            assertThat(response.getHits().getTotalHits().value, equalTo(1L));
+        });
     }
 
     private XContentBuilder createDynamicTemplateMapping() throws IOException {

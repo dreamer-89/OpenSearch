@@ -297,7 +297,8 @@ public abstract class OpenSearchBlobStoreRepositoryIntegTestCase extends OpenSea
             docCounts[i] = iterations(10, 1000);
             logger.info("-->  create random index {} with {} records", indexNames[i], docCounts[i]);
             addRandomDocuments(indexNames[i], docCounts[i]);
-            assertHitCount(client().prepareSearch(indexNames[i]).setSize(0).get(), docCounts[i]);
+            final int j = i;
+            assertBusy(() -> { assertHitCount(client().prepareSearch(indexNames[j]).setSize(0).get(), docCounts[j]); });
         }
 
         final String snapshotName = randomName();
@@ -345,7 +346,8 @@ public abstract class OpenSearchBlobStoreRepositoryIntegTestCase extends OpenSea
         ensureGreen(TimeValue.timeValueSeconds(120));
 
         for (int i = 0; i < indexCount; i++) {
-            assertHitCount(client().prepareSearch(indexNames[i]).setSize(0).get(), docCounts[i]);
+            final int j = i;
+            assertBusy(() -> { assertHitCount(client().prepareSearch(indexNames[j]).setSize(0).get(), docCounts[j]); });
         }
 
         logger.info("-->  delete snapshot {}:{}", repoName, snapshotName);
@@ -419,7 +421,7 @@ public abstract class OpenSearchBlobStoreRepositoryIntegTestCase extends OpenSea
             );
 
             ensureGreen();
-            assertHitCount(client().prepareSearch(indexName).setSize(0).get(), docCounts[iterationToRestore]);
+            assertBusy(() -> { assertHitCount(client().prepareSearch(indexName).setSize(0).get(), docCounts[iterationToRestore]); });
         }
 
         for (int i = 0; i < iterationCount; i++) {

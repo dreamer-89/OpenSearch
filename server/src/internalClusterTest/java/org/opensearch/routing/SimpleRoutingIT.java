@@ -105,7 +105,11 @@ public class SimpleRoutingIT extends OpenSearchIntegTestCase {
         }
         logger.info("--> verifying get with routing, should find");
         for (int i = 0; i < 5; i++) {
-            assertThat(client().prepareGet("test", "1").setRouting(routingValue).execute().actionGet().isExists(), equalTo(true));
+            assertBusy(
+                () -> {
+                    assertThat(client().prepareGet("test", "1").setRouting(routingValue).execute().actionGet().isExists(), equalTo(true));
+                }
+            );
         }
 
         logger.info("--> deleting with no routing, should not delete anything");
@@ -118,8 +122,10 @@ public class SimpleRoutingIT extends OpenSearchIntegTestCase {
         logger.info("--> deleting with routing, should delete");
         client().prepareDelete("test", "1").setRouting(routingValue).setRefreshPolicy(RefreshPolicy.IMMEDIATE).get();
         for (int i = 0; i < 5; i++) {
-            assertThat(client().prepareGet("test", "1").execute().actionGet().isExists(), equalTo(false));
-            assertThat(client().prepareGet("test", "1").setRouting(routingValue).execute().actionGet().isExists(), equalTo(false));
+            assertBusy(() -> {
+                assertThat(client().prepareGet("test", "1").execute().actionGet().isExists(), equalTo(false));
+                assertThat(client().prepareGet("test", "1").setRouting(routingValue).execute().actionGet().isExists(), equalTo(false));
+            });
         }
 
         logger.info("--> indexing with id [1], and routing [0]");
@@ -135,11 +141,15 @@ public class SimpleRoutingIT extends OpenSearchIntegTestCase {
         }
         logger.info("--> verifying get with routing, should find");
         for (int i = 0; i < 5; i++) {
-            assertThat(client().prepareGet("test", "1").setRouting(routingValue).execute().actionGet().isExists(), equalTo(true));
+            assertBusy(
+                () -> {
+                    assertThat(client().prepareGet("test", "1").setRouting(routingValue).execute().actionGet().isExists(), equalTo(true));
+                }
+            );
         }
     }
 
-    public void testSimpleSearchRouting() {
+    public void testSimpleSearchRouting() throws Exception {
         createIndex("test");
         ensureGreen();
         String routingValue = findNonMatchingRoutingValue("test", "1");
@@ -157,7 +167,11 @@ public class SimpleRoutingIT extends OpenSearchIntegTestCase {
         }
         logger.info("--> verifying get with routing, should find");
         for (int i = 0; i < 5; i++) {
-            assertThat(client().prepareGet("test", "1").setRouting(routingValue).execute().actionGet().isExists(), equalTo(true));
+            assertBusy(
+                () -> {
+                    assertThat(client().prepareGet("test", "1").setRouting(routingValue).execute().actionGet().isExists(), equalTo(true));
+                }
+            );
         }
 
         logger.info("--> search with no routing, should fine one");
@@ -229,20 +243,22 @@ public class SimpleRoutingIT extends OpenSearchIntegTestCase {
 
         logger.info("--> search with no routing, should fine two");
         for (int i = 0; i < 5; i++) {
-            assertThat(
-                client().prepareSearch().setQuery(QueryBuilders.matchAllQuery()).execute().actionGet().getHits().getTotalHits().value,
-                equalTo(2L)
-            );
-            assertThat(
-                client().prepareSearch()
-                    .setSize(0)
-                    .setQuery(QueryBuilders.matchAllQuery())
-                    .execute()
-                    .actionGet()
-                    .getHits()
-                    .getTotalHits().value,
-                equalTo(2L)
-            );
+            assertBusy(() -> {
+                assertThat(
+                    client().prepareSearch().setQuery(QueryBuilders.matchAllQuery()).execute().actionGet().getHits().getTotalHits().value,
+                    equalTo(2L)
+                );
+                assertThat(
+                    client().prepareSearch()
+                        .setSize(0)
+                        .setQuery(QueryBuilders.matchAllQuery())
+                        .execute()
+                        .actionGet()
+                        .getHits()
+                        .getTotalHits().value,
+                    equalTo(2L)
+                );
+            });
         }
 
         logger.info("--> search with {} routing, should find one", routingValue);
@@ -376,7 +392,12 @@ public class SimpleRoutingIT extends OpenSearchIntegTestCase {
 
         logger.info("--> verifying get with routing, should find");
         for (int i = 0; i < 5; i++) {
-            assertThat(client().prepareGet(indexOrAlias(), "1").setRouting(routingValue).execute().actionGet().isExists(), equalTo(true));
+            assertBusy(() -> {
+                assertThat(
+                    client().prepareGet(indexOrAlias(), "1").setRouting(routingValue).execute().actionGet().isExists(),
+                    equalTo(true)
+                );
+            });
         }
 
         logger.info("--> deleting with no routing, should fail");

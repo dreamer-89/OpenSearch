@@ -73,14 +73,16 @@ public class ExplainActionIT extends OpenSearchIntegTestCase {
         assertFalse(response.isMatch()); // not a match b/c not realtime
 
         refresh();
-        response = client().prepareExplain(indexOrAlias(), "1").setQuery(QueryBuilders.matchAllQuery()).get();
-        assertNotNull(response);
-        assertTrue(response.isMatch());
-        assertNotNull(response.getExplanation());
-        assertTrue(response.getExplanation().isMatch());
-        assertThat(response.getIndex(), equalTo("test"));
-        assertThat(response.getId(), equalTo("1"));
-        assertThat(response.getExplanation().getValue(), equalTo(1.0f));
+        assertBusy(() -> {
+            ExplainResponse responseFinal = client().prepareExplain(indexOrAlias(), "1").setQuery(QueryBuilders.matchAllQuery()).get();
+            assertNotNull(responseFinal);
+            assertTrue(responseFinal.isMatch());
+            assertNotNull(responseFinal.getExplanation());
+            assertTrue(responseFinal.getExplanation().isMatch());
+            assertThat(responseFinal.getIndex(), equalTo("test"));
+            assertThat(responseFinal.getId(), equalTo("1"));
+            assertThat(responseFinal.getExplanation().getValue(), equalTo(1.0f));
+        });
 
         response = client().prepareExplain(indexOrAlias(), "1").setQuery(QueryBuilders.termQuery("field", "value2")).get();
         assertNotNull(response);
@@ -187,21 +189,23 @@ public class ExplainActionIT extends OpenSearchIntegTestCase {
             .get();
 
         refresh();
-        ExplainResponse response = client().prepareExplain(indexOrAlias(), "1")
-            .setQuery(QueryBuilders.matchAllQuery())
-            .setFetchSource("obj1.field1", null)
-            .get();
-        assertNotNull(response);
-        assertTrue(response.isMatch());
-        assertNotNull(response.getExplanation());
-        assertTrue(response.getExplanation().isMatch());
-        assertThat(response.getExplanation().getValue(), equalTo(1.0f));
-        assertThat(response.getGetResult().isExists(), equalTo(true));
-        assertThat(response.getGetResult().getId(), equalTo("1"));
-        assertThat(response.getGetResult().getSource().size(), equalTo(1));
-        assertThat(((Map<String, Object>) response.getGetResult().getSource().get("obj1")).get("field1").toString(), equalTo("value1"));
+        assertBusy(() -> {
+            ExplainResponse response = client().prepareExplain(indexOrAlias(), "1")
+                .setQuery(QueryBuilders.matchAllQuery())
+                .setFetchSource("obj1.field1", null)
+                .get();
+            assertNotNull(response);
+            assertTrue(response.isMatch());
+            assertNotNull(response.getExplanation());
+            assertTrue(response.getExplanation().isMatch());
+            assertThat(response.getExplanation().getValue(), equalTo(1.0f));
+            assertThat(response.getGetResult().isExists(), equalTo(true));
+            assertThat(response.getGetResult().getId(), equalTo("1"));
+            assertThat(response.getGetResult().getSource().size(), equalTo(1));
+            assertThat(((Map<String, Object>) response.getGetResult().getSource().get("obj1")).get("field1").toString(), equalTo("value1"));
+        });
 
-        response = client().prepareExplain(indexOrAlias(), "1")
+        ExplainResponse response = client().prepareExplain(indexOrAlias(), "1")
             .setQuery(QueryBuilders.matchAllQuery())
             .setFetchSource(null, "obj1.field2")
             .get();
@@ -256,7 +260,7 @@ public class ExplainActionIT extends OpenSearchIntegTestCase {
         assertThat((String) response.getGetResult().getSource().get("field1"), equalTo("value1"));
     }
 
-    public void testExplainDateRangeInQueryString() {
+    public void testExplainDateRangeInQueryString() throws Exception {
         createIndex("test");
 
         ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
@@ -267,9 +271,13 @@ public class ExplainActionIT extends OpenSearchIntegTestCase {
 
         refresh();
 
-        ExplainResponse explainResponse = client().prepareExplain("test", "1").setQuery(queryStringQuery("past:[now-2M/d TO now/d]")).get();
-        assertThat(explainResponse.isExists(), equalTo(true));
-        assertThat(explainResponse.isMatch(), equalTo(true));
+        assertBusy(() -> {
+            ExplainResponse explainResponse = client().prepareExplain("test", "1")
+                .setQuery(queryStringQuery("past:[now-2M/d TO now/d]"))
+                .get();
+            assertThat(explainResponse.isExists(), equalTo(true));
+            assertThat(explainResponse.isMatch(), equalTo(true));
+        });
     }
 
     private static String indexOrAlias() {

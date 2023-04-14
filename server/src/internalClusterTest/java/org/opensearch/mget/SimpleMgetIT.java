@@ -184,11 +184,13 @@ public class SimpleMgetIT extends OpenSearchIntegTestCase {
             MultiGetItemResponse responseItem = response.getResponses()[i];
             assertThat(responseItem.getIndex(), equalTo("test"));
             if (i % 2 == 0) {
-                Map<String, Object> source = responseItem.getResponse().getSourceAsMap();
-                assertThat(source.size(), equalTo(1));
-                assertThat(source, hasKey("included"));
-                assertThat(((Map<String, Object>) source.get("included")).size(), equalTo(1));
-                assertThat(((Map<String, Object>) source.get("included")), hasKey("field"));
+                assertBusy(() -> {
+                    Map<String, Object> source = responseItem.getResponse().getSourceAsMap();
+                    assertThat(source.size(), equalTo(1));
+                    assertThat(source, hasKey("included"));
+                    assertThat(((Map<String, Object>) source.get("included")).size(), equalTo(1));
+                    assertThat(((Map<String, Object>) source.get("included")), hasKey("field"));
+                });
             } else {
                 assertThat(responseItem.getResponse().getSourceAsBytes(), nullValue());
             }

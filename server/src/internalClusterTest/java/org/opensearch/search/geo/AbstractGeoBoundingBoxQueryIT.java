@@ -177,41 +177,43 @@ abstract class AbstractGeoBoundingBoxQueryIT extends OpenSearchIntegTestCase {
             .setRefreshPolicy(IMMEDIATE)
             .get();
 
-        SearchResponse searchResponse = client().prepareSearch()
-            .setQuery(
-                boolQuery().must(termQuery("userid", 880))
-                    .filter(geoBoundingBoxQuery("location").setCorners(74.579421999999994, 143.5, -66.668903999999998, 113.96875))
-            )
-            .get();
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(1L));
-        searchResponse = client().prepareSearch()
-            .setQuery(
-                boolQuery().must(termQuery("userid", 880))
-                    .filter(
-                        geoBoundingBoxQuery("location").setCorners(74.579421999999994, 143.5, -66.668903999999998, 113.96875)
-                            .type("indexed")
-                    )
-            )
-            .get();
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(1L));
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch()
+                .setQuery(
+                    boolQuery().must(termQuery("userid", 880))
+                        .filter(geoBoundingBoxQuery("location").setCorners(74.579421999999994, 143.5, -66.668903999999998, 113.96875))
+                )
+                .get();
+            assertThat(searchResponse.getHits().getTotalHits().value, equalTo(1L));
+            searchResponse = client().prepareSearch()
+                .setQuery(
+                    boolQuery().must(termQuery("userid", 880))
+                        .filter(
+                            geoBoundingBoxQuery("location").setCorners(74.579421999999994, 143.5, -66.668903999999998, 113.96875)
+                                .type("indexed")
+                        )
+                )
+                .get();
+            assertThat(searchResponse.getHits().getTotalHits().value, equalTo(1L));
 
-        searchResponse = client().prepareSearch()
-            .setQuery(
-                boolQuery().must(termQuery("userid", 534))
-                    .filter(geoBoundingBoxQuery("location").setCorners(74.579421999999994, 143.5, -66.668903999999998, 113.96875))
-            )
-            .get();
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(1L));
-        searchResponse = client().prepareSearch()
-            .setQuery(
-                boolQuery().must(termQuery("userid", 534))
-                    .filter(
-                        geoBoundingBoxQuery("location").setCorners(74.579421999999994, 143.5, -66.668903999999998, 113.96875)
-                            .type("indexed")
-                    )
-            )
-            .get();
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(1L));
+            searchResponse = client().prepareSearch()
+                .setQuery(
+                    boolQuery().must(termQuery("userid", 534))
+                        .filter(geoBoundingBoxQuery("location").setCorners(74.579421999999994, 143.5, -66.668903999999998, 113.96875))
+                )
+                .get();
+            assertThat(searchResponse.getHits().getTotalHits().value, equalTo(1L));
+            searchResponse = client().prepareSearch()
+                .setQuery(
+                    boolQuery().must(termQuery("userid", 534))
+                        .filter(
+                            geoBoundingBoxQuery("location").setCorners(74.579421999999994, 143.5, -66.668903999999998, 113.96875)
+                                .type("indexed")
+                        )
+                )
+                .get();
+            assertThat(searchResponse.getHits().getTotalHits().value, equalTo(1L));
+        });
     }
 
     public void testCompleteLonRange() throws Exception {

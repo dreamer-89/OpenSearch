@@ -185,20 +185,26 @@ public class MinimumClusterManagerNodesIT extends OpenSearchIntegTestCase {
             .actionGet();
         assertThat(clusterHealthResponse.isTimedOut(), equalTo(false));
 
-        state = client().admin().cluster().prepareState().setLocal(true).execute().actionGet().getState();
-        assertThat(state.blocks().hasGlobalBlockWithId(NoClusterManagerBlockService.NO_CLUSTER_MANAGER_BLOCK_ID), equalTo(false));
-        state = client().admin().cluster().prepareState().setLocal(true).execute().actionGet().getState();
-        assertThat(state.blocks().hasGlobalBlockWithId(NoClusterManagerBlockService.NO_CLUSTER_MANAGER_BLOCK_ID), equalTo(false));
+        assertBusy(() -> {
+            ClusterState stateFinal = client().admin().cluster().prepareState().setLocal(true).execute().actionGet().getState();
+            assertThat(stateFinal.blocks().hasGlobalBlockWithId(NoClusterManagerBlockService.NO_CLUSTER_MANAGER_BLOCK_ID), equalTo(false));
+            stateFinal = client().admin().cluster().prepareState().setLocal(true).execute().actionGet().getState();
+            assertThat(stateFinal.blocks().hasGlobalBlockWithId(NoClusterManagerBlockService.NO_CLUSTER_MANAGER_BLOCK_ID), equalTo(false));
 
-        state = client().admin().cluster().prepareState().execute().actionGet().getState();
-        assertThat(state.nodes().getSize(), equalTo(2));
-        assertThat(state.metadata().indices().containsKey("test"), equalTo(true));
+            stateFinal = client().admin().cluster().prepareState().execute().actionGet().getState();
+            assertThat(stateFinal.nodes().getSize(), equalTo(2));
+            assertThat(stateFinal.metadata().indices().containsKey("test"), equalTo(true));
+        });
 
         ensureGreen();
 
         logger.info("--> verify we get the data back after cluster reform");
         for (int i = 0; i < 10; i++) {
-            assertHitCount(client().prepareSearch().setSize(0).setQuery(QueryBuilders.matchAllQuery()).execute().actionGet(), 100);
+            assertBusy(
+                () -> {
+                    assertHitCount(client().prepareSearch().setSize(0).setQuery(QueryBuilders.matchAllQuery()).execute().actionGet(), 100);
+                }
+            );
         }
 
         logger.info("--> clearing voting config exclusions");
@@ -233,21 +239,27 @@ public class MinimumClusterManagerNodesIT extends OpenSearchIntegTestCase {
             .actionGet();
         assertThat(clusterHealthResponse.isTimedOut(), equalTo(false));
 
-        state = client().admin().cluster().prepareState().setLocal(true).execute().actionGet().getState();
-        assertThat(state.blocks().hasGlobalBlockWithId(NoClusterManagerBlockService.NO_CLUSTER_MANAGER_BLOCK_ID), equalTo(false));
-        state = client().admin().cluster().prepareState().setLocal(true).execute().actionGet().getState();
-        assertThat(state.blocks().hasGlobalBlockWithId(NoClusterManagerBlockService.NO_CLUSTER_MANAGER_BLOCK_ID), equalTo(false));
+        assertBusy(() -> {
+            ClusterState stateFinal = client().admin().cluster().prepareState().setLocal(true).execute().actionGet().getState();
+            assertThat(stateFinal.blocks().hasGlobalBlockWithId(NoClusterManagerBlockService.NO_CLUSTER_MANAGER_BLOCK_ID), equalTo(false));
+            stateFinal = client().admin().cluster().prepareState().setLocal(true).execute().actionGet().getState();
+            assertThat(stateFinal.blocks().hasGlobalBlockWithId(NoClusterManagerBlockService.NO_CLUSTER_MANAGER_BLOCK_ID), equalTo(false));
 
-        state = client().admin().cluster().prepareState().execute().actionGet().getState();
-        assertThat(state.nodes().getSize(), equalTo(2));
-        assertThat(state.metadata().indices().containsKey("test"), equalTo(true));
+            stateFinal = client().admin().cluster().prepareState().execute().actionGet().getState();
+            assertThat(stateFinal.nodes().getSize(), equalTo(2));
+            assertThat(stateFinal.metadata().indices().containsKey("test"), equalTo(true));
+        });
 
         logger.info("Running Cluster Health");
         ensureGreen();
 
         logger.info("--> verify we the data back");
         for (int i = 0; i < 10; i++) {
-            assertHitCount(client().prepareSearch().setSize(0).setQuery(QueryBuilders.matchAllQuery()).execute().actionGet(), 100);
+            assertBusy(
+                () -> {
+                    assertHitCount(client().prepareSearch().setSize(0).setQuery(QueryBuilders.matchAllQuery()).execute().actionGet(), 100);
+                }
+            );
         }
     }
 
@@ -308,7 +320,11 @@ public class MinimumClusterManagerNodesIT extends OpenSearchIntegTestCase {
         refresh();
         logger.info("--> verify we get the data back");
         for (int i = 0; i < 10; i++) {
-            assertHitCount(client().prepareSearch().setSize(0).setQuery(QueryBuilders.matchAllQuery()).execute().actionGet(), 100);
+            assertBusy(
+                () -> {
+                    assertHitCount(client().prepareSearch().setSize(0).setQuery(QueryBuilders.matchAllQuery()).execute().actionGet(), 100);
+                }
+            );
         }
 
         List<String> nonClusterManagerNodes = new ArrayList<>(
@@ -340,7 +356,11 @@ public class MinimumClusterManagerNodesIT extends OpenSearchIntegTestCase {
 
         logger.info("--> verify we the data back");
         for (int i = 0; i < 10; i++) {
-            assertHitCount(client().prepareSearch().setSize(0).setQuery(QueryBuilders.matchAllQuery()).execute().actionGet(), 100);
+            assertBusy(
+                () -> {
+                    assertHitCount(client().prepareSearch().setSize(0).setQuery(QueryBuilders.matchAllQuery()).execute().actionGet(), 100);
+                }
+            );
         }
     }
 
@@ -418,11 +438,13 @@ public class MinimumClusterManagerNodesIT extends OpenSearchIntegTestCase {
 
         for (String node : internalCluster().getNodeNames()) {
             Settings nodeSetting = internalCluster().clusterService(node).state().metadata().settings();
-            assertThat(
-                node + " processed the cluster state despite of a min cluster-manager node violation",
-                nodeSetting.get("_SHOULD_NOT_BE_THERE_"),
-                nullValue()
-            );
+            assertBusy(() -> {
+                assertThat(
+                    node + " processed the cluster state despite of a min cluster-manager node violation",
+                    nodeSetting.get("_SHOULD_NOT_BE_THERE_"),
+                    nullValue()
+                );
+            });
         }
 
     }

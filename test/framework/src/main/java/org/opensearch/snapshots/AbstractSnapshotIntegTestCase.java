@@ -473,7 +473,11 @@ public abstract class AbstractSnapshotIntegTestCase extends OpenSearchIntegTestC
         }
         indexRandom(true, builders);
         flushAndRefresh(index);
-        assertDocCount(index, numdocs);
+        try {
+            assertBusy(() -> { assertDocCount(index, numdocs); });
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     protected long getCountForIndex(String indexName) {

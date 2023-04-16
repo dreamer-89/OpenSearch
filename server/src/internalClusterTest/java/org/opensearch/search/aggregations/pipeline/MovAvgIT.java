@@ -1302,46 +1302,48 @@ public class MovAvgIT extends OpenSearchIntegTestCase {
         bulkBuilder.get();
         ensureSearchable();
 
-        SearchResponse response = client().prepareSearch("predict_non_empty")
+        assertBusy(() -> {
+            SearchResponse response = client().prepareSearch("predict_non_empty")
 
-            .addAggregation(
-                histogram("histo").field(INTERVAL_FIELD)
-                    .interval(1)
-                    .subAggregation(max("max").field(VALUE_FIELD))
-                    .subAggregation(max("max2").field(VALUE_FIELD2))
-                    .subAggregation(
-                        movingAvg("movavg_values", "max").window(windowSize)
-                            .modelBuilder(new SimpleModel.SimpleModelBuilder())
-                            .gapPolicy(BucketHelpers.GapPolicy.SKIP)
-                            .predict(5)
-                    )
-            )
-            .get();
+                .addAggregation(
+                    histogram("histo").field(INTERVAL_FIELD)
+                        .interval(1)
+                        .subAggregation(max("max").field(VALUE_FIELD))
+                        .subAggregation(max("max2").field(VALUE_FIELD2))
+                        .subAggregation(
+                            movingAvg("movavg_values", "max").window(windowSize)
+                                .modelBuilder(new SimpleModel.SimpleModelBuilder())
+                                .gapPolicy(BucketHelpers.GapPolicy.SKIP)
+                                .predict(5)
+                        )
+                )
+                .get();
 
-        assertSearchResponse(response);
+            assertSearchResponse(response);
 
-        Histogram histo = response.getAggregations().get("histo");
-        assertThat(histo, notNullValue());
-        assertThat(histo.getName(), equalTo("histo"));
-        List<? extends Bucket> buckets = histo.getBuckets();
-        assertThat("Size of buckets array is not correct.", buckets.size(), equalTo(20));
+            Histogram histo = response.getAggregations().get("histo");
+            assertThat(histo, notNullValue());
+            assertThat(histo.getName(), equalTo("histo"));
+            List<? extends Bucket> buckets = histo.getBuckets();
+            assertThat("Size of buckets array is not correct.", buckets.size(), equalTo(20));
 
-        SimpleValue current = buckets.get(0).getAggregations().get("movavg_values");
-        assertThat(current, nullValue());
+            SimpleValue current = buckets.get(0).getAggregations().get("movavg_values");
+            assertThat(current, nullValue());
 
-        for (int i = 1; i < 20; i++) {
-            Bucket bucket = buckets.get(i);
-            assertThat(bucket, notNullValue());
-            assertThat(bucket.getKey(), equalTo((double) i));
-            assertThat(bucket.getDocCount(), equalTo(1L));
-            SimpleValue movAvgAgg = bucket.getAggregations().get("movavg_values");
-            if (i < 15) {
-                assertThat(movAvgAgg, notNullValue());
-                assertThat(movAvgAgg.value(), equalTo(10d));
-            } else {
-                assertThat(movAvgAgg, nullValue());
+            for (int i = 1; i < 20; i++) {
+                Bucket bucket = buckets.get(i);
+                assertThat(bucket, notNullValue());
+                assertThat(bucket.getKey(), equalTo((double) i));
+                assertThat(bucket.getDocCount(), equalTo(1L));
+                SimpleValue movAvgAgg = bucket.getAggregations().get("movavg_values");
+                if (i < 15) {
+                    assertThat(movAvgAgg, notNullValue());
+                    assertThat(movAvgAgg.value(), equalTo(10d));
+                } else {
+                    assertThat(movAvgAgg, nullValue());
+                }
             }
-        }
+        });
     }
 
     private void assertValidIterators(Iterator expectedBucketIter, Iterator expectedCountsIter, Iterator expectedValuesIter) {

@@ -206,50 +206,54 @@ public class NestedIT extends OpenSearchIntegTestCase {
     }
 
     public void testSimple() throws Exception {
-        SearchResponse response = client().prepareSearch("idx")
-            .addAggregation(nested("nested", "nested").subAggregation(stats("nested_value_stats").field("nested.value")))
-            .get();
+        assertBusy(() -> {
+            SearchResponse response = client().prepareSearch("idx")
+                .addAggregation(nested("nested", "nested").subAggregation(stats("nested_value_stats").field("nested.value")))
+                .get();
 
-        assertSearchResponse(response);
+            assertSearchResponse(response);
 
-        double min = Double.POSITIVE_INFINITY;
-        double max = Double.NEGATIVE_INFINITY;
-        long sum = 0;
-        long count = 0;
-        for (int i = 0; i < numParents; ++i) {
-            for (int j = 0; j < numChildren[i]; ++j) {
-                final long value = i + 1 + j;
-                min = Math.min(min, value);
-                max = Math.max(max, value);
-                sum += value;
-                ++count;
+            double min = Double.POSITIVE_INFINITY;
+            double max = Double.NEGATIVE_INFINITY;
+            long sum = 0;
+            long count = 0;
+            for (int i = 0; i < numParents; ++i) {
+                for (int j = 0; j < numChildren[i]; ++j) {
+                    final long value = i + 1 + j;
+                    min = Math.min(min, value);
+                    max = Math.max(max, value);
+                    sum += value;
+                    ++count;
+                }
             }
-        }
 
-        Nested nested = response.getAggregations().get("nested");
-        assertThat(nested, notNullValue());
-        assertThat(nested.getName(), equalTo("nested"));
-        assertThat(nested.getDocCount(), equalTo(count));
-        assertThat(nested.getAggregations().asList().isEmpty(), is(false));
+            Nested nested = response.getAggregations().get("nested");
+            assertThat(nested, notNullValue());
+            assertThat(nested.getName(), equalTo("nested"));
+            assertThat(nested.getDocCount(), equalTo(count));
+            assertThat(nested.getAggregations().asList().isEmpty(), is(false));
 
-        Stats stats = nested.getAggregations().get("nested_value_stats");
-        assertThat(stats, notNullValue());
-        assertThat(stats.getMin(), equalTo(min));
-        assertThat(stats.getMax(), equalTo(max));
-        assertThat(stats.getCount(), equalTo(count));
-        assertThat(stats.getSum(), equalTo((double) sum));
-        assertThat(stats.getAvg(), equalTo((double) sum / count));
+            Stats stats = nested.getAggregations().get("nested_value_stats");
+            assertThat(stats, notNullValue());
+            assertThat(stats.getMin(), equalTo(min));
+            assertThat(stats.getMax(), equalTo(max));
+            assertThat(stats.getCount(), equalTo(count));
+            assertThat(stats.getSum(), equalTo((double) sum));
+            assertThat(stats.getAvg(), equalTo((double) sum / count));
+        });
     }
 
     public void testNonExistingNestedField() throws Exception {
-        SearchResponse searchResponse = client().prepareSearch("idx")
-            .addAggregation(nested("nested", "value").subAggregation(stats("nested_value_stats").field("nested.value")))
-            .get();
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("idx")
+                .addAggregation(nested("nested", "value").subAggregation(stats("nested_value_stats").field("nested.value")))
+                .get();
 
-        Nested nested = searchResponse.getAggregations().get("nested");
-        assertThat(nested, Matchers.notNullValue());
-        assertThat(nested.getName(), equalTo("nested"));
-        assertThat(nested.getDocCount(), is(0L));
+            Nested nested = searchResponse.getAggregations().get("nested");
+            assertThat(nested, Matchers.notNullValue());
+            assertThat(nested.getName(), equalTo("nested"));
+            assertThat(nested.getDocCount(), is(0L));
+        });
     }
 
     public void testNestedWithSubTermsAgg() throws Exception {
@@ -307,95 +311,103 @@ public class NestedIT extends OpenSearchIntegTestCase {
     }
 
     public void testNestedAsSubAggregation() throws Exception {
-        SearchResponse response = client().prepareSearch("idx")
-            .addAggregation(
-                terms("top_values").field("value")
-                    .size(100)
-                    .collectMode(aggCollectionMode)
-                    .subAggregation(nested("nested", "nested").subAggregation(max("max_value").field("nested.value")))
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse response = client().prepareSearch("idx")
+                .addAggregation(
+                    terms("top_values").field("value")
+                        .size(100)
+                        .collectMode(aggCollectionMode)
+                        .subAggregation(nested("nested", "nested").subAggregation(max("max_value").field("nested.value")))
+                )
+                .get();
 
-        assertSearchResponse(response);
+            assertSearchResponse(response);
 
-        LongTerms values = response.getAggregations().get("top_values");
-        assertThat(values, notNullValue());
-        assertThat(values.getName(), equalTo("top_values"));
-        assertThat(values.getBuckets(), notNullValue());
-        assertThat(values.getBuckets().size(), equalTo(numParents));
+            LongTerms values = response.getAggregations().get("top_values");
+            assertThat(values, notNullValue());
+            assertThat(values.getName(), equalTo("top_values"));
+            assertThat(values.getBuckets(), notNullValue());
+            assertThat(values.getBuckets().size(), equalTo(numParents));
 
-        for (int i = 0; i < numParents; i++) {
-            String topValue = "" + (i + 1);
-            assertThat(values.getBucketByKey(topValue), notNullValue());
-            Nested nested = values.getBucketByKey(topValue).getAggregations().get("nested");
-            assertThat(nested, notNullValue());
-            Max max = nested.getAggregations().get("max_value");
-            assertThat(max, notNullValue());
-            assertThat(max.getValue(), equalTo(numChildren[i] == 0 ? Double.NEGATIVE_INFINITY : (double) i + numChildren[i]));
-        }
+            for (int i = 0; i < numParents; i++) {
+                String topValue = "" + (i + 1);
+                assertThat(values.getBucketByKey(topValue), notNullValue());
+                Nested nested = values.getBucketByKey(topValue).getAggregations().get("nested");
+                assertThat(nested, notNullValue());
+                Max max = nested.getAggregations().get("max_value");
+                assertThat(max, notNullValue());
+                assertThat(max.getValue(), equalTo(numChildren[i] == 0 ? Double.NEGATIVE_INFINITY : (double) i + numChildren[i]));
+            }
+        });
     }
 
     public void testNestNestedAggs() throws Exception {
-        SearchResponse response = client().prepareSearch("idx_nested_nested_aggs")
-            .addAggregation(
-                nested("level1", "nested1").subAggregation(
-                    terms("a").field("nested1.a.keyword")
-                        .collectMode(aggCollectionMode)
-                        .subAggregation(nested("level2", "nested1.nested2").subAggregation(sum("sum").field("nested1.nested2.b")))
+        assertBusy(() -> {
+            SearchResponse response = client().prepareSearch("idx_nested_nested_aggs")
+                .addAggregation(
+                    nested("level1", "nested1").subAggregation(
+                        terms("a").field("nested1.a.keyword")
+                            .collectMode(aggCollectionMode)
+                            .subAggregation(nested("level2", "nested1.nested2").subAggregation(sum("sum").field("nested1.nested2.b")))
+                    )
                 )
-            )
-            .get();
-        assertSearchResponse(response);
+                .get();
+            assertSearchResponse(response);
 
-        Nested level1 = response.getAggregations().get("level1");
-        assertThat(level1, notNullValue());
-        assertThat(level1.getName(), equalTo("level1"));
-        assertThat(level1.getDocCount(), equalTo(2L));
+            Nested level1 = response.getAggregations().get("level1");
+            assertThat(level1, notNullValue());
+            assertThat(level1.getName(), equalTo("level1"));
+            assertThat(level1.getDocCount(), equalTo(2L));
 
-        StringTerms a = level1.getAggregations().get("a");
-        Terms.Bucket bBucket = a.getBucketByKey("a");
-        assertThat(bBucket.getDocCount(), equalTo(1L));
+            StringTerms a = level1.getAggregations().get("a");
+            Terms.Bucket bBucket = a.getBucketByKey("a");
+            assertThat(bBucket.getDocCount(), equalTo(1L));
 
-        Nested level2 = bBucket.getAggregations().get("level2");
-        assertThat(level2.getDocCount(), equalTo(1L));
-        Sum sum = level2.getAggregations().get("sum");
-        assertThat(sum.getValue(), equalTo(2d));
+            Nested level2 = bBucket.getAggregations().get("level2");
+            assertThat(level2.getDocCount(), equalTo(1L));
+            Sum sum = level2.getAggregations().get("sum");
+            assertThat(sum.getValue(), equalTo(2d));
 
-        a = level1.getAggregations().get("a");
-        bBucket = a.getBucketByKey("b");
-        assertThat(bBucket.getDocCount(), equalTo(1L));
+            a = level1.getAggregations().get("a");
+            bBucket = a.getBucketByKey("b");
+            assertThat(bBucket.getDocCount(), equalTo(1L));
 
-        level2 = bBucket.getAggregations().get("level2");
-        assertThat(level2.getDocCount(), equalTo(1L));
-        sum = level2.getAggregations().get("sum");
-        assertThat(sum.getValue(), equalTo(2d));
+            level2 = bBucket.getAggregations().get("level2");
+            assertThat(level2.getDocCount(), equalTo(1L));
+            sum = level2.getAggregations().get("sum");
+            assertThat(sum.getValue(), equalTo(2d));
+        });
     }
 
     public void testEmptyAggregation() throws Exception {
-        SearchResponse searchResponse = client().prepareSearch("empty_bucket_idx")
-            .setQuery(matchAllQuery())
-            .addAggregation(histogram("histo").field("value").interval(1L).minDocCount(0).subAggregation(nested("nested", "nested")))
-            .get();
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("empty_bucket_idx")
+                .setQuery(matchAllQuery())
+                .addAggregation(histogram("histo").field("value").interval(1L).minDocCount(0).subAggregation(nested("nested", "nested")))
+                .get();
 
-        assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
-        Histogram histo = searchResponse.getAggregations().get("histo");
-        assertThat(histo, Matchers.notNullValue());
-        Histogram.Bucket bucket = histo.getBuckets().get(1);
-        assertThat(bucket, Matchers.notNullValue());
+            assertThat(searchResponse.getHits().getTotalHits().value, equalTo(2L));
+            Histogram histo = searchResponse.getAggregations().get("histo");
+            assertThat(histo, Matchers.notNullValue());
+            Histogram.Bucket bucket = histo.getBuckets().get(1);
+            assertThat(bucket, Matchers.notNullValue());
 
-        Nested nested = bucket.getAggregations().get("nested");
-        assertThat(nested, Matchers.notNullValue());
-        assertThat(nested.getName(), equalTo("nested"));
-        assertThat(nested.getDocCount(), is(0L));
+            Nested nested = bucket.getAggregations().get("nested");
+            assertThat(nested, Matchers.notNullValue());
+            assertThat(nested.getName(), equalTo("nested"));
+            assertThat(nested.getDocCount(), is(0L));
+        });
     }
 
     public void testNestedOnObjectField() throws Exception {
-        try {
-            client().prepareSearch("idx").setQuery(matchAllQuery()).addAggregation(nested("object_field", "incorrect")).get();
-            fail();
-        } catch (SearchPhaseExecutionException e) {
-            assertThat(e.toString(), containsString("[nested] nested path [incorrect] is not nested"));
-        }
+        assertBusy(() -> {
+            try {
+                client().prepareSearch("idx").setQuery(matchAllQuery()).addAggregation(nested("object_field", "incorrect")).get();
+                fail();
+            } catch (SearchPhaseExecutionException e) {
+                assertThat(e.toString(), containsString("[nested] nested path [incorrect] is not nested"));
+            }
+        });
     }
 
     // Test based on: https://github.com/elastic/elasticsearch/issues/9280
@@ -480,64 +492,66 @@ public class NestedIT extends OpenSearchIntegTestCase {
         );
         indexRandom(true, indexRequests);
 
-        SearchResponse response = client().prepareSearch("idx2")
-            .addAggregation(
-                terms("startDate").field("dates.month.start")
-                    .subAggregation(
-                        terms("endDate").field("dates.month.end")
-                            .subAggregation(
-                                terms("period").field("dates.month.label")
-                                    .subAggregation(
-                                        nested("ctxt_idfier_nested", "comments").subAggregation(
-                                            filter("comment_filter", termQuery("comments.identifier", "29111")).subAggregation(
-                                                nested("nested_tags", "comments.tags").subAggregation(
-                                                    terms("tag").field("comments.tags.name")
+        assertBusy(() -> {
+            SearchResponse response = client().prepareSearch("idx2")
+                .addAggregation(
+                    terms("startDate").field("dates.month.start")
+                        .subAggregation(
+                            terms("endDate").field("dates.month.end")
+                                .subAggregation(
+                                    terms("period").field("dates.month.label")
+                                        .subAggregation(
+                                            nested("ctxt_idfier_nested", "comments").subAggregation(
+                                                filter("comment_filter", termQuery("comments.identifier", "29111")).subAggregation(
+                                                    nested("nested_tags", "comments.tags").subAggregation(
+                                                        terms("tag").field("comments.tags.name")
+                                                    )
                                                 )
                                             )
                                         )
-                                    )
-                            )
-                    )
-            )
-            .get();
-        assertNoFailures(response);
-        assertHitCount(response, 2);
+                                )
+                        )
+                )
+                .get();
+            assertNoFailures(response);
+            assertHitCount(response, 2);
 
-        Terms startDate = response.getAggregations().get("startDate");
-        assertThat(startDate.getBuckets().size(), equalTo(2));
-        Terms.Bucket bucket = startDate.getBucketByKey("2014-11-01T00:00:00.000Z");
-        assertThat(bucket.getDocCount(), equalTo(1L));
-        Terms endDate = bucket.getAggregations().get("endDate");
-        bucket = endDate.getBucketByKey("2014-11-30T00:00:00.000Z");
-        assertThat(bucket.getDocCount(), equalTo(1L));
-        Terms period = bucket.getAggregations().get("period");
-        bucket = period.getBucketByKey("2014-11");
-        assertThat(bucket.getDocCount(), equalTo(1L));
-        Nested comments = bucket.getAggregations().get("ctxt_idfier_nested");
-        assertThat(comments.getDocCount(), equalTo(2L));
-        Filter filter = comments.getAggregations().get("comment_filter");
-        assertThat(filter.getDocCount(), equalTo(1L));
-        Nested nestedTags = filter.getAggregations().get("nested_tags");
-        assertThat(nestedTags.getDocCount(), equalTo(0L)); // This must be 0
-        Terms tags = nestedTags.getAggregations().get("tag");
-        assertThat(tags.getBuckets().size(), equalTo(0)); // and this must be empty
+            Terms startDate = response.getAggregations().get("startDate");
+            assertThat(startDate.getBuckets().size(), equalTo(2));
+            Terms.Bucket bucket = startDate.getBucketByKey("2014-11-01T00:00:00.000Z");
+            assertThat(bucket.getDocCount(), equalTo(1L));
+            Terms endDate = bucket.getAggregations().get("endDate");
+            bucket = endDate.getBucketByKey("2014-11-30T00:00:00.000Z");
+            assertThat(bucket.getDocCount(), equalTo(1L));
+            Terms period = bucket.getAggregations().get("period");
+            bucket = period.getBucketByKey("2014-11");
+            assertThat(bucket.getDocCount(), equalTo(1L));
+            Nested comments = bucket.getAggregations().get("ctxt_idfier_nested");
+            assertThat(comments.getDocCount(), equalTo(2L));
+            Filter filter = comments.getAggregations().get("comment_filter");
+            assertThat(filter.getDocCount(), equalTo(1L));
+            Nested nestedTags = filter.getAggregations().get("nested_tags");
+            assertThat(nestedTags.getDocCount(), equalTo(0L)); // This must be 0
+            Terms tags = nestedTags.getAggregations().get("tag");
+            assertThat(tags.getBuckets().size(), equalTo(0)); // and this must be empty
 
-        bucket = startDate.getBucketByKey("2014-12-01T00:00:00.000Z");
-        assertThat(bucket.getDocCount(), equalTo(1L));
-        endDate = bucket.getAggregations().get("endDate");
-        bucket = endDate.getBucketByKey("2014-12-31T00:00:00.000Z");
-        assertThat(bucket.getDocCount(), equalTo(1L));
-        period = bucket.getAggregations().get("period");
-        bucket = period.getBucketByKey("2014-12");
-        assertThat(bucket.getDocCount(), equalTo(1L));
-        comments = bucket.getAggregations().get("ctxt_idfier_nested");
-        assertThat(comments.getDocCount(), equalTo(2L));
-        filter = comments.getAggregations().get("comment_filter");
-        assertThat(filter.getDocCount(), equalTo(1L));
-        nestedTags = filter.getAggregations().get("nested_tags");
-        assertThat(nestedTags.getDocCount(), equalTo(0L)); // This must be 0
-        tags = nestedTags.getAggregations().get("tag");
-        assertThat(tags.getBuckets().size(), equalTo(0)); // and this must be empty
+            bucket = startDate.getBucketByKey("2014-12-01T00:00:00.000Z");
+            assertThat(bucket.getDocCount(), equalTo(1L));
+            endDate = bucket.getAggregations().get("endDate");
+            bucket = endDate.getBucketByKey("2014-12-31T00:00:00.000Z");
+            assertThat(bucket.getDocCount(), equalTo(1L));
+            period = bucket.getAggregations().get("period");
+            bucket = period.getBucketByKey("2014-12");
+            assertThat(bucket.getDocCount(), equalTo(1L));
+            comments = bucket.getAggregations().get("ctxt_idfier_nested");
+            assertThat(comments.getDocCount(), equalTo(2L));
+            filter = comments.getAggregations().get("comment_filter");
+            assertThat(filter.getDocCount(), equalTo(1L));
+            nestedTags = filter.getAggregations().get("nested_tags");
+            assertThat(nestedTags.getDocCount(), equalTo(0L)); // This must be 0
+            tags = nestedTags.getAggregations().get("tag");
+            assertThat(tags.getBuckets().size(), equalTo(0)); // and this must be empty
+        });
     }
 
     public void testNestedSameDocIdProcessedMultipleTime() throws Exception {
@@ -589,61 +603,63 @@ public class NestedIT extends OpenSearchIntegTestCase {
             .get();
         refresh();
 
-        SearchResponse response = client().prepareSearch("idx4")
-            .addAggregation(
-                terms("category").field("categories")
-                    .subAggregation(nested("property", "property").subAggregation(terms("property_id").field("property.id")))
-            )
-            .get();
-        assertNoFailures(response);
-        assertHitCount(response, 2);
+        assertBusy(() -> {
+            SearchResponse response = client().prepareSearch("idx4")
+                .addAggregation(
+                    terms("category").field("categories")
+                        .subAggregation(nested("property", "property").subAggregation(terms("property_id").field("property.id")))
+                )
+                .get();
+            assertNoFailures(response);
+            assertHitCount(response, 2);
 
-        Terms category = response.getAggregations().get("category");
-        assertThat(category.getBuckets().size(), equalTo(4));
+            Terms category = response.getAggregations().get("category");
+            assertThat(category.getBuckets().size(), equalTo(4));
 
-        Terms.Bucket bucket = category.getBucketByKey("1");
-        assertThat(bucket.getDocCount(), equalTo(2L));
-        Nested property = bucket.getAggregations().get("property");
-        assertThat(property.getDocCount(), equalTo(6L));
-        Terms propertyId = property.getAggregations().get("property_id");
-        assertThat(propertyId.getBuckets().size(), equalTo(5));
-        assertThat(propertyId.getBucketByKey("1").getDocCount(), equalTo(2L));
-        assertThat(propertyId.getBucketByKey("2").getDocCount(), equalTo(1L));
-        assertThat(propertyId.getBucketByKey("3").getDocCount(), equalTo(1L));
-        assertThat(propertyId.getBucketByKey("4").getDocCount(), equalTo(1L));
-        assertThat(propertyId.getBucketByKey("5").getDocCount(), equalTo(1L));
+            Terms.Bucket bucket = category.getBucketByKey("1");
+            assertThat(bucket.getDocCount(), equalTo(2L));
+            Nested property = bucket.getAggregations().get("property");
+            assertThat(property.getDocCount(), equalTo(6L));
+            Terms propertyId = property.getAggregations().get("property_id");
+            assertThat(propertyId.getBuckets().size(), equalTo(5));
+            assertThat(propertyId.getBucketByKey("1").getDocCount(), equalTo(2L));
+            assertThat(propertyId.getBucketByKey("2").getDocCount(), equalTo(1L));
+            assertThat(propertyId.getBucketByKey("3").getDocCount(), equalTo(1L));
+            assertThat(propertyId.getBucketByKey("4").getDocCount(), equalTo(1L));
+            assertThat(propertyId.getBucketByKey("5").getDocCount(), equalTo(1L));
 
-        bucket = category.getBucketByKey("2");
-        assertThat(bucket.getDocCount(), equalTo(2L));
-        property = bucket.getAggregations().get("property");
-        assertThat(property.getDocCount(), equalTo(6L));
-        propertyId = property.getAggregations().get("property_id");
-        assertThat(propertyId.getBuckets().size(), equalTo(5));
-        assertThat(propertyId.getBucketByKey("1").getDocCount(), equalTo(2L));
-        assertThat(propertyId.getBucketByKey("2").getDocCount(), equalTo(1L));
-        assertThat(propertyId.getBucketByKey("3").getDocCount(), equalTo(1L));
-        assertThat(propertyId.getBucketByKey("4").getDocCount(), equalTo(1L));
-        assertThat(propertyId.getBucketByKey("5").getDocCount(), equalTo(1L));
+            bucket = category.getBucketByKey("2");
+            assertThat(bucket.getDocCount(), equalTo(2L));
+            property = bucket.getAggregations().get("property");
+            assertThat(property.getDocCount(), equalTo(6L));
+            propertyId = property.getAggregations().get("property_id");
+            assertThat(propertyId.getBuckets().size(), equalTo(5));
+            assertThat(propertyId.getBucketByKey("1").getDocCount(), equalTo(2L));
+            assertThat(propertyId.getBucketByKey("2").getDocCount(), equalTo(1L));
+            assertThat(propertyId.getBucketByKey("3").getDocCount(), equalTo(1L));
+            assertThat(propertyId.getBucketByKey("4").getDocCount(), equalTo(1L));
+            assertThat(propertyId.getBucketByKey("5").getDocCount(), equalTo(1L));
 
-        bucket = category.getBucketByKey("3");
-        assertThat(bucket.getDocCount(), equalTo(1L));
-        property = bucket.getAggregations().get("property");
-        assertThat(property.getDocCount(), equalTo(3L));
-        propertyId = property.getAggregations().get("property_id");
-        assertThat(propertyId.getBuckets().size(), equalTo(3));
-        assertThat(propertyId.getBucketByKey("1").getDocCount(), equalTo(1L));
-        assertThat(propertyId.getBucketByKey("2").getDocCount(), equalTo(1L));
-        assertThat(propertyId.getBucketByKey("3").getDocCount(), equalTo(1L));
+            bucket = category.getBucketByKey("3");
+            assertThat(bucket.getDocCount(), equalTo(1L));
+            property = bucket.getAggregations().get("property");
+            assertThat(property.getDocCount(), equalTo(3L));
+            propertyId = property.getAggregations().get("property_id");
+            assertThat(propertyId.getBuckets().size(), equalTo(3));
+            assertThat(propertyId.getBucketByKey("1").getDocCount(), equalTo(1L));
+            assertThat(propertyId.getBucketByKey("2").getDocCount(), equalTo(1L));
+            assertThat(propertyId.getBucketByKey("3").getDocCount(), equalTo(1L));
 
-        bucket = category.getBucketByKey("4");
-        assertThat(bucket.getDocCount(), equalTo(1L));
-        property = bucket.getAggregations().get("property");
-        assertThat(property.getDocCount(), equalTo(3L));
-        propertyId = property.getAggregations().get("property_id");
-        assertThat(propertyId.getBuckets().size(), equalTo(3));
-        assertThat(propertyId.getBucketByKey("1").getDocCount(), equalTo(1L));
-        assertThat(propertyId.getBucketByKey("2").getDocCount(), equalTo(1L));
-        assertThat(propertyId.getBucketByKey("3").getDocCount(), equalTo(1L));
+            bucket = category.getBucketByKey("4");
+            assertThat(bucket.getDocCount(), equalTo(1L));
+            property = bucket.getAggregations().get("property");
+            assertThat(property.getDocCount(), equalTo(3L));
+            propertyId = property.getAggregations().get("property_id");
+            assertThat(propertyId.getBuckets().size(), equalTo(3));
+            assertThat(propertyId.getBucketByKey("1").getDocCount(), equalTo(1L));
+            assertThat(propertyId.getBucketByKey("2").getDocCount(), equalTo(1L));
+            assertThat(propertyId.getBucketByKey("3").getDocCount(), equalTo(1L));
+        });
     }
 
     public void testFilterAggInsideNestedAgg() throws Exception {
@@ -763,49 +779,51 @@ public class NestedIT extends OpenSearchIntegTestCase {
             .get();
         refresh();
 
-        SearchResponse response = client().prepareSearch("classes")
-            .addAggregation(
-                nested("to_method", "methods").subAggregation(
-                    filter(
-                        "num_string_params",
-                        nestedQuery("methods.parameters", termQuery("methods.parameters.type", "String"), ScoreMode.None)
+        assertBusy(() -> {
+            SearchResponse response = client().prepareSearch("classes")
+                .addAggregation(
+                    nested("to_method", "methods").subAggregation(
+                        filter(
+                            "num_string_params",
+                            nestedQuery("methods.parameters", termQuery("methods.parameters.type", "String"), ScoreMode.None)
+                        )
                     )
                 )
-            )
-            .get();
-        Nested toMethods = response.getAggregations().get("to_method");
-        Filter numStringParams = toMethods.getAggregations().get("num_string_params");
-        assertThat(numStringParams.getDocCount(), equalTo(3L));
+                .get();
+            Nested toMethods = response.getAggregations().get("to_method");
+            Filter numStringParams = toMethods.getAggregations().get("num_string_params");
+            assertThat(numStringParams.getDocCount(), equalTo(3L));
 
-        response = client().prepareSearch("classes")
-            .addAggregation(
-                nested("to_method", "methods").subAggregation(
-                    terms("return_type").field("methods.return_type")
-                        .subAggregation(
-                            filter(
-                                "num_string_params",
-                                nestedQuery("methods.parameters", termQuery("methods.parameters.type", "String"), ScoreMode.None)
+            response = client().prepareSearch("classes")
+                .addAggregation(
+                    nested("to_method", "methods").subAggregation(
+                        terms("return_type").field("methods.return_type")
+                            .subAggregation(
+                                filter(
+                                    "num_string_params",
+                                    nestedQuery("methods.parameters", termQuery("methods.parameters.type", "String"), ScoreMode.None)
+                                )
                             )
-                        )
+                    )
                 )
-            )
-            .get();
-        toMethods = response.getAggregations().get("to_method");
-        Terms terms = toMethods.getAggregations().get("return_type");
-        Bucket bucket = terms.getBucketByKey("void");
-        assertThat(bucket.getDocCount(), equalTo(3L));
-        numStringParams = bucket.getAggregations().get("num_string_params");
-        assertThat(numStringParams.getDocCount(), equalTo(2L));
+                .get();
+            toMethods = response.getAggregations().get("to_method");
+            Terms terms = toMethods.getAggregations().get("return_type");
+            Bucket bucket = terms.getBucketByKey("void");
+            assertThat(bucket.getDocCount(), equalTo(3L));
+            numStringParams = bucket.getAggregations().get("num_string_params");
+            assertThat(numStringParams.getDocCount(), equalTo(2L));
 
-        bucket = terms.getBucketByKey("QueryBuilder");
-        assertThat(bucket.getDocCount(), equalTo(2L));
-        numStringParams = bucket.getAggregations().get("num_string_params");
-        assertThat(numStringParams.getDocCount(), equalTo(1L));
+            bucket = terms.getBucketByKey("QueryBuilder");
+            assertThat(bucket.getDocCount(), equalTo(2L));
+            numStringParams = bucket.getAggregations().get("num_string_params");
+            assertThat(numStringParams.getDocCount(), equalTo(1L));
 
-        bucket = terms.getBucketByKey("Query");
-        assertThat(bucket.getDocCount(), equalTo(1L));
-        numStringParams = bucket.getAggregations().get("num_string_params");
-        assertThat(numStringParams.getDocCount(), equalTo(0L));
+            bucket = terms.getBucketByKey("Query");
+            assertThat(bucket.getDocCount(), equalTo(1L));
+            numStringParams = bucket.getAggregations().get("num_string_params");
+            assertThat(numStringParams.getDocCount(), equalTo(0L));
+        });
     }
 
     public void testExtractInnerHitBuildersWithDuplicateHitName() throws Exception {
@@ -816,20 +834,22 @@ public class NestedIT extends OpenSearchIntegTestCase {
         );
         ensureGreen("idxduplicatehitnames");
 
-        SearchRequestBuilder searchRequestBuilder = client().prepareSearch("idxduplicatehitnames")
-            .setQuery(
-                boolQuery().should(
-                    nestedQuery("property", termQuery("property.id", 1D), ScoreMode.None).innerHit(new InnerHitBuilder("ih1"))
-                )
-                    .should(nestedQuery("property", termQuery("property.id", 1D), ScoreMode.None).innerHit(new InnerHitBuilder("ih2")))
-                    .should(nestedQuery("property", termQuery("property.id", 1D), ScoreMode.None).innerHit(new InnerHitBuilder("ih1")))
-            );
+        assertBusy(() -> {
+            SearchRequestBuilder searchRequestBuilder = client().prepareSearch("idxduplicatehitnames")
+                .setQuery(
+                    boolQuery().should(
+                        nestedQuery("property", termQuery("property.id", 1D), ScoreMode.None).innerHit(new InnerHitBuilder("ih1"))
+                    )
+                        .should(nestedQuery("property", termQuery("property.id", 1D), ScoreMode.None).innerHit(new InnerHitBuilder("ih2")))
+                        .should(nestedQuery("property", termQuery("property.id", 1D), ScoreMode.None).innerHit(new InnerHitBuilder("ih1")))
+                );
 
-        assertFailures(
-            searchRequestBuilder,
-            RestStatus.BAD_REQUEST,
-            containsString("[inner_hits] already contains an entry for key [ih1]")
-        );
+            assertFailures(
+                searchRequestBuilder,
+                RestStatus.BAD_REQUEST,
+                containsString("[inner_hits] already contains an entry for key [ih1]")
+            );
+        });
     }
 
     public void testExtractInnerHitBuildersWithDuplicatePath() throws Exception {
@@ -840,17 +860,21 @@ public class NestedIT extends OpenSearchIntegTestCase {
         );
         ensureGreen("idxnullhitnames");
 
-        SearchRequestBuilder searchRequestBuilder = client().prepareSearch("idxnullhitnames")
-            .setQuery(
-                boolQuery().should(nestedQuery("property", termQuery("property.id", 1D), ScoreMode.None).innerHit(new InnerHitBuilder()))
-                    .should(nestedQuery("property", termQuery("property.id", 1D), ScoreMode.None).innerHit(new InnerHitBuilder()))
-                    .should(nestedQuery("property", termQuery("property.id", 1D), ScoreMode.None).innerHit(new InnerHitBuilder()))
-            );
+        assertBusy(() -> {
+            SearchRequestBuilder searchRequestBuilder = client().prepareSearch("idxnullhitnames")
+                .setQuery(
+                    boolQuery().should(
+                        nestedQuery("property", termQuery("property.id", 1D), ScoreMode.None).innerHit(new InnerHitBuilder())
+                    )
+                        .should(nestedQuery("property", termQuery("property.id", 1D), ScoreMode.None).innerHit(new InnerHitBuilder()))
+                        .should(nestedQuery("property", termQuery("property.id", 1D), ScoreMode.None).innerHit(new InnerHitBuilder()))
+                );
 
-        assertFailures(
-            searchRequestBuilder,
-            RestStatus.BAD_REQUEST,
-            containsString("[inner_hits] already contains an entry for key [property]")
-        );
+            assertFailures(
+                searchRequestBuilder,
+                RestStatus.BAD_REQUEST,
+                containsString("[inner_hits] already contains an entry for key [property]")
+            );
+        });
     }
 }

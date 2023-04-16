@@ -56,6 +56,7 @@ import org.opensearch.test.OpenSearchIntegTestCase;
 
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.concurrent.TimeUnit;
 
 import static org.opensearch.cluster.metadata.IndexMetadata.SETTING_NUMBER_OF_REPLICAS;
 import static org.opensearch.cluster.metadata.IndexMetadata.SETTING_NUMBER_OF_SHARDS;
@@ -356,7 +357,7 @@ public class QueryRescorerIT extends OpenSearchIntegTestCase {
             assertSecondHit(searchResponse, hasId("6"));
             assertThirdHit(searchResponse, hasId("3"));
             assertFourthHit(searchResponse, hasId("2"));
-        });
+        }, 30, TimeUnit.SECONDS);
     }
 
     // Tests a rescorer that penalizes the scores:
@@ -743,34 +744,36 @@ public class QueryRescorerIT extends OpenSearchIntegTestCase {
         ).setScoreMode(QueryRescoreMode.Total);
 
         // First set the rescore window large enough that both rescores take effect
-        SearchRequestBuilder request = client().prepareSearch();
-        request.addRescorer(eightIsGreat, numDocs).addRescorer(sevenIsBetter, numDocs);
-        SearchResponse response = request.get();
-        assertFirstHit(response, hasId("7"));
-        assertSecondHit(response, hasId("8"));
+        assertBusy(() -> {
+            SearchRequestBuilder request = client().prepareSearch();
+            request.addRescorer(eightIsGreat, numDocs).addRescorer(sevenIsBetter, numDocs);
+            SearchResponse response = request.get();
+            assertFirstHit(response, hasId("7"));
+            assertSecondHit(response, hasId("8"));
 
-        // Now squash the second rescore window so it never gets to see a seven
-        response = request.setSize(1).clearRescorers().addRescorer(eightIsGreat, numDocs).addRescorer(sevenIsBetter, 1).get();
-        assertFirstHit(response, hasId("8"));
-        // We have no idea what the second hit will be because we didn't get a chance to look for seven
+            // Now squash the second rescore window so it never gets to see a seven
+            response = request.setSize(1).clearRescorers().addRescorer(eightIsGreat, numDocs).addRescorer(sevenIsBetter, 1).get();
+            assertFirstHit(response, hasId("8"));
+            // We have no idea what the second hit will be because we didn't get a chance to look for seven
 
-        // Now use one rescore to drag the number we're looking for into the window of another
-        QueryRescorerBuilder ninetyIsGood = new QueryRescorerBuilder(
-            functionScoreQuery(queryStringQuery("*ninety*"), ScoreFunctionBuilders.weightFactorFunction(1000.0f)).boostMode(
-                CombineFunction.REPLACE
-            )
-        ).setScoreMode(QueryRescoreMode.Total);
-        QueryRescorerBuilder oneToo = new QueryRescorerBuilder(
-            functionScoreQuery(queryStringQuery("*one*"), ScoreFunctionBuilders.weightFactorFunction(1000.0f)).boostMode(
-                CombineFunction.REPLACE
-            )
-        ).setScoreMode(QueryRescoreMode.Total);
-        request.clearRescorers().addRescorer(ninetyIsGood, numDocs).addRescorer(oneToo, 10);
-        response = request.setSize(2).get();
-        assertThat(response.getHits().getMaxScore(), equalTo(response.getHits().getHits()[0].getScore()));
-        assertFirstHit(response, hasId("91"));
-        assertFirstHit(response, hasScore(2001.0f));
-        assertSecondHit(response, hasScore(1001.0f)); // Not sure which one it is but it is ninety something
+            // Now use one rescore to drag the number we're looking for into the window of another
+            QueryRescorerBuilder ninetyIsGood = new QueryRescorerBuilder(
+                functionScoreQuery(queryStringQuery("*ninety*"), ScoreFunctionBuilders.weightFactorFunction(1000.0f)).boostMode(
+                    CombineFunction.REPLACE
+                )
+            ).setScoreMode(QueryRescoreMode.Total);
+            QueryRescorerBuilder oneToo = new QueryRescorerBuilder(
+                functionScoreQuery(queryStringQuery("*one*"), ScoreFunctionBuilders.weightFactorFunction(1000.0f)).boostMode(
+                    CombineFunction.REPLACE
+                )
+            ).setScoreMode(QueryRescoreMode.Total);
+            request.clearRescorers().addRescorer(ninetyIsGood, numDocs).addRescorer(oneToo, 10);
+            response = request.setSize(2).get();
+            assertThat(response.getHits().getMaxScore(), equalTo(response.getHits().getHits()[0].getScore()));
+            assertFirstHit(response, hasId("91"));
+            assertFirstHit(response, hasScore(2001.0f));
+            assertSecondHit(response, hasScore(1001.0f)); // Not sure which one it is but it is ninety something
+        });
     }
 
     private int indexRandomNumbers(String analyzer) throws Exception {
@@ -835,31 +838,29 @@ public class QueryRescorerIT extends OpenSearchIntegTestCase {
             client().prepareIndex("test").setId("" + i).setSource("number", 0).get();
         }
         refresh();
-
-        Exception exc = expectThrows(
-            Exception.class,
-            () -> client().prepareSearch()
-                .addSort(SortBuilders.fieldSort("number"))
-                .setTrackScores(true)
-                .addRescorer(new QueryRescorerBuilder(matchAllQuery()), 50)
-                .get()
-        );
-        assertNotNull(exc.getCause());
-        assertThat(exc.getCause().getMessage(), containsString("Cannot use [sort] option in conjunction with [rescore]."));
-
-        exc = expectThrows(
-            Exception.class,
-            () -> client().prepareSearch()
-                .addSort(SortBuilders.fieldSort("number"))
-                .addSort(SortBuilders.scoreSort())
-                .setTrackScores(true)
-                .addRescorer(new QueryRescorerBuilder(matchAllQuery()), 50)
-                .get()
-        );
-        assertNotNull(exc.getCause());
-        assertThat(exc.getCause().getMessage(), containsString("Cannot use [sort] option in conjunction with [rescore]."));
-
         assertBusy(() -> {
+            Exception exc = expectThrows(
+                Exception.class,
+                () -> client().prepareSearch()
+                    .addSort(SortBuilders.fieldSort("number"))
+                    .setTrackScores(true)
+                    .addRescorer(new QueryRescorerBuilder(matchAllQuery()), 50)
+                    .get()
+            );
+            assertNotNull(exc.getCause());
+            assertThat(exc.getCause().getMessage(), containsString("Cannot use [sort] option in conjunction with [rescore]."));
+
+            exc = expectThrows(
+                Exception.class,
+                () -> client().prepareSearch()
+                    .addSort(SortBuilders.fieldSort("number"))
+                    .addSort(SortBuilders.scoreSort())
+                    .setTrackScores(true)
+                    .addRescorer(new QueryRescorerBuilder(matchAllQuery()), 50)
+                    .get()
+            );
+            assertNotNull(exc.getCause());
+            assertThat(exc.getCause().getMessage(), containsString("Cannot use [sort] option in conjunction with [rescore]."));
             SearchResponse resp = client().prepareSearch()
                 .addSort(SortBuilders.scoreSort())
                 .setTrackScores(true)

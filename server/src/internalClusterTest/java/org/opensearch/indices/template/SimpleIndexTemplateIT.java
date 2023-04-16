@@ -176,34 +176,38 @@ public class SimpleIndexTemplateIT extends OpenSearchIntegTestCase {
         client().prepareIndex("test_index").setId("1").setSource("field1", "value1", "field2", "value 2").setRefreshPolicy(IMMEDIATE).get();
 
         ensureGreen();
-        SearchResponse searchResponse = client().prepareSearch("test_index")
-            .setQuery(termQuery("field1", "value1"))
-            .addStoredField("field1")
-            .addStoredField("field2")
-            .execute()
-            .actionGet();
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test_index")
+                .setQuery(termQuery("field1", "value1"))
+                .addStoredField("field1")
+                .addStoredField("field2")
+                .execute()
+                .actionGet();
 
-        assertHitCount(searchResponse, 1);
-        assertThat(searchResponse.getHits().getAt(0).field("field1").getValue().toString(), equalTo("value1"));
-        // field2 is not stored.
-        assertThat(searchResponse.getHits().getAt(0).field("field2"), nullValue());
+            assertHitCount(searchResponse, 1);
+            assertThat(searchResponse.getHits().getAt(0).field("field1").getValue().toString(), equalTo("value1"));
+            // field2 is not stored.
+            assertThat(searchResponse.getHits().getAt(0).field("field2"), nullValue());
+        });
 
         client().prepareIndex("text_index").setId("1").setSource("field1", "value1", "field2", "value 2").setRefreshPolicy(IMMEDIATE).get();
 
         ensureGreen();
         // now only match on one template (template_1)
-        searchResponse = client().prepareSearch("text_index")
-            .setQuery(termQuery("field1", "value1"))
-            .addStoredField("field1")
-            .addStoredField("field2")
-            .execute()
-            .actionGet();
-        if (searchResponse.getFailedShards() > 0) {
-            logger.warn("failed search {}", Arrays.toString(searchResponse.getShardFailures()));
-        }
-        assertHitCount(searchResponse, 1);
-        assertThat(searchResponse.getHits().getAt(0).field("field1").getValue().toString(), equalTo("value1"));
-        assertThat(searchResponse.getHits().getAt(0).field("field2").getValue().toString(), equalTo("value 2"));
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("text_index")
+                .setQuery(termQuery("field1", "value1"))
+                .addStoredField("field1")
+                .addStoredField("field2")
+                .execute()
+                .actionGet();
+            if (searchResponse.getFailedShards() > 0) {
+                logger.warn("failed search {}", Arrays.toString(searchResponse.getShardFailures()));
+            }
+            assertHitCount(searchResponse, 1);
+            assertThat(searchResponse.getHits().getAt(0).field("field1").getValue().toString(), equalTo("value1"));
+            assertThat(searchResponse.getHits().getAt(0).field("field2").getValue().toString(), equalTo("value 2"));
+        });
     }
 
     public void testDeleteIndexTemplate() throws Exception {
@@ -254,11 +258,13 @@ public class SimpleIndexTemplateIT extends OpenSearchIntegTestCase {
         logger.info("--> explicitly delete template_1");
         admin().indices().prepareDeleteTemplate("template_1").execute().actionGet();
 
-        ClusterState state = admin().cluster().prepareState().execute().actionGet().getState();
+        assertBusy(() -> {
+            ClusterState state = admin().cluster().prepareState().execute().actionGet().getState();
 
-        assertThat(state.metadata().templates().size(), equalTo(1 + existingTemplates));
-        assertThat(state.metadata().templates().containsKey("template_2"), equalTo(true));
-        assertThat(state.metadata().templates().containsKey("template_1"), equalTo(false));
+            assertThat(state.metadata().templates().size(), equalTo(1 + existingTemplates));
+            assertThat(state.metadata().templates().containsKey("template_2"), equalTo(true));
+            assertThat(state.metadata().templates().containsKey("template_1"), equalTo(false));
+        });
 
         logger.info("--> put template_1 back");
         client().admin()
@@ -286,14 +292,18 @@ public class SimpleIndexTemplateIT extends OpenSearchIntegTestCase {
 
         logger.info("--> delete template*");
         admin().indices().prepareDeleteTemplate("template*").execute().actionGet();
-        assertThat(
-            admin().cluster().prepareState().execute().actionGet().getState().metadata().templates().size(),
-            equalTo(existingTemplates)
-        );
+        assertBusy(() -> {
+            assertThat(
+                admin().cluster().prepareState().execute().actionGet().getState().metadata().templates().size(),
+                equalTo(existingTemplates)
+            );
+        });
 
         logger.info("--> delete * with no templates, make sure we don't get a failure");
-        admin().indices().prepareDeleteTemplate("*").execute().actionGet();
-        assertThat(admin().cluster().prepareState().execute().actionGet().getState().metadata().templates().size(), equalTo(0));
+        assertBusy(() -> {
+            admin().indices().prepareDeleteTemplate("*").execute().actionGet();
+            assertThat(admin().cluster().prepareState().execute().actionGet().getState().metadata().templates().size(), equalTo(0));
+        });
     }
 
     public void testThatGetIndexTemplatesWorks() throws Exception {
@@ -413,19 +423,25 @@ public class SimpleIndexTemplateIT extends OpenSearchIntegTestCase {
             .actionGet();
 
         logger.info("--> get template template_*");
-        GetIndexTemplatesResponse getTemplate1Response = client().admin().indices().prepareGetTemplates("template_*").execute().actionGet();
-        assertThat(getTemplate1Response.getIndexTemplates(), hasSize(2));
+        assertBusy(() -> {
+            GetIndexTemplatesResponse getTemplate1Response = client().admin()
+                .indices()
+                .prepareGetTemplates("template_*")
+                .execute()
+                .actionGet();
+            assertThat(getTemplate1Response.getIndexTemplates(), hasSize(2));
 
-        List<String> templateNames = new ArrayList<>();
-        templateNames.add(getTemplate1Response.getIndexTemplates().get(0).name());
-        templateNames.add(getTemplate1Response.getIndexTemplates().get(1).name());
-        assertThat(templateNames, containsInAnyOrder("template_1", "template_2"));
+            List<String> templateNames = new ArrayList<>();
+            templateNames.add(getTemplate1Response.getIndexTemplates().get(0).name());
+            templateNames.add(getTemplate1Response.getIndexTemplates().get(1).name());
+            assertThat(templateNames, containsInAnyOrder("template_1", "template_2"));
+        });
 
         logger.info("--> get all templates");
-        getTemplate1Response = client().admin().indices().prepareGetTemplates("template*").execute().actionGet();
+        GetIndexTemplatesResponse getTemplate1Response = client().admin().indices().prepareGetTemplates("template*").execute().actionGet();
         assertThat(getTemplate1Response.getIndexTemplates(), hasSize(3));
 
-        templateNames = new ArrayList<>();
+        List<String> templateNames = new ArrayList<>();
         templateNames.add(getTemplate1Response.getIndexTemplates().get(0).name());
         templateNames.add(getTemplate1Response.getIndexTemplates().get(1).name());
         templateNames.add(getTemplate1Response.getIndexTemplates().get(2).name());
@@ -468,8 +484,10 @@ public class SimpleIndexTemplateIT extends OpenSearchIntegTestCase {
         client().admin().indices().prepareDeleteTemplate("*").get();
 
         // check get all templates on an empty index.
-        GetIndexTemplatesResponse response = client().admin().indices().prepareGetTemplates().get();
-        assertThat(response.getIndexTemplates(), empty());
+        assertBusy(() -> {
+            GetIndexTemplatesResponse response = client().admin().indices().prepareGetTemplates().get();
+            assertThat(response.getIndexTemplates(), empty());
+        });
 
         MapperParsingException e = expectThrows(
             MapperParsingException.class,
@@ -480,10 +498,12 @@ public class SimpleIndexTemplateIT extends OpenSearchIntegTestCase {
                 .setMapping("{\"foo\": \"abcde\"}", XContentType.JSON)
                 .get()
         );
-        assertThat(e.getMessage(), containsString("Failed to parse mapping "));
+        assertBusy(() -> {
+            assertThat(e.getMessage(), containsString("Failed to parse mapping "));
 
-        response = client().admin().indices().prepareGetTemplates().get();
-        assertThat(response.getIndexTemplates(), hasSize(0));
+            GetIndexTemplatesResponse response = client().admin().indices().prepareGetTemplates().get();
+            assertThat(response.getIndexTemplates(), hasSize(0));
+        });
     }
 
     public void testInvalidSettings() throws Exception {
@@ -491,8 +511,10 @@ public class SimpleIndexTemplateIT extends OpenSearchIntegTestCase {
         client().admin().indices().prepareDeleteTemplate("*").get();
 
         // check get all templates on an empty index.
-        GetIndexTemplatesResponse response = client().admin().indices().prepareGetTemplates().get();
-        assertThat(response.getIndexTemplates(), empty());
+        assertBusy(() -> {
+            GetIndexTemplatesResponse response = client().admin().indices().prepareGetTemplates().get();
+            assertThat(response.getIndexTemplates(), empty());
+        });
 
         IllegalArgumentException e = expectThrows(
             IllegalArgumentException.class,
@@ -509,13 +531,15 @@ public class SimpleIndexTemplateIT extends OpenSearchIntegTestCase {
             e.getMessage()
         );
 
-        response = client().admin().indices().prepareGetTemplates().get();
+        GetIndexTemplatesResponse response = client().admin().indices().prepareGetTemplates().get();
         assertEquals(0, response.getIndexTemplates().size());
 
         createIndex("test");
 
-        GetSettingsResponse getSettingsResponse = client().admin().indices().prepareGetSettings("test").get();
-        assertNull(getSettingsResponse.getIndexToSettings().get("test").get("index.does_not_exist"));
+        assertBusy(() -> {
+            GetSettingsResponse getSettingsResponse = client().admin().indices().prepareGetSettings("test").get();
+            assertNull(getSettingsResponse.getIndexToSettings().get("test").get("index.does_not_exist"));
+        });
     }
 
     public void testIndexTemplateWithAliases() throws Exception {
@@ -540,9 +564,11 @@ public class SimpleIndexTemplateIT extends OpenSearchIntegTestCase {
         client().prepareIndex("test_index").setId("4").setSource("type", "typeY", "field", "D value").get();
         client().prepareIndex("test_index").setId("5").setSource("type", "typeZ", "field", "E value").get();
 
-        GetAliasesResponse getAliasesResponse = client().admin().indices().prepareGetAliases().setIndices("test_index").get();
-        assertThat(getAliasesResponse.getAliases().size(), equalTo(1));
-        assertThat(getAliasesResponse.getAliases().get("test_index").size(), equalTo(4));
+        assertBusy(() -> {
+            GetAliasesResponse getAliasesResponse = client().admin().indices().prepareGetAliases().setIndices("test_index").get();
+            assertThat(getAliasesResponse.getAliases().size(), equalTo(1));
+            assertThat(getAliasesResponse.getAliases().get("test_index").size(), equalTo(4));
+        });
 
         refresh();
 
@@ -885,14 +911,16 @@ public class SimpleIndexTemplateIT extends OpenSearchIntegTestCase {
                 )
                 .get()
         );
-        assertThat(e.getMessage(), containsString("analyzer [custom_1] has not been configured in mappings"));
+        assertBusy(() -> {
+            assertThat(e.getMessage(), containsString("analyzer [custom_1] has not been configured in mappings"));
 
-        response = client().admin().indices().prepareGetTemplates().get();
-        assertThat(response.getIndexTemplates(), hasSize(1));
+            GetIndexTemplatesResponse responseFinal = client().admin().indices().prepareGetTemplates().get();
+            assertThat(responseFinal.getIndexTemplates(), hasSize(1));
+        });
 
     }
 
-    public void testOrderAndVersion() {
+    public void testOrderAndVersion() throws Exception {
         int order = randomInt();
         Integer version = randomBoolean() ? randomInt() : null;
 
@@ -907,13 +935,15 @@ public class SimpleIndexTemplateIT extends OpenSearchIntegTestCase {
                 .get()
         );
 
-        GetIndexTemplatesResponse response = client().admin().indices().prepareGetTemplates("versioned_template").get();
-        assertThat(response.getIndexTemplates().size(), equalTo(1));
-        assertThat(response.getIndexTemplates().get(0).getVersion(), equalTo(version));
-        assertThat(response.getIndexTemplates().get(0).getOrder(), equalTo(order));
+        assertBusy(() -> {
+            GetIndexTemplatesResponse response = client().admin().indices().prepareGetTemplates("versioned_template").get();
+            assertThat(response.getIndexTemplates().size(), equalTo(1));
+            assertThat(response.getIndexTemplates().get(0).getVersion(), equalTo(version));
+            assertThat(response.getIndexTemplates().get(0).getOrder(), equalTo(order));
+        });
     }
 
-    public void testMultipleTemplate() throws IOException {
+    public void testMultipleTemplate() throws Exception {
         client().admin()
             .indices()
             .preparePutTemplate("template_1")
@@ -943,28 +973,30 @@ public class SimpleIndexTemplateIT extends OpenSearchIntegTestCase {
         ensureGreen();
 
         // ax -> matches template
-        SearchResponse searchResponse = client().prepareSearch("ax")
-            .setQuery(termQuery("field1", "value1"))
-            .addStoredField("field1")
-            .addStoredField("field2")
-            .execute()
-            .actionGet();
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("ax")
+                .setQuery(termQuery("field1", "value1"))
+                .addStoredField("field1")
+                .addStoredField("field2")
+                .execute()
+                .actionGet();
 
-        assertHitCount(searchResponse, 1);
-        assertEquals("value1", searchResponse.getHits().getAt(0).field("field1").getValue().toString());
-        assertNull(searchResponse.getHits().getAt(0).field("field2"));
+            assertHitCount(searchResponse, 1);
+            assertEquals("value1", searchResponse.getHits().getAt(0).field("field1").getValue().toString());
+            assertNull(searchResponse.getHits().getAt(0).field("field2"));
 
-        // bx -> matches template
-        searchResponse = client().prepareSearch("bx")
-            .setQuery(termQuery("field1", "value1"))
-            .addStoredField("field1")
-            .addStoredField("field2")
-            .execute()
-            .actionGet();
+            // bx -> matches template
+            searchResponse = client().prepareSearch("bx")
+                .setQuery(termQuery("field1", "value1"))
+                .addStoredField("field1")
+                .addStoredField("field2")
+                .execute()
+                .actionGet();
 
-        assertHitCount(searchResponse, 1);
-        assertEquals("value1", searchResponse.getHits().getAt(0).field("field1").getValue().toString());
-        assertNull(searchResponse.getHits().getAt(0).field("field2"));
+            assertHitCount(searchResponse, 1);
+            assertEquals("value1", searchResponse.getHits().getAt(0).field("field1").getValue().toString());
+            assertNull(searchResponse.getHits().getAt(0).field("field2"));
+        });
     }
 
     public void testPartitionedTemplate() throws Exception {

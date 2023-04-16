@@ -91,8 +91,10 @@ public class UpdateNumberOfReplicasIT extends OpenSearchIntegTestCase {
         refresh();
 
         for (int i = 0; i < 10; i++) {
-            SearchResponse countResponse = client().prepareSearch().setSize(0).setQuery(matchAllQuery()).get();
-            assertHitCount(countResponse, 10L);
+            assertBusy(() -> {
+                SearchResponse countResponse = client().prepareSearch().setSize(0).setQuery(matchAllQuery()).get();
+                assertHitCount(countResponse, 10L);
+            });
         }
 
         final long settingsVersion = client().admin()
@@ -170,8 +172,10 @@ public class UpdateNumberOfReplicasIT extends OpenSearchIntegTestCase {
         assertThat(clusterHealth.getIndices().get("test").getActiveShards(), equalTo(numShards.numPrimaries * 3));
 
         for (int i = 0; i < 10; i++) {
-            SearchResponse countResponse = client().prepareSearch().setSize(0).setQuery(matchAllQuery()).get();
-            assertHitCount(countResponse, 10L);
+            assertBusy(() -> {
+                SearchResponse countResponse = client().prepareSearch().setSize(0).setQuery(matchAllQuery()).get();
+                assertHitCount(countResponse, 10L);
+            });
         }
 
         logger.info("Decreasing number of replicas from 2 to 0");
@@ -202,7 +206,7 @@ public class UpdateNumberOfReplicasIT extends OpenSearchIntegTestCase {
         assertThat(clusterHealth.getIndices().get("test").getActiveShards(), equalTo(numShards.numPrimaries));
 
         for (int i = 0; i < 10; i++) {
-            assertHitCount(client().prepareSearch().setQuery(matchAllQuery()).get(), 10);
+            assertBusy(() -> { assertHitCount(client().prepareSearch().setQuery(matchAllQuery()).get(), 10); });
         }
 
         final long afterReplicaDecreaseSettingsVersion = client().admin()

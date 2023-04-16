@@ -6,7 +6,6 @@ package org.opensearch.snapshots;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
 import com.carrotsearch.randomizedtesting.generators.RandomPicks;
-import org.apache.lucene.tests.util.LuceneTestCase;
 import org.hamcrest.MatcherAssert;
 import org.opensearch.action.admin.cluster.node.stats.NodeStats;
 import org.opensearch.action.admin.cluster.node.stats.NodesStatsRequest;

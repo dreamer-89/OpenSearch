@@ -62,7 +62,7 @@ public final class SearchableSnapshotIT extends AbstractSnapshotIntegTestCase {
 
     @Override
     protected Settings featureFlagSettings() {
-        return Settings.builder().put(FeatureFlags.SEARCHABLE_SNAPSHOT, "true").build();
+        return Settings.builder().put(FeatureFlags.SEARCHABLE_SNAPSHOT, "true").put(FeatureFlags.REPLICATION_TYPE, "true").build();
     }
 
     @Override

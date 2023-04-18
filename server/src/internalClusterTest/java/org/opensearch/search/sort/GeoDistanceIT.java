@@ -172,21 +172,23 @@ public class GeoDistanceIT extends OpenSearchIntegTestCase {
         client().admin().indices().prepareRefresh().get();
 
         // Order: Asc
-        SearchResponse searchResponse = client().prepareSearch("test")
-            .setQuery(matchAllQuery())
-            .addSort(SortBuilders.geoDistanceSort("locations", 40.7143528, -74.0059731).order(SortOrder.ASC))
-            .get();
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test")
+                .setQuery(matchAllQuery())
+                .addSort(SortBuilders.geoDistanceSort("locations", 40.7143528, -74.0059731).order(SortOrder.ASC))
+                .get();
 
-        assertHitCount(searchResponse, 5);
-        assertOrderedSearchHits(searchResponse, "1", "2", "3", "4", "5");
-        assertThat(((Number) searchResponse.getHits().getAt(0).getSortValues()[0]).doubleValue(), closeTo(0d, 10d));
-        assertThat(((Number) searchResponse.getHits().getAt(1).getSortValues()[0]).doubleValue(), closeTo(421.2d, 10d));
-        assertThat(((Number) searchResponse.getHits().getAt(2).getSortValues()[0]).doubleValue(), closeTo(462.1d, 10d));
-        assertThat(((Number) searchResponse.getHits().getAt(3).getSortValues()[0]).doubleValue(), closeTo(1055.0d, 10d));
-        assertThat(((Number) searchResponse.getHits().getAt(4).getSortValues()[0]).doubleValue(), closeTo(2029.0d, 10d));
+            assertHitCount(searchResponse, 5);
+            assertOrderedSearchHits(searchResponse, "1", "2", "3", "4", "5");
+            assertThat(((Number) searchResponse.getHits().getAt(0).getSortValues()[0]).doubleValue(), closeTo(0d, 10d));
+            assertThat(((Number) searchResponse.getHits().getAt(1).getSortValues()[0]).doubleValue(), closeTo(421.2d, 10d));
+            assertThat(((Number) searchResponse.getHits().getAt(2).getSortValues()[0]).doubleValue(), closeTo(462.1d, 10d));
+            assertThat(((Number) searchResponse.getHits().getAt(3).getSortValues()[0]).doubleValue(), closeTo(1055.0d, 10d));
+            assertThat(((Number) searchResponse.getHits().getAt(4).getSortValues()[0]).doubleValue(), closeTo(2029.0d, 10d));
+        });
 
         // Order: Asc, Mode: max
-        searchResponse = client().prepareSearch("test")
+        SearchResponse searchResponse = client().prepareSearch("test")
             .setQuery(matchAllQuery())
             .addSort(SortBuilders.geoDistanceSort("locations", 40.7143528, -74.0059731).order(SortOrder.ASC).sortMode(SortMode.MAX))
             .get();
@@ -304,27 +306,31 @@ public class GeoDistanceIT extends OpenSearchIntegTestCase {
         refresh();
 
         // Order: Asc
-        SearchResponse searchResponse = client().prepareSearch("test")
-            .setQuery(matchAllQuery())
-            .addSort(SortBuilders.geoDistanceSort("locations", 40.7143528, -74.0059731).order(SortOrder.ASC))
-            .get();
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test")
+                .setQuery(matchAllQuery())
+                .addSort(SortBuilders.geoDistanceSort("locations", 40.7143528, -74.0059731).order(SortOrder.ASC))
+                .get();
 
-        assertHitCount(searchResponse, 2);
-        assertOrderedSearchHits(searchResponse, "1", "2");
-        assertThat(((Number) searchResponse.getHits().getAt(0).getSortValues()[0]).doubleValue(), closeTo(462.1d, 10d));
-        assertThat(((Number) searchResponse.getHits().getAt(1).getSortValues()[0]).doubleValue(), equalTo(Double.POSITIVE_INFINITY));
+            assertHitCount(searchResponse, 2);
+            assertOrderedSearchHits(searchResponse, "1", "2");
+            assertThat(((Number) searchResponse.getHits().getAt(0).getSortValues()[0]).doubleValue(), closeTo(462.1d, 10d));
+            assertThat(((Number) searchResponse.getHits().getAt(1).getSortValues()[0]).doubleValue(), equalTo(Double.POSITIVE_INFINITY));
+        });
 
         // Order: Desc
-        searchResponse = client().prepareSearch("test")
-            .setQuery(matchAllQuery())
-            .addSort(SortBuilders.geoDistanceSort("locations", 40.7143528, -74.0059731).order(SortOrder.DESC))
-            .get();
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test")
+                .setQuery(matchAllQuery())
+                .addSort(SortBuilders.geoDistanceSort("locations", 40.7143528, -74.0059731).order(SortOrder.DESC))
+                .get();
 
-        // Doc with missing geo point is first, is consistent with 0.20.x
-        assertHitCount(searchResponse, 2);
-        assertOrderedSearchHits(searchResponse, "2", "1");
-        assertThat(((Number) searchResponse.getHits().getAt(0).getSortValues()[0]).doubleValue(), equalTo(Double.POSITIVE_INFINITY));
-        assertThat(((Number) searchResponse.getHits().getAt(1).getSortValues()[0]).doubleValue(), closeTo(5286d, 10d));
+            // Doc with missing geo point is first, is consistent with 0.20.x
+            assertHitCount(searchResponse, 2);
+            assertOrderedSearchHits(searchResponse, "2", "1");
+            assertThat(((Number) searchResponse.getHits().getAt(0).getSortValues()[0]).doubleValue(), equalTo(Double.POSITIVE_INFINITY));
+            assertThat(((Number) searchResponse.getHits().getAt(1).getSortValues()[0]).doubleValue(), closeTo(5286d, 10d));
+        });
     }
 
     public void testDistanceSortingNestedFields() throws Exception {
@@ -445,40 +451,46 @@ public class GeoDistanceIT extends OpenSearchIntegTestCase {
         );
 
         // Order: Asc
-        SearchResponse searchResponse = client().prepareSearch("companies")
-            .setQuery(matchAllQuery())
-            .addSort(
-                SortBuilders.geoDistanceSort("branches.location", 40.7143528, -74.0059731).order(SortOrder.ASC).setNestedPath("branches")
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("companies")
+                .setQuery(matchAllQuery())
+                .addSort(
+                    SortBuilders.geoDistanceSort("branches.location", 40.7143528, -74.0059731)
+                        .order(SortOrder.ASC)
+                        .setNestedPath("branches")
+                )
+                .get();
 
-        assertHitCount(searchResponse, 4);
-        assertOrderedSearchHits(searchResponse, "1", "2", "3", "4");
-        assertThat(((Number) searchResponse.getHits().getAt(0).getSortValues()[0]).doubleValue(), closeTo(0d, 10d));
-        assertThat(((Number) searchResponse.getHits().getAt(1).getSortValues()[0]).doubleValue(), closeTo(462.1d, 10d));
-        assertThat(((Number) searchResponse.getHits().getAt(2).getSortValues()[0]).doubleValue(), closeTo(1055.0d, 10d));
-        assertThat(((Number) searchResponse.getHits().getAt(3).getSortValues()[0]).doubleValue(), closeTo(2029.0d, 10d));
+            assertHitCount(searchResponse, 4);
+            assertOrderedSearchHits(searchResponse, "1", "2", "3", "4");
+            assertThat(((Number) searchResponse.getHits().getAt(0).getSortValues()[0]).doubleValue(), closeTo(0d, 10d));
+            assertThat(((Number) searchResponse.getHits().getAt(1).getSortValues()[0]).doubleValue(), closeTo(462.1d, 10d));
+            assertThat(((Number) searchResponse.getHits().getAt(2).getSortValues()[0]).doubleValue(), closeTo(1055.0d, 10d));
+            assertThat(((Number) searchResponse.getHits().getAt(3).getSortValues()[0]).doubleValue(), closeTo(2029.0d, 10d));
+        });
 
         // Order: Asc, Mode: max
-        searchResponse = client().prepareSearch("companies")
-            .setQuery(matchAllQuery())
-            .addSort(
-                SortBuilders.geoDistanceSort("branches.location", 40.7143528, -74.0059731)
-                    .order(SortOrder.ASC)
-                    .sortMode(SortMode.MAX)
-                    .setNestedPath("branches")
-            )
-            .get();
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("companies")
+                .setQuery(matchAllQuery())
+                .addSort(
+                    SortBuilders.geoDistanceSort("branches.location", 40.7143528, -74.0059731)
+                        .order(SortOrder.ASC)
+                        .sortMode(SortMode.MAX)
+                        .setNestedPath("branches")
+                )
+                .get();
 
-        assertHitCount(searchResponse, 4);
-        assertOrderedSearchHits(searchResponse, "1", "3", "2", "4");
-        assertThat(((Number) searchResponse.getHits().getAt(0).getSortValues()[0]).doubleValue(), closeTo(0d, 10d));
-        assertThat(((Number) searchResponse.getHits().getAt(1).getSortValues()[0]).doubleValue(), closeTo(1258.0d, 10d));
-        assertThat(((Number) searchResponse.getHits().getAt(2).getSortValues()[0]).doubleValue(), closeTo(5286.0d, 10d));
-        assertThat(((Number) searchResponse.getHits().getAt(3).getSortValues()[0]).doubleValue(), closeTo(8572.0d, 10d));
+            assertHitCount(searchResponse, 4);
+            assertOrderedSearchHits(searchResponse, "1", "3", "2", "4");
+            assertThat(((Number) searchResponse.getHits().getAt(0).getSortValues()[0]).doubleValue(), closeTo(0d, 10d));
+            assertThat(((Number) searchResponse.getHits().getAt(1).getSortValues()[0]).doubleValue(), closeTo(1258.0d, 10d));
+            assertThat(((Number) searchResponse.getHits().getAt(2).getSortValues()[0]).doubleValue(), closeTo(5286.0d, 10d));
+            assertThat(((Number) searchResponse.getHits().getAt(3).getSortValues()[0]).doubleValue(), closeTo(8572.0d, 10d));
+        });
 
         // Order: Desc
-        searchResponse = client().prepareSearch("companies")
+        SearchResponse searchResponse = client().prepareSearch("companies")
             .setQuery(matchAllQuery())
             .addSort(
                 SortBuilders.geoDistanceSort("branches.location", 40.7143528, -74.0059731).order(SortOrder.DESC).setNestedPath("branches")
@@ -648,30 +660,34 @@ public class GeoDistanceIT extends OpenSearchIntegTestCase {
         refresh();
 
         // Order: Asc
-        SearchResponse searchResponse = client().prepareSearch("test1", "test2")
-            .setQuery(matchAllQuery())
-            .addSort(SortBuilders.geoDistanceSort("locations", 40.7143528, -74.0059731).ignoreUnmapped(true).order(SortOrder.ASC))
-            .get();
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test1", "test2")
+                .setQuery(matchAllQuery())
+                .addSort(SortBuilders.geoDistanceSort("locations", 40.7143528, -74.0059731).ignoreUnmapped(true).order(SortOrder.ASC))
+                .get();
 
-        assertHitCount(searchResponse, 2);
-        assertOrderedSearchHits(searchResponse, "1", "2");
-        assertThat(((Number) searchResponse.getHits().getAt(0).getSortValues()[0]).doubleValue(), closeTo(462.1d, 10d));
-        assertThat(((Number) searchResponse.getHits().getAt(1).getSortValues()[0]).doubleValue(), equalTo(Double.POSITIVE_INFINITY));
+            assertHitCount(searchResponse, 2);
+            assertOrderedSearchHits(searchResponse, "1", "2");
+            assertThat(((Number) searchResponse.getHits().getAt(0).getSortValues()[0]).doubleValue(), closeTo(462.1d, 10d));
+            assertThat(((Number) searchResponse.getHits().getAt(1).getSortValues()[0]).doubleValue(), equalTo(Double.POSITIVE_INFINITY));
+        });
 
         // Order: Desc
-        searchResponse = client().prepareSearch("test1", "test2")
-            .setQuery(matchAllQuery())
-            .addSort(SortBuilders.geoDistanceSort("locations", 40.7143528, -74.0059731).ignoreUnmapped(true).order(SortOrder.DESC))
-            .get();
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test1", "test2")
+                .setQuery(matchAllQuery())
+                .addSort(SortBuilders.geoDistanceSort("locations", 40.7143528, -74.0059731).ignoreUnmapped(true).order(SortOrder.DESC))
+                .get();
 
-        // Doc with missing geo point is first, is consistent with 0.20.x
-        assertHitCount(searchResponse, 2);
-        assertOrderedSearchHits(searchResponse, "2", "1");
-        assertThat(((Number) searchResponse.getHits().getAt(0).getSortValues()[0]).doubleValue(), equalTo(Double.POSITIVE_INFINITY));
-        assertThat(((Number) searchResponse.getHits().getAt(1).getSortValues()[0]).doubleValue(), closeTo(5286d, 10d));
+            // Doc with missing geo point is first, is consistent with 0.20.x
+            assertHitCount(searchResponse, 2);
+            assertOrderedSearchHits(searchResponse, "2", "1");
+            assertThat(((Number) searchResponse.getHits().getAt(0).getSortValues()[0]).doubleValue(), equalTo(Double.POSITIVE_INFINITY));
+            assertThat(((Number) searchResponse.getHits().getAt(1).getSortValues()[0]).doubleValue(), closeTo(5286d, 10d));
+        });
 
         // Make sure that by default the unmapped fields continue to fail
-        searchResponse = client().prepareSearch("test1", "test2")
+        SearchResponse searchResponse = client().prepareSearch("test1", "test2")
             .setQuery(matchAllQuery())
             .addSort(SortBuilders.geoDistanceSort("locations", 40.7143528, -74.0059731).order(SortOrder.DESC))
             .get();

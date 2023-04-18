@@ -53,7 +53,7 @@ import org.opensearch.test.OpenSearchIntegTestCase;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import static org.opensearch.action.support.WriteRequest.RefreshPolicy.IMMEDIATE;
 import static org.opensearch.cluster.metadata.IndexMetadata.SETTING_NUMBER_OF_REPLICAS;
@@ -69,6 +69,7 @@ import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertNoFailures
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 
+@OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.TEST, minNumDataNodes = 2)
 public class SimpleSearchIT extends OpenSearchIntegTestCase {
 
     public void testSearchNullIndex() {
@@ -84,7 +85,7 @@ public class SimpleSearchIT extends OpenSearchIntegTestCase {
 
     }
 
-    public void testSearchRandomPreference() throws InterruptedException, ExecutionException {
+    public void testSearchRandomPreference() throws Exception {
         createIndex("test");
         indexRandom(
             true,
@@ -104,11 +105,14 @@ public class SimpleSearchIT extends OpenSearchIntegTestCase {
                 randomPreference = randomUnicodeOfLengthBetween(0, 4);
             }
             // id is not indexed, but lets see that we automatically convert to
-            SearchResponse searchResponse = client().prepareSearch()
-                .setQuery(QueryBuilders.matchAllQuery())
-                .setPreference(randomPreference)
-                .get();
-            assertHitCount(searchResponse, 6L);
+            final String finalRandomPreference = randomPreference;
+            assertBusy(() -> {
+                SearchResponse searchResponse = client().prepareSearch()
+                    .setQuery(QueryBuilders.matchAllQuery())
+                    .setPreference(finalRandomPreference)
+                    .get();
+                assertHitCount(searchResponse, 6L);
+            }, 30, TimeUnit.SECONDS);
 
         }
     }
@@ -138,11 +142,12 @@ public class SimpleSearchIT extends OpenSearchIntegTestCase {
 
         client().prepareIndex("test").setId("1").setSource("from", "192.168.0.5", "to", "192.168.0.10").setRefreshPolicy(IMMEDIATE).get();
 
-        SearchResponse search = client().prepareSearch()
-            .setQuery(boolQuery().must(rangeQuery("from").lte("192.168.0.7")).must(rangeQuery("to").gte("192.168.0.7")))
-            .get();
-
-        assertHitCount(search, 1L);
+        assertBusy(() -> {
+            SearchResponse search = client().prepareSearch()
+                .setQuery(boolQuery().must(rangeQuery("from").lte("192.168.0.7")).must(rangeQuery("to").gte("192.168.0.7")))
+                .get();
+            assertHitCount(search, 1L);
+        });
     }
 
     public void testIpCidr() throws Exception {
@@ -173,10 +178,12 @@ public class SimpleSearchIT extends OpenSearchIntegTestCase {
         client().prepareIndex("test").setId("5").setSource("ip", "2001:db8::ff00:42:8329").get();
         refresh();
 
-        SearchResponse search = client().prepareSearch().setQuery(boolQuery().must(QueryBuilders.termQuery("ip", "192.168.0.1"))).get();
-        assertHitCount(search, 1L);
+        assertBusy(() -> {
+            SearchResponse search = client().prepareSearch().setQuery(boolQuery().must(QueryBuilders.termQuery("ip", "192.168.0.1"))).get();
+            assertHitCount(search, 1L);
+        });
 
-        search = client().prepareSearch().setQuery(queryStringQuery("ip: 192.168.0.1")).get();
+        SearchResponse search = client().prepareSearch().setQuery(queryStringQuery("ip: 192.168.0.1")).get();
         assertHitCount(search, 1L);
 
         search = client().prepareSearch().setQuery(boolQuery().must(QueryBuilders.termQuery("ip", "192.168.0.1/32"))).get();
@@ -210,16 +217,20 @@ public class SimpleSearchIT extends OpenSearchIntegTestCase {
         );
     }
 
-    public void testSimpleId() {
+    public void testSimpleId() throws Exception {
         createIndex("test");
 
         client().prepareIndex("test").setId("XXX1").setSource("field", "value").setRefreshPolicy(IMMEDIATE).get();
         // id is not indexed, but lets see that we automatically convert to
-        SearchResponse searchResponse = client().prepareSearch().setQuery(QueryBuilders.termQuery("_id", "XXX1")).get();
-        assertHitCount(searchResponse, 1L);
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch().setQuery(QueryBuilders.termQuery("_id", "XXX1")).get();
+            assertHitCount(searchResponse, 1L);
+        });
 
-        searchResponse = client().prepareSearch().setQuery(QueryBuilders.queryStringQuery("_id:XXX1")).get();
-        assertHitCount(searchResponse, 1L);
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch().setQuery(QueryBuilders.queryStringQuery("_id:XXX1")).get();
+            assertHitCount(searchResponse, 1L);
+        });
     }
 
     public void testSimpleDateRange() throws Exception {
@@ -228,34 +239,44 @@ public class SimpleSearchIT extends OpenSearchIntegTestCase {
         client().prepareIndex("test").setId("2").setSource("field", "2010-01-06T02:00").get();
         ensureGreen();
         refresh();
-        SearchResponse searchResponse = client().prepareSearch("test")
-            .setQuery(QueryBuilders.rangeQuery("field").gte("2010-01-03||+2d").lte("2010-01-04||+2d/d"))
-            .get();
-        assertNoFailures(searchResponse);
-        assertHitCount(searchResponse, 2L);
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test")
+                .setQuery(QueryBuilders.rangeQuery("field").gte("2010-01-03||+2d").lte("2010-01-04||+2d/d"))
+                .get();
+            assertNoFailures(searchResponse);
+            assertHitCount(searchResponse, 2L);
+        });
 
-        searchResponse = client().prepareSearch("test")
-            .setQuery(QueryBuilders.rangeQuery("field").gte("2010-01-05T02:00").lte("2010-01-06T02:00"))
-            .get();
-        assertNoFailures(searchResponse);
-        assertHitCount(searchResponse, 2L);
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test")
+                .setQuery(QueryBuilders.rangeQuery("field").gte("2010-01-05T02:00").lte("2010-01-06T02:00"))
+                .get();
+            assertNoFailures(searchResponse);
+            assertHitCount(searchResponse, 2L);
+        });
 
-        searchResponse = client().prepareSearch("test")
-            .setQuery(QueryBuilders.rangeQuery("field").gte("2010-01-05T02:00").lt("2010-01-06T02:00"))
-            .get();
-        assertNoFailures(searchResponse);
-        assertHitCount(searchResponse, 1L);
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test")
+                .setQuery(QueryBuilders.rangeQuery("field").gte("2010-01-05T02:00").lt("2010-01-06T02:00"))
+                .get();
+            assertNoFailures(searchResponse);
+            assertHitCount(searchResponse, 1L);
+        });
 
-        searchResponse = client().prepareSearch("test")
-            .setQuery(QueryBuilders.rangeQuery("field").gt("2010-01-05T02:00").lt("2010-01-06T02:00"))
-            .get();
-        assertNoFailures(searchResponse);
-        assertHitCount(searchResponse, 0L);
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test")
+                .setQuery(QueryBuilders.rangeQuery("field").gt("2010-01-05T02:00").lt("2010-01-06T02:00"))
+                .get();
+            assertNoFailures(searchResponse);
+            assertHitCount(searchResponse, 0L);
+        });
 
-        searchResponse = client().prepareSearch("test")
-            .setQuery(QueryBuilders.queryStringQuery("field:[2010-01-03||+2d TO 2010-01-04||+2d/d]"))
-            .get();
-        assertHitCount(searchResponse, 2L);
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test")
+                .setQuery(QueryBuilders.queryStringQuery("field:[2010-01-03||+2d TO 2010-01-04||+2d/d]"))
+                .get();
+            assertHitCount(searchResponse, 2L);
+        });
     }
 
     public void testSimpleTerminateAfterCount() throws Exception {
@@ -349,15 +370,20 @@ public class SimpleSearchIT extends OpenSearchIntegTestCase {
         createIndex("idx");
         indexRandom(true, client().prepareIndex("idx").setSource("{}", XContentType.JSON));
 
-        assertHitCount(client().prepareSearch("idx").setFrom(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY) - 10).get(), 1);
-        assertHitCount(client().prepareSearch("idx").setSize(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY)).get(), 1);
-        assertHitCount(
-            client().prepareSearch("idx")
-                .setSize(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY) / 2)
-                .setFrom(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY) / 2 - 1)
-                .get(),
-            1
-        );
+        assertBusy(() -> {
+            assertHitCount(
+                client().prepareSearch("idx").setFrom(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY) - 10).get(),
+                1
+            );
+            assertHitCount(client().prepareSearch("idx").setSize(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY)).get(), 1);
+            assertHitCount(
+                client().prepareSearch("idx")
+                    .setSize(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY) / 2)
+                    .setFrom(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY) / 2 - 1)
+                    .get(),
+                1
+            );
+        });
     }
 
     public void testTooLargeFromAndSizeOkBySetting() throws Exception {
@@ -367,15 +393,17 @@ public class SimpleSearchIT extends OpenSearchIntegTestCase {
         ).get();
         indexRandom(true, client().prepareIndex("idx").setSource("{}", XContentType.JSON));
 
-        assertHitCount(client().prepareSearch("idx").setFrom(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY)).get(), 1);
-        assertHitCount(client().prepareSearch("idx").setSize(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY) + 1).get(), 1);
-        assertHitCount(
-            client().prepareSearch("idx")
-                .setSize(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY))
-                .setFrom(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY))
-                .get(),
-            1
-        );
+        assertBusy(() -> {
+            assertHitCount(client().prepareSearch("idx").setFrom(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY)).get(), 1);
+            assertHitCount(client().prepareSearch("idx").setSize(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY) + 1).get(), 1);
+            assertHitCount(
+                client().prepareSearch("idx")
+                    .setSize(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY))
+                    .setFrom(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY))
+                    .get(),
+                1
+            );
+        });
     }
 
     public void testTooLargeFromAndSizeOkByDynamicSetting() throws Exception {
@@ -395,30 +423,40 @@ public class SimpleSearchIT extends OpenSearchIntegTestCase {
         );
         indexRandom(true, client().prepareIndex("idx").setSource("{}", XContentType.JSON));
 
-        assertHitCount(client().prepareSearch("idx").setFrom(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY)).get(), 1);
-        assertHitCount(client().prepareSearch("idx").setSize(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY) + 1).get(), 1);
-        assertHitCount(
-            client().prepareSearch("idx")
-                .setSize(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY))
-                .setFrom(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY))
-                .get(),
-            1
-        );
+        assertBusy(() -> {
+            assertHitCount(client().prepareSearch("idx").setFrom(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY)).get(), 1);
+            assertHitCount(client().prepareSearch("idx").setSize(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY) + 1).get(), 1);
+            assertHitCount(
+                client().prepareSearch("idx")
+                    .setSize(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY))
+                    .setFrom(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY))
+                    .get(),
+                1
+            );
+        });
     }
 
     public void testTooLargeFromAndSizeBackwardsCompatibilityRecommendation() throws Exception {
         prepareCreate("idx").setSettings(Settings.builder().put(IndexSettings.MAX_RESULT_WINDOW_SETTING.getKey(), Integer.MAX_VALUE)).get();
         indexRandom(true, client().prepareIndex("idx").setSource("{}", XContentType.JSON));
 
-        assertHitCount(client().prepareSearch("idx").setFrom(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY) * 10).get(), 1);
-        assertHitCount(client().prepareSearch("idx").setSize(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY) * 10).get(), 1);
-        assertHitCount(
-            client().prepareSearch("idx")
-                .setSize(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY) * 10)
-                .setFrom(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY) * 10)
-                .get(),
-            1
-        );
+        assertBusy(() -> {
+            assertHitCount(
+                client().prepareSearch("idx").setFrom(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY) * 10).get(),
+                1
+            );
+            assertHitCount(
+                client().prepareSearch("idx").setSize(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY) * 10).get(),
+                1
+            );
+            assertHitCount(
+                client().prepareSearch("idx")
+                    .setSize(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY) * 10)
+                    .setFrom(IndexSettings.MAX_RESULT_WINDOW_SETTING.get(Settings.EMPTY) * 10)
+                    .get(),
+                1
+            );
+        }, 30, TimeUnit.SECONDS);
     }
 
     public void testTooLargeRescoreWindow() throws Exception {
@@ -435,10 +473,12 @@ public class SimpleSearchIT extends OpenSearchIntegTestCase {
             .get();
         indexRandom(true, client().prepareIndex("idx").setSource("{}", XContentType.JSON));
 
-        assertHitCount(
-            client().prepareSearch("idx").addRescorer(new QueryRescorerBuilder(matchAllQuery()).windowSize(defaultMaxWindow + 1)).get(),
-            1
-        );
+        assertBusy(() -> {
+            assertHitCount(
+                client().prepareSearch("idx").addRescorer(new QueryRescorerBuilder(matchAllQuery()).windowSize(defaultMaxWindow + 1)).get(),
+                1
+            );
+        });
     }
 
     public void testTooLargeRescoreOkByResultWindowSetting() throws Exception {
@@ -452,27 +492,33 @@ public class SimpleSearchIT extends OpenSearchIntegTestCase {
         ).get();
         indexRandom(true, client().prepareIndex("idx").setSource("{}", XContentType.JSON));
 
-        assertHitCount(
-            client().prepareSearch("idx").addRescorer(new QueryRescorerBuilder(matchAllQuery()).windowSize(defaultMaxWindow + 1)).get(),
-            1
-        );
+        assertBusy(() -> {
+            assertHitCount(
+                client().prepareSearch("idx").addRescorer(new QueryRescorerBuilder(matchAllQuery()).windowSize(defaultMaxWindow + 1)).get(),
+                1
+            );
+        });
     }
 
     public void testTooLargeRescoreOkByDynamicSetting() throws Exception {
         int defaultMaxWindow = IndexSettings.MAX_RESCORE_WINDOW_SETTING.get(Settings.EMPTY);
         createIndex("idx");
-        assertAcked(
-            client().admin()
-                .indices()
-                .prepareUpdateSettings("idx")
-                .setSettings(Settings.builder().put(IndexSettings.MAX_RESCORE_WINDOW_SETTING.getKey(), defaultMaxWindow * 2))
-                .get()
-        );
+        assertBusy(() -> {
+            assertAcked(
+                client().admin()
+                    .indices()
+                    .prepareUpdateSettings("idx")
+                    .setSettings(Settings.builder().put(IndexSettings.MAX_RESCORE_WINDOW_SETTING.getKey(), defaultMaxWindow * 2))
+                    .get()
+            );
+        }, 30, TimeUnit.SECONDS);
         indexRandom(true, client().prepareIndex("idx").setSource("{}", XContentType.JSON));
 
-        assertHitCount(
-            client().prepareSearch("idx").addRescorer(new QueryRescorerBuilder(matchAllQuery()).windowSize(defaultMaxWindow + 1)).get(),
-            1
+        assertBusy(
+            () -> assertHitCount(
+                client().prepareSearch("idx").addRescorer(new QueryRescorerBuilder(matchAllQuery()).windowSize(defaultMaxWindow + 1)).get(),
+                1
+            )
         );
     }
 
@@ -491,9 +537,11 @@ public class SimpleSearchIT extends OpenSearchIntegTestCase {
         );
         indexRandom(true, client().prepareIndex("idx").setSource("{}", XContentType.JSON));
 
-        assertHitCount(
-            client().prepareSearch("idx").addRescorer(new QueryRescorerBuilder(matchAllQuery()).windowSize(defaultMaxWindow + 1)).get(),
-            1
+        assertBusy(
+            () -> assertHitCount(
+                client().prepareSearch("idx").addRescorer(new QueryRescorerBuilder(matchAllQuery()).windowSize(defaultMaxWindow + 1)).get(),
+                1
+            )
         );
     }
 
@@ -523,8 +571,10 @@ public class SimpleSearchIT extends OpenSearchIntegTestCase {
         XContentParser parser = createParser(JsonXContent.jsonXContent, queryJson);
         parser.nextToken();
         TermQueryBuilder query = TermQueryBuilder.fromXContent(parser);
-        SearchResponse searchResponse = client().prepareSearch("idx").setQuery(query).get();
-        assertEquals(1, searchResponse.getHits().getTotalHits().value);
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("idx").setQuery(query).get();
+            assertEquals(1, searchResponse.getHits().getTotalHits().value);
+        });
     }
 
     public void testTooLongRegexInRegexpQuery() throws Exception {

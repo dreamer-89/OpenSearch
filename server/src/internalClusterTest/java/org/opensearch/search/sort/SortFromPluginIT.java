@@ -39,15 +39,21 @@ public class SortFromPluginIT extends OpenSearchIntegTestCase {
 
         refresh();
 
-        SearchResponse searchResponse = client().prepareSearch("test").addSort(new CustomSortBuilder("field", SortOrder.ASC)).get();
-        assertThat(searchResponse.getHits().getAt(0).getId(), equalTo("3"));
-        assertThat(searchResponse.getHits().getAt(1).getId(), equalTo("2"));
-        assertThat(searchResponse.getHits().getAt(2).getId(), equalTo("1"));
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test").addSort(new CustomSortBuilder("field", SortOrder.ASC)).get();
+            assertEquals(searchResponse.getHits().getTotalHits().value, 3);
+            assertThat(searchResponse.getHits().getAt(0).getId(), equalTo("3"));
+            assertThat(searchResponse.getHits().getAt(1).getId(), equalTo("2"));
+            assertThat(searchResponse.getHits().getAt(2).getId(), equalTo("1"));
+        });
 
-        searchResponse = client().prepareSearch("test").addSort(new CustomSortBuilder("field", SortOrder.DESC)).get();
-        assertThat(searchResponse.getHits().getAt(0).getId(), equalTo("1"));
-        assertThat(searchResponse.getHits().getAt(1).getId(), equalTo("2"));
-        assertThat(searchResponse.getHits().getAt(2).getId(), equalTo("3"));
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test").addSort(new CustomSortBuilder("field", SortOrder.DESC)).get();
+            assertEquals(searchResponse.getHits().getTotalHits().value, 3);
+            assertThat(searchResponse.getHits().getAt(0).getId(), equalTo("1"));
+            assertThat(searchResponse.getHits().getAt(1).getId(), equalTo("2"));
+            assertThat(searchResponse.getHits().getAt(2).getId(), equalTo("3"));
+        });
     }
 
     public void testPluginSortXContent() throws Exception {
@@ -61,22 +67,25 @@ public class SortFromPluginIT extends OpenSearchIntegTestCase {
         refresh();
 
         // builder -> json -> builder
-        SearchResponse searchResponse = client().prepareSearch("test")
-            .setSource(
-                SearchSourceBuilder.fromXContent(
-                    createParser(
-                        JsonXContent.jsonXContent,
-                        new SearchSourceBuilder().sort(new CustomSortBuilder("field", SortOrder.ASC)).toString()
+        assertBusy(() -> {
+            SearchResponse searchResponse = client().prepareSearch("test")
+                .setSource(
+                    SearchSourceBuilder.fromXContent(
+                        createParser(
+                            JsonXContent.jsonXContent,
+                            new SearchSourceBuilder().sort(new CustomSortBuilder("field", SortOrder.ASC)).toString()
+                        )
                     )
                 )
-            )
-            .get();
+                .get();
 
-        assertThat(searchResponse.getHits().getAt(0).getId(), equalTo("3"));
-        assertThat(searchResponse.getHits().getAt(1).getId(), equalTo("2"));
-        assertThat(searchResponse.getHits().getAt(2).getId(), equalTo("1"));
+            assertEquals(searchResponse.getHits().getTotalHits().value, 3);
+            assertThat(searchResponse.getHits().getAt(0).getId(), equalTo("3"));
+            assertThat(searchResponse.getHits().getAt(1).getId(), equalTo("2"));
+            assertThat(searchResponse.getHits().getAt(2).getId(), equalTo("1"));
+        });
 
-        searchResponse = client().prepareSearch("test")
+        SearchResponse searchResponse = client().prepareSearch("test")
             .setSource(
                 SearchSourceBuilder.fromXContent(
                     createParser(
@@ -87,6 +96,7 @@ public class SortFromPluginIT extends OpenSearchIntegTestCase {
             )
             .get();
 
+        assertEquals(searchResponse.getHits().getTotalHits().value, 3);
         assertThat(searchResponse.getHits().getAt(0).getId(), equalTo("1"));
         assertThat(searchResponse.getHits().getAt(1).getId(), equalTo("2"));
         assertThat(searchResponse.getHits().getAt(2).getId(), equalTo("3"));

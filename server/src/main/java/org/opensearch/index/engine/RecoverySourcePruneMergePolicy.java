@@ -238,8 +238,8 @@ final class RecoverySourcePruneMergePolicy extends OneMergeWrappingMergePolicy {
             }
 
             @Override
-            public void document(int docID, StoredFieldVisitor visitor) throws IOException {
-                in.document(docID, visitor);
+            public void visitDocument(int docID, StoredFieldVisitor visitor) throws IOException {
+                in.visitDocument(docID, visitor);
             }
 
             @Override
@@ -268,11 +268,11 @@ final class RecoverySourcePruneMergePolicy extends OneMergeWrappingMergePolicy {
             }
 
             @Override
-            public void document(int docID, StoredFieldVisitor visitor) throws IOException {
+            public void visitDocument(int docID, StoredFieldVisitor visitor) throws IOException {
                 if (recoverySourceToKeep != null && recoverySourceToKeep.get(docID)) {
-                    super.document(docID, visitor);
+                    super.visitDocument(docID, visitor);
                 } else {
-                    super.document(docID, new FilterStoredFieldVisitor(visitor) {
+                    super.visitDocument(docID, new FilterStoredFieldVisitor(visitor) {
                         @Override
                         public Status needsField(FieldInfo fieldInfo) throws IOException {
                             if (recoverySourceField.equals(fieldInfo.name)) {
@@ -293,6 +293,7 @@ final class RecoverySourcePruneMergePolicy extends OneMergeWrappingMergePolicy {
             public StoredFieldsReader clone() {
                 return new RecoverySourcePruningStoredFieldsReader(in.clone(), recoverySourceToKeep, recoverySourceField);
             }
+
         }
 
         /**

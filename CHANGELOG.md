@@ -33,6 +33,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Bump `com.networknt:json-schema-validator` from 1.0.78 to 1.0.81 (#7460)
 - Bump Apache Lucene to 9.6.0 ([#7505](https://github.com/opensearch-project/OpenSearch/pull/7505))
 - Bump `com.google.cloud:google-cloud-core-http` from 1.93.3 to 2.17.0 (#7488)
+- Update nebula-publishing-plugin to 19.2.0 ([#5704](https://github.com/opensearch-project/OpenSearch/pull/5704))
+- Bumps `reactor-netty` from 1.1.1 to 1.1.2 ([#5878](https://github.com/opensearch-project/OpenSearch/pull/5878))
+- OpenJDK Update (January 2023 Patch releases) ([#6075](https://github.com/opensearch-project/OpenSearch/pull/6075))
+- Bumps `Mockito` from 4.7.0 to 5.1.0, `ByteBuddy` from 1.12.18 to 1.12.22 ([#6088](https://github.com/opensearch-project/OpenSearch/pull/6088))
+- Bumps `joda` from 2.10.13 to 2.12.2 ([#6095](https://github.com/opensearch-project/OpenSearch/pull/6095))
 
 ### Changed
 - Enable `./gradlew build` on MacOS by disabling bcw tests ([#7303](https://github.com/opensearch-project/OpenSearch/pull/7303))

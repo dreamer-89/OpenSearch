@@ -218,10 +218,10 @@ public class MultiMatchQuery extends MatchQuery {
         }
 
         @Override
-        protected Query newSynonymQuery(String field, TermAndBoost[] terms) {
+        protected Query newSynonymQuery(TermAndBoost[] terms) {
             BytesRef[] values = new BytesRef[terms.length];
             for (int i = 0; i < terms.length; i++) {
-                values[i] = terms[i].term;
+                values[i] = terms[i].term.bytes();
             }
             return blendTerms(context, values, commonTermsCutoff, tieBreaker, lenient, blendedFields);
         }

@@ -61,7 +61,6 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.apache.lucene.search.MultiTermQuery.CONSTANT_SCORE_REWRITE;
-import static org.apache.lucene.search.MultiTermQuery.CONSTANT_SCORE_BLENDED_REWRITE;
 import static org.hamcrest.Matchers.equalTo;
 
 public class TextFieldTypeTests extends FieldTypeTestCase {
@@ -121,10 +120,7 @@ public class TextFieldTypeTests extends FieldTypeTestCase {
 
     public void testRegexpQuery() {
         MappedFieldType ft = createFieldType();
-        assertEquals(
-            new RegexpQuery(new Term("field", "foo.*")),
-            ft.regexpQuery("foo.*", 0, 0, 10, CONSTANT_SCORE_BLENDED_REWRITE, MOCK_QSC)
-        );
+        assertEquals(new RegexpQuery(new Term("field", "foo.*")), ft.regexpQuery("foo.*", 0, 0, 10, null, MOCK_QSC));
 
         MappedFieldType unsearchable = new TextFieldType("field", false, false, Collections.emptyMap());
         IllegalArgumentException e = expectThrows(
@@ -169,7 +165,7 @@ public class TextFieldTypeTests extends FieldTypeTestCase {
         assertEquals(new ConstantScoreQuery(new TermQuery(new Term("field._index_prefix", "goin"))), q);
 
         q = ft.prefixQuery("internationalisatio", CONSTANT_SCORE_REWRITE, false, MOCK_QSC);
-        assertEquals(new PrefixQuery(new Term("field", "internationalisatio"), CONSTANT_SCORE_REWRITE), q);
+        assertEquals(new PrefixQuery(new Term("field", "internationalisatio")), q);
 
         q = ft.prefixQuery("Internationalisatio", CONSTANT_SCORE_REWRITE, true, MOCK_QSC);
         assertEquals(AutomatonQueries.caseInsensitivePrefixQuery(new Term("field", "Internationalisatio")), q);
@@ -188,16 +184,9 @@ public class TextFieldTypeTests extends FieldTypeTestCase {
         Automaton automaton = Operations.concatenate(Arrays.asList(Automata.makeChar('g'), Automata.makeAnyChar()));
 
         Query expected = new ConstantScoreQuery(
-            new BooleanQuery.Builder().add(
-                new AutomatonQuery(
-                    new Term("field._index_prefix", "g*"),
-                    automaton,
-                    Operations.DEFAULT_DETERMINIZE_WORK_LIMIT,
-                    false,
-                    CONSTANT_SCORE_REWRITE
-                ),
-                BooleanClause.Occur.SHOULD
-            ).add(new TermQuery(new Term("field", "g")), BooleanClause.Occur.SHOULD).build()
+            new BooleanQuery.Builder().add(new AutomatonQuery(new Term("field._index_prefix", "g*"), automaton), BooleanClause.Occur.SHOULD)
+                .add(new TermQuery(new Term("field", "g")), BooleanClause.Occur.SHOULD)
+                .build()
         );
 
         assertThat(q, equalTo(expected));
@@ -206,16 +195,9 @@ public class TextFieldTypeTests extends FieldTypeTestCase {
         automaton = Operations.concatenate(Arrays.asList(Automata.makeChar('g'), Automata.makeAnyChar()));
 
         expected = new ConstantScoreQuery(
-            new BooleanQuery.Builder().add(
-                new AutomatonQuery(
-                    new Term("field._index_prefix", "g*"),
-                    automaton,
-                    Operations.DEFAULT_DETERMINIZE_WORK_LIMIT,
-                    false,
-                    CONSTANT_SCORE_REWRITE
-                ),
-                BooleanClause.Occur.SHOULD
-            ).add(new TermQuery(new Term("field", "g")), BooleanClause.Occur.SHOULD).build()
+            new BooleanQuery.Builder().add(new AutomatonQuery(new Term("field._index_prefix", "g*"), automaton), BooleanClause.Occur.SHOULD)
+                .add(new TermQuery(new Term("field", "g")), BooleanClause.Occur.SHOULD)
+                .build()
         );
 
         assertThat(q, equalTo(expected));

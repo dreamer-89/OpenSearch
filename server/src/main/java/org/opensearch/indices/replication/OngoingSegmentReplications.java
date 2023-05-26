@@ -148,6 +148,8 @@ class OngoingSegmentReplications {
      */
     CopyState prepareForReplication(CheckpointInfoRequest request, FileChunkWriter fileChunkWriter) throws IOException {
         final CopyState copyState = getCachedCopyState(request.getCheckpoint());
+        logger.info("--> Replica codec {}", request.getCheckpoint().getCodec());
+        logger.info("--> Primary codec {}", copyState.getCheckpoint().getCodec());
         if (copyState.getCheckpoint().getCodec().equals(request.getCheckpoint().getCodec()) == false) {
             logger.trace("Requested unsupported codec version {}", request.getCheckpoint().getCodec());
             throw new CancellableThreads.ExecutionCancelledException(

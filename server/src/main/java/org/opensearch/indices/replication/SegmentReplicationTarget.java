@@ -57,9 +57,14 @@ public class SegmentReplicationTarget extends ReplicationTarget {
         return this.checkpoint;
     }
 
-    public SegmentReplicationTarget(IndexShard indexShard, SegmentReplicationSource source, ReplicationListener listener) {
+    public SegmentReplicationTarget(
+        ReplicationCheckpoint checkpoint,
+        IndexShard indexShard,
+        SegmentReplicationSource source,
+        ReplicationListener listener
+    ) {
         super("replication_target", indexShard, new ReplicationLuceneIndex(), listener);
-        this.checkpoint = indexShard.getLatestReplicationCheckpoint();
+        this.checkpoint = checkpoint;
         this.source = source;
         this.state = new SegmentReplicationState(
             indexShard.routingEntry(),
@@ -96,7 +101,7 @@ public class SegmentReplicationTarget extends ReplicationTarget {
     }
 
     public SegmentReplicationTarget retryCopy() {
-        return new SegmentReplicationTarget(indexShard, source, listener);
+        return new SegmentReplicationTarget(checkpoint, indexShard, source, listener);
     }
 
     @Override

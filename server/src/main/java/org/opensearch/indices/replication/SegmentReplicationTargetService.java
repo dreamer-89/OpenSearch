@@ -228,7 +228,7 @@ public class SegmentReplicationTargetService implements IndexEventListener {
             }
             final Thread thread = Thread.currentThread();
             if (replicaShard.shouldProcessCheckpoint(receivedCheckpoint)) {
-                startReplication(replicaShard, new SegmentReplicationListener() {
+                startReplication(receivedCheckpoint, replicaShard, new SegmentReplicationListener() {
                     @Override
                     public void onReplicationDone(SegmentReplicationState state) {
                         logger.trace(
@@ -301,8 +301,17 @@ public class SegmentReplicationTargetService implements IndexEventListener {
         }
     }
 
-    public SegmentReplicationTarget startReplication(final IndexShard indexShard, final SegmentReplicationListener listener) {
-        final SegmentReplicationTarget target = new SegmentReplicationTarget(indexShard, sourceFactory.get(indexShard), listener);
+    public SegmentReplicationTarget startReplication(
+        final ReplicationCheckpoint checkpoint,
+        final IndexShard indexShard,
+        final SegmentReplicationListener listener
+    ) {
+        final SegmentReplicationTarget target = new SegmentReplicationTarget(
+            checkpoint,
+            indexShard,
+            sourceFactory.get(indexShard),
+            listener
+        );
         startReplication(target);
         return target;
     }
@@ -420,49 +429,57 @@ public class SegmentReplicationTargetService implements IndexEventListener {
                 channel.sendResponse(TransportResponse.Empty.INSTANCE);
                 return;
             }
-            startReplication(indexShard, new SegmentReplicationTargetService.SegmentReplicationListener() {
-                @Override
-                public void onReplicationDone(SegmentReplicationState state) {
-                    logger.trace(
-                        () -> new ParameterizedMessage(
-                            "[shardId {}] [replication id {}] Replication complete to {}, timing data: {}",
-                            indexShard.shardId().getId(),
-                            state.getReplicationId(),
-                            indexShard.getLatestReplicationCheckpoint(),
-                            state.getTimingData()
-                        )
-                    );
-                    try {
-                        // Promote engine type for primary target
-                        if (indexShard.recoveryState().getPrimary() == true) {
-                            indexShard.resetToWriteableEngine();
+            startReplication(
+                ReplicationCheckpoint.empty(request.getShardId(), indexShard.getDefaultCodecName()),
+                indexShard,
+                new SegmentReplicationTargetService.SegmentReplicationListener() {
+                    @Override
+                    public void onReplicationDone(SegmentReplicationState state) {
+                        logger.trace(
+                            () -> new ParameterizedMessage(
+                                "[shardId {}] [replication id {}] Replication complete to {}, timing data: {}",
+                                indexShard.shardId().getId(),
+                                state.getReplicationId(),
+                                indexShard.getLatestReplicationCheckpoint(),
+                                state.getTimingData()
+                            )
+                        );
+                        try {
+                            // Promote engine type for primary target
+                            if (indexShard.recoveryState().getPrimary() == true) {
+                                indexShard.resetToWriteableEngine();
+                            }
+                            channel.sendResponse(TransportResponse.Empty.INSTANCE);
+                        } catch (InterruptedException | TimeoutException | IOException e) {
+                            throw new RuntimeException(e);
                         }
-                        channel.sendResponse(TransportResponse.Empty.INSTANCE);
-                    } catch (InterruptedException | TimeoutException | IOException e) {
-                        throw new RuntimeException(e);
                     }
-                }
 
-                @Override
-                public void onReplicationFailure(SegmentReplicationState state, ReplicationFailedException e, boolean sendShardFailure) {
-                    logger.trace(
-                        () -> new ParameterizedMessage(
-                            "[shardId {}] [replication id {}] Replication failed, timing data: {}",
-                            indexShard.shardId().getId(),
-                            state.getReplicationId(),
-                            state.getTimingData()
-                        )
-                    );
-                    if (sendShardFailure == true) {
-                        indexShard.failShard("replication failure", e);
-                    }
-                    try {
-                        channel.sendResponse(e);
-                    } catch (IOException ex) {
-                        throw new RuntimeException(ex);
+                    @Override
+                    public void onReplicationFailure(
+                        SegmentReplicationState state,
+                        ReplicationFailedException e,
+                        boolean sendShardFailure
+                    ) {
+                        logger.trace(
+                            () -> new ParameterizedMessage(
+                                "[shardId {}] [replication id {}] Replication failed, timing data: {}",
+                                indexShard.shardId().getId(),
+                                state.getReplicationId(),
+                                state.getTimingData()
+                            )
+                        );
+                        if (sendShardFailure == true) {
+                            indexShard.failShard("replication failure", e);
+                        }
+                        try {
+                            channel.sendResponse(e);
+                        } catch (IOException ex) {
+                            throw new RuntimeException(ex);
+                        }
                     }
                 }
-            });
+            );
         }
     }
 

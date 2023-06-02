@@ -9,6 +9,8 @@
 package org.opensearch.indices.replication;
 
 import com.carrotsearch.randomizedtesting.RandomizedTest;
+import org.apache.lucene.codecs.Codec;
+import org.apache.lucene.codecs.lucene95.Lucene95Codec;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.SortedDocValuesField;
@@ -51,7 +53,9 @@ import org.opensearch.index.IndexModule;
 import org.opensearch.index.SegmentReplicationPerGroupStats;
 import org.opensearch.index.SegmentReplicationPressureService;
 import org.opensearch.index.SegmentReplicationShardStats;
+import org.opensearch.index.codec.CodecService;
 import org.opensearch.index.engine.Engine;
+import org.opensearch.index.engine.EngineConfig;
 import org.opensearch.index.engine.NRTReplicationReaderManager;
 import org.opensearch.index.shard.IndexShard;
 import org.opensearch.index.shard.ShardId;
@@ -68,14 +72,22 @@ import org.opensearch.test.OpenSearchIntegTestCase;
 import org.opensearch.test.transport.MockTransportService;
 import org.opensearch.transport.TransportService;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import static java.util.Arrays.asList;
 import static org.opensearch.action.search.PitTestsUtil.assertSegments;
@@ -1249,4 +1261,117 @@ public class SegmentReplicationIT extends SegmentReplicationBaseIT {
         waitForSearchableDocs(2, nodes);
     }
 
+    /**
+     * This test validates that that segment replications works for any random compression mode
+     * @throws Exception
+     */
+    public void testCodecWithDifferentCompressionModes() throws Exception {
+        final String nodeA = internalCluster().startNode();
+        final String nodeB = internalCluster().startNode();
+        final Settings settings = Settings.builder()
+            .put(indexSettings())
+            .put(
+                EngineConfig.INDEX_CODEC_SETTING.getKey(),
+                randomFrom(CodecService.DEFAULT_CODEC, CodecService.BEST_COMPRESSION_CODEC, CodecService.LUCENE_DEFAULT_CODEC)
+            )
+            .build();
+        createIndex(INDEX_NAME, settings);
+        final int initialDocCount = scaledRandomIntBetween(100, 200);
+        try (
+            BackgroundIndexer indexer = new BackgroundIndexer(
+                INDEX_NAME,
+                "_doc",
+                client(),
+                -1,
+                RandomizedTest.scaledRandomIntBetween(2, 5),
+                false,
+                random()
+            )
+        ) {
+            indexer.start(initialDocCount);
+            waitForDocs(initialDocCount, indexer);
+            refresh(INDEX_NAME);
+            waitForSearchableDocs(initialDocCount, nodeA, nodeB);
+
+            final int additionalDocCount = scaledRandomIntBetween(0, 200);
+            final int expectedHitCount = initialDocCount + additionalDocCount;
+            indexer.start(additionalDocCount);
+            waitForDocs(expectedHitCount, indexer);
+
+            flushAndRefresh(INDEX_NAME);
+            waitForSearchableDocs(expectedHitCount, nodeA, nodeB);
+
+            ensureGreen(INDEX_NAME);
+            verifyStoreContent();
+        }
+    }
+
+    /**
+     * This test validates that segment replications works for older codec implementations
+     * @throws Exception
+     */
+    public void testCodecWithOlderCodecs() throws Exception {
+        final String nodeA = internalCluster().startNode();
+        final String nodeB = internalCluster().startNode();
+        final Settings settings = Settings.builder()
+            .put(indexSettings())
+            .put(
+                EngineConfig.INDEX_CODEC_SETTING.getKey(),
+                getOlderLuceneCodecs()
+            )
+            .build();
+        createIndex(INDEX_NAME, settings);
+        final int initialDocCount = scaledRandomIntBetween(100, 200);
+        try (
+            BackgroundIndexer indexer = new BackgroundIndexer(
+                INDEX_NAME,
+                "_doc",
+                client(),
+                -1,
+                RandomizedTest.scaledRandomIntBetween(2, 5),
+                false,
+                random()
+            )
+        ) {
+            indexer.start(initialDocCount);
+            waitForDocs(initialDocCount, indexer);
+            refresh(INDEX_NAME);
+            waitForSearchableDocs(initialDocCount, nodeA, nodeB);
+
+            final int additionalDocCount = scaledRandomIntBetween(0, 200);
+            final int expectedHitCount = initialDocCount + additionalDocCount;
+            indexer.start(additionalDocCount);
+            waitForDocs(expectedHitCount, indexer);
+
+            flushAndRefresh(INDEX_NAME);
+            waitForSearchableDocs(expectedHitCount, nodeA, nodeB);
+
+            ensureGreen(INDEX_NAME);
+            verifyStoreContent();
+        }
+    }
+
+    public String getOlderLuceneCodecs() throws IOException {
+        TreeSet<String> codecNames = new TreeSet<>();
+        Codec codecName = new CodecService(null, null).codec(CodecService.DEFAULT_CODEC);
+        ZipInputStream zip = new ZipInputStream(codecName.getClass().getProtectionDomain().getCodeSource().getLocation().openStream());
+        Pattern luceneDirectoryPattern = Pattern.compile("lucene[0-9]+");
+        while(true) {
+            ZipEntry e = zip.getNextEntry();
+            if (e == null)
+                break;
+            if (e.isDirectory()) {
+                final String dirPath = e.getName().substring(0, e.getName().length()-1);
+                int index =  dirPath.lastIndexOf(File.separator);
+                final String dirName = dirPath.substring(index+1);
+                Matcher matcher = luceneDirectoryPattern.matcher(dirName);
+                if (dirName.startsWith("lucene") && matcher.matches()) {
+                    codecNames.add(dirName);
+                }
+            }
+        }
+        logger.info("--> Older lucene codecs {}", codecNames);
+        String oldestSupportedCodec = codecNames.pollFirst();
+        return oldestSupportedCodec.substring(0,1).toUpperCase() + oldestSupportedCodec.substring(1);
+    }
 }

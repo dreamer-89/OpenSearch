@@ -252,7 +252,7 @@ public class XContentHelperTests extends OpenSearchTestCase {
 
         String inputJson = "{ \"mappings\" : {} }";
         try (
-            XContentParser parser = XContentType.JSON.xContent()
+            XContentParser parser = XContentType.JSON.xContent().createGenerator()
                 .createParser(NamedXContentRegistry.EMPTY, DeprecationHandler.THROW_UNSUPPORTED_OPERATION, inputJson)
         ) {
 

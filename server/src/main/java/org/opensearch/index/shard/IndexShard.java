@@ -679,7 +679,9 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
                             if (indexSettings.isSegRepEnabled()) {
                                 // this Shard's engine was read only, we need to update its engine before restoring local history from xlog.
                                 assert newRouting.primary() && currentRouting.primary() == false;
+                                logger.info("--> Before reset engine {}", this.translogStats().estimatedNumberOfOperations());
                                 resetEngineToGlobalCheckpoint();
+                                logger.info("--> After reset engine {}", this.translogStats().estimatedNumberOfOperations());
                             }
                             replicationTracker.activatePrimaryMode(getLocalCheckpoint());
                             ensurePeerRecoveryRetentionLeasesExist();

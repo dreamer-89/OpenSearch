@@ -98,6 +98,7 @@ public class RemoteStorePeerRecoverySourceHandler extends RecoverySourceHandler 
             sendSnapshotStep.onResponse(new SendSnapshotResult(endingSeqNo, 0, TimeValue.ZERO));
         }, onFailure);
 
+        logger.info("--> Calling finalizeStepAndCompleteFuture");
         finalizeStepAndCompleteFuture(startingSeqNo, sendSnapshotStep, sendFileStep, prepareEngineStep, onFailure);
     }
 }

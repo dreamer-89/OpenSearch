@@ -145,7 +145,7 @@ public class SegmentReplicationTarget extends ReplicationTarget {
         final StepListener<CheckpointInfoResponse> checkpointInfoListener = new StepListener<>();
         final StepListener<GetSegmentFilesResponse> getFilesListener = new StepListener<>();
 
-        logger.trace(new ParameterizedMessage("Starting Replication Target: {}", description()));
+        logger.info(new ParameterizedMessage("Starting Replication Target: {}", description()));
         // Get list of files to copy from this checkpoint.
         state.setStage(SegmentReplicationState.Stage.GET_CHECKPOINT_INFO);
         cancellableThreads.checkForCancel();
@@ -194,6 +194,11 @@ public class SegmentReplicationTarget extends ReplicationTarget {
         throws OpenSearchCorruptionException {
         cancellableThreads.checkForCancel();
         state.setStage(SegmentReplicationState.Stage.FINALIZE_REPLICATION);
+        // Return when there is no info. This can happen for newly created indices.
+//        if (checkpointInfoResponse.getInfosBytes() == null) {
+//            logger.warn("--> There is no info. Return");
+//            return;
+//        }
         Store store = null;
         try {
             store = store();

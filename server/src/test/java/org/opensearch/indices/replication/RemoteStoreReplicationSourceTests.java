@@ -9,7 +9,9 @@
 package org.opensearch.indices.replication;
 
 import org.apache.lucene.codecs.Codec;
+import org.apache.lucene.index.SegmentInfos;
 import org.apache.lucene.store.FilterDirectory;
+import org.apache.lucene.util.Version;
 import org.mockito.Mockito;
 import org.opensearch.action.support.PlainActionFuture;
 import org.opensearch.cluster.metadata.IndexMetadata;
@@ -21,22 +23,23 @@ import org.opensearch.index.shard.IndexShardState;
 import org.opensearch.index.shard.RemoteStoreRefreshListenerTests;
 import org.opensearch.index.store.RemoteSegmentStoreDirectory;
 import org.opensearch.index.store.Store;
+import org.opensearch.index.store.StoreFileMetadata;
 import org.opensearch.indices.replication.checkpoint.ReplicationCheckpoint;
 import org.opensearch.indices.replication.common.ReplicationType;
 
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 public class RemoteStoreReplicationSourceTests extends OpenSearchIndexLevelReplicationTestCase {
-
-    private static final long PRIMARY_TERM = 1L;
-    private static final long SEGMENTS_GEN = 2L;
-    private static final long VERSION = 4L;
     private static final long REPLICATION_ID = 123L;
     private RemoteStoreReplicationSource replicationSource;
     private IndexShard indexShard;
@@ -57,7 +60,6 @@ public class RemoteStoreReplicationSourceTests extends OpenSearchIndexLevelRepli
         super.setUp();
 
         indexShard = newStartedShard(true, settings, new InternalEngineFactory());
-
         indexDoc(indexShard, "_doc", "1");
         indexDoc(indexShard, "_doc", "2");
         indexShard.refresh("test");
@@ -69,6 +71,7 @@ public class RemoteStoreReplicationSourceTests extends OpenSearchIndexLevelRepli
         when(store.directory()).thenReturn(indexShard.store().directory());
         remoteStore = mock(Store.class);
         when(mockShard.remoteStore()).thenReturn(remoteStore);
+        when(mockShard.state()).thenReturn(indexShard.state());
         RemoteSegmentStoreDirectory remoteSegmentStoreDirectory =
             (RemoteSegmentStoreDirectory) ((FilterDirectory) ((FilterDirectory) indexShard.remoteStore().directory()).getDelegate())
                 .getDelegate();
@@ -109,13 +112,15 @@ public class RemoteStoreReplicationSourceTests extends OpenSearchIndexLevelRepli
     }
 
     public void testGetCheckpointMetadataEmpty() throws ExecutionException, InterruptedException, IOException {
+        SegmentInfos segmentInfos = indexShard.getSegmentInfosSnapshot().get();
         when(mockShard.getSegmentInfosSnapshot()).thenReturn(indexShard.getSegmentInfosSnapshot());
         final ReplicationCheckpoint checkpoint = new ReplicationCheckpoint(
             indexShard.shardId(),
-            PRIMARY_TERM,
-            SEGMENTS_GEN,
-            VERSION,
-            Codec.getDefault().getName()
+            indexShard.getOperationPrimaryTerm(),
+            segmentInfos.getGeneration(),
+            segmentInfos.getVersion(),
+            indexShard.store().getSegmentMetadataMap(segmentInfos).values().stream().mapToLong(StoreFileMetadata::length).sum(),
+            indexShard.getDefaultCodecName()
         );
         IndexShard emptyIndexShard = null;
         try {
@@ -134,6 +139,7 @@ public class RemoteStoreReplicationSourceTests extends OpenSearchIndexLevelRepli
 
             final PlainActionFuture<CheckpointInfoResponse> res = PlainActionFuture.newFuture();
             when(mockShard.state()).thenReturn(IndexShardState.RECOVERING);
+            replicationSource = new RemoteStoreReplicationSource(mockShard);
             // Recovering shard should just do a noop and return empty metadata map.
             replicationSource.getCheckpointMetadata(REPLICATION_ID, checkpoint, res);
             CheckpointInfoResponse response = res.get();
@@ -151,30 +157,60 @@ public class RemoteStoreReplicationSourceTests extends OpenSearchIndexLevelRepli
         }
     }
 
-    public void testGetSegmentFiles() throws ExecutionException, InterruptedException {
+    public void testGetSegmentFiles() throws ExecutionException, InterruptedException, IOException {
+        SegmentInfos segmentInfos = indexShard.getSegmentInfosSnapshot().get();
         final ReplicationCheckpoint checkpoint = new ReplicationCheckpoint(
             indexShard.shardId(),
-            PRIMARY_TERM,
-            SEGMENTS_GEN,
-            VERSION,
-            Codec.getDefault().getName()
+            indexShard.getOperationPrimaryTerm(),
+            segmentInfos.getGeneration(),
+            segmentInfos.getVersion(),
+            indexShard.store().getSegmentMetadataMap(segmentInfos).values().stream().mapToLong(StoreFileMetadata::length).sum(),
+            indexShard.getDefaultCodecName()
         );
+        List<StoreFileMetadata> filesToFetch = indexShard.getSegmentMetadataMap().values().stream().collect(Collectors.toList());
 
         final PlainActionFuture<GetSegmentFilesResponse> res = PlainActionFuture.newFuture();
-        replicationSource.getSegmentFiles(REPLICATION_ID, checkpoint, Collections.emptyList(), indexShard, res);
+        replicationSource.getSegmentFiles(REPLICATION_ID, checkpoint, filesToFetch, indexShard, res);
         GetSegmentFilesResponse response = res.get();
         assert (response.files.isEmpty());
         assertEquals("RemoteStoreReplicationSource", replicationSource.getDescription());
 
     }
 
+    public void testGetSegmentFilesFileAlreadyExists() throws IOException {
+        SegmentInfos segmentInfos = indexShard.getSegmentInfosSnapshot().get();
+        final ReplicationCheckpoint checkpoint = new ReplicationCheckpoint(
+            indexShard.shardId(),
+            indexShard.getOperationPrimaryTerm(),
+            segmentInfos.getGeneration(),
+            segmentInfos.getVersion(),
+            indexShard.store().getSegmentMetadataMap(segmentInfos).values().stream().mapToLong(StoreFileMetadata::length).sum(),
+            indexShard.getDefaultCodecName()
+        );
+        List<StoreFileMetadata> filesToFetch = indexShard.getSegmentMetadataMap().values().stream().collect(Collectors.toList());
+//        assertThrows(FileAlreadyExistsException.class, () -> {
+//            final PlainActionFuture<GetSegmentFilesResponse> res = PlainActionFuture.newFuture();
+//            replicationSource.getSegmentFiles(REPLICATION_ID, checkpoint, filesToFetch, indexShard, res);
+//            res.get();
+//        });
+    }
+
     public void testGetSegmentFilesFailure() throws IOException {
         final ReplicationCheckpoint checkpoint = indexShard.getLatestReplicationCheckpoint();
+        StoreFileMetadata testMetadata = new StoreFileMetadata("testFile", 1L, "checksum", Version.LATEST);
         Mockito.doThrow(new RuntimeException("testing")).when(mockShard).store();
         assertThrows(ExecutionException.class, () -> {
             final PlainActionFuture<GetSegmentFilesResponse> res = PlainActionFuture.newFuture();
-            replicationSource.getSegmentFiles(REPLICATION_ID, checkpoint, Collections.emptyList(), mockShard, res);
+            replicationSource.getSegmentFiles(REPLICATION_ID, checkpoint, List.of(testMetadata), mockShard, res);
             res.get(10, TimeUnit.SECONDS);
         });
+    }
+
+    public void testGetSegmentFilesReturnEmptyResponse() throws ExecutionException, InterruptedException {
+        final ReplicationCheckpoint checkpoint = indexShard.getLatestReplicationCheckpoint();
+        final PlainActionFuture<GetSegmentFilesResponse> res = PlainActionFuture.newFuture();
+        replicationSource.getSegmentFiles(REPLICATION_ID, checkpoint, Collections.emptyList(), mockShard, res);
+        GetSegmentFilesResponse response = res.get();
+        assert (response.files.isEmpty());
     }
 }

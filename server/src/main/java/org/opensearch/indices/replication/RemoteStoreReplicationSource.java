@@ -25,6 +25,7 @@ import org.opensearch.index.store.remote.metadata.RemoteSegmentMetadata;
 import org.opensearch.indices.replication.checkpoint.ReplicationCheckpoint;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -60,6 +61,7 @@ public class RemoteStoreReplicationSource implements SegmentReplicationSource {
         final Version version = indexShard.getSegmentInfosSnapshot().get().getCommitLuceneVersion();
         try {
             RemoteSegmentMetadata mdFile = remoteDirectory.readLatestMetadataFile();
+//            logger.info("--> Call stack trace on getCheckPointMetadata {}", Arrays.toString(Thread.currentThread().getStackTrace()).replace(',', '\n'));
             // During initial recovery flow, the remote store might not have metadata as primary hasn't uploaded anything yet.
             if (mdFile == null && indexShard.state().equals(IndexShardState.STARTED) == false) {
                 listener.onResponse(new CheckpointInfoResponse(checkpoint, Collections.emptyMap(), null));
@@ -101,7 +103,7 @@ public class RemoteStoreReplicationSource implements SegmentReplicationSource {
                 return;
             }
             logger.trace("Downloading segments files from remote store {}", filesToFetch);
-            RemoteSegmentMetadata remoteSegmentMetadata = remoteDirectory.readLatestMetadataFile();
+            RemoteSegmentMetadata remoteSegmentMetadata = remoteDirectory.init();
             List<StoreFileMetadata> downloadedSegments = new ArrayList<>();
             if (remoteSegmentMetadata != null) {
                 try {

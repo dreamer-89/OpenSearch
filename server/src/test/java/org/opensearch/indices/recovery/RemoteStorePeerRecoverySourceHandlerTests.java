@@ -90,32 +90,4 @@ public class RemoteStorePeerRecoverySourceHandlerTests extends OpenSearchIndexLe
             assertFalse(primary.getRetentionLeases().contains(ReplicationTracker.getPeerRecoveryRetentionLeaseId(replica2.routingEntry())));
         }
     }
-
-    protected SegmentReplicationTargetService prepareForReplication(
-        IndexShard primaryShard,
-        IndexShard target,
-        TransportService transportService,
-        IndicesService indicesService,
-        ClusterService clusterService,
-        Consumer<IndexShard> postGetFilesRunnable
-    ) {
-        RecoverySettings recoverySettings = new RecoverySettings(
-            Settings.EMPTY,
-            new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
-        );
-        SegmentReplicationSourceFactory sourceFactory = new SegmentReplicationSourceFactory(
-            transportService,
-            recoverySettings,
-            clusterService
-        );
-        final SegmentReplicationTargetService targetService = new SegmentReplicationTargetService(
-            threadPool,
-            new RecoverySettings(Settings.EMPTY, new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)),
-            transportService,
-            sourceFactory,
-            indicesService,
-            clusterService
-        );
-        return targetService;
-    }
 }

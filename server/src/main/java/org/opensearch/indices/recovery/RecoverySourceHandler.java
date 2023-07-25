@@ -183,6 +183,7 @@ public abstract class RecoverySourceHandler {
                 IOUtils.closeWhileHandlingException(releaseResources, () -> future.onFailure(e));
             };
             innerRecoveryToTarget(listener, onFailure);
+            logger.info("--> Recovery innerRecoveryToTarget completed");
         } catch (Exception e) {
             IOUtils.closeWhileHandlingException(releaseResources, () -> future.onFailure(e));
         }

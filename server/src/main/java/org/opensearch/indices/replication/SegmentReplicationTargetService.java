@@ -19,6 +19,7 @@ import org.opensearch.cluster.routing.ShardRouting;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.Nullable;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.common.util.CancellableThreads;
 import org.opensearch.common.util.concurrent.AbstractRunnable;
 import org.opensearch.common.util.concurrent.ConcurrentCollections;
 import org.opensearch.index.shard.IndexEventListener;
@@ -410,18 +411,15 @@ public class SegmentReplicationTargetService implements IndexEventListener {
         final ReplicationCheckpoint checkpoint,
         final SegmentReplicationListener listener
     ) {
-        final SegmentReplicationTarget target = new SegmentReplicationTarget(
-            indexShard,
-            checkpoint,
-            sourceFactory.get(indexShard),
-            listener
-        );
+        final CancellableThreads cancellableThreads = new CancellableThreads();
+        final SegmentReplicationSource source = sourceFactory.get(indexShard, cancellableThreads);
+        final SegmentReplicationTarget target = new SegmentReplicationTarget(indexShard, checkpoint, source, listener, cancellableThreads);
         startReplication(target);
         return target;
     }
 
-    // pkg-private for integration tests
-    void startReplication(final SegmentReplicationTarget target) {
+    // Used and meant only for tests
+    public void startReplication(final SegmentReplicationTarget target) {
         final long replicationId;
         try {
             replicationId = onGoingReplications.startSafe(target, recoverySettings.activityTimeout());

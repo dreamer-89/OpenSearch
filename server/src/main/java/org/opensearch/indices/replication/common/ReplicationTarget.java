@@ -81,6 +81,16 @@ public abstract class ReplicationTarget extends AbstractRefCounted {
     public abstract void notifyListener(ReplicationFailedException e, boolean sendShardFailure);
 
     public ReplicationTarget(String name, IndexShard indexShard, ReplicationLuceneIndex stateIndex, ReplicationListener listener) {
+        this(name, indexShard, stateIndex, listener, new CancellableThreads());
+    }
+
+    public ReplicationTarget(
+        String name,
+        IndexShard indexShard,
+        ReplicationLuceneIndex stateIndex,
+        ReplicationListener listener,
+        CancellableThreads cancellableThreads
+    ) {
         super(name);
         this.logger = Loggers.getLogger(getClass(), indexShard.shardId());
         this.listener = listener;
@@ -88,8 +98,8 @@ public abstract class ReplicationTarget extends AbstractRefCounted {
         this.stateIndex = stateIndex;
         this.indexShard = indexShard;
         this.store = indexShard.store();
+        this.cancellableThreads = cancellableThreads;
         // make sure the store is not released until we are done.
-        this.cancellableThreads = new CancellableThreads();
         store.incRef();
     }
 

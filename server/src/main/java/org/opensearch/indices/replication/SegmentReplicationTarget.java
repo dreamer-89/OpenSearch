@@ -55,9 +55,10 @@ public class SegmentReplicationTarget extends ReplicationTarget {
         IndexShard indexShard,
         ReplicationCheckpoint checkpoint,
         SegmentReplicationSource source,
-        ReplicationListener listener
+        ReplicationListener listener,
+        CancellableThreads cancellableThreads
     ) {
-        super("replication_target", indexShard, new ReplicationLuceneIndex(), listener);
+        super("replication_target", indexShard, new ReplicationLuceneIndex(), listener, cancellableThreads);
         this.checkpoint = checkpoint;
         this.source = source;
         this.state = new SegmentReplicationState(
@@ -95,7 +96,7 @@ public class SegmentReplicationTarget extends ReplicationTarget {
     }
 
     public SegmentReplicationTarget retryCopy() {
-        return new SegmentReplicationTarget(indexShard, checkpoint, source, listener);
+        return new SegmentReplicationTarget(indexShard, checkpoint, source, listener, cancellableThreads);
     }
 
     @Override

@@ -34,6 +34,7 @@ package org.opensearch.recovery;
 import org.opensearch.OpenSearchException;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.common.unit.TimeValue;
+import org.opensearch.common.util.CancellableThreads;
 import org.opensearch.index.replication.OpenSearchIndexLevelReplicationTestCase;
 import org.opensearch.index.shard.IndexShard;
 import org.opensearch.core.index.shard.ShardId;
@@ -122,13 +123,15 @@ public class ReplicationCollectionTests extends OpenSearchIndexLevelReplicationT
                 shard,
                 shards.getPrimary().getLatestReplicationCheckpoint(),
                 mock(SegmentReplicationSource.class),
-                mock(ReplicationListener.class)
+                mock(ReplicationListener.class),
+                new CancellableThreads()
             );
             final SegmentReplicationTarget target2 = new SegmentReplicationTarget(
                 shard,
                 shards.getPrimary().getLatestReplicationCheckpoint(),
                 mock(SegmentReplicationSource.class),
-                mock(ReplicationListener.class)
+                mock(ReplicationListener.class),
+                new CancellableThreads()
             );
             collection.startSafe(target1, TimeValue.timeValueMinutes(30));
             assertThrows(ReplicationFailedException.class, () -> collection.startSafe(target2, TimeValue.timeValueMinutes(30)));

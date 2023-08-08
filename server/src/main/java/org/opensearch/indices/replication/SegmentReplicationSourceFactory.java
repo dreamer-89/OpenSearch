@@ -11,6 +11,7 @@ package org.opensearch.indices.replication;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.routing.ShardRouting;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.util.CancellableThreads;
 import org.opensearch.index.shard.IndexShard;
 import org.opensearch.core.index.shard.ShardId;
 import org.opensearch.indices.recovery.RecoverySettings;
@@ -37,9 +38,9 @@ public class SegmentReplicationSourceFactory {
         this.clusterService = clusterService;
     }
 
-    public SegmentReplicationSource get(IndexShard shard) {
+    public SegmentReplicationSource get(IndexShard shard, CancellableThreads cancellableThreads) {
         if (shard.indexSettings().isSegRepWithRemoteEnabled()) {
-            return new RemoteStoreReplicationSource(shard);
+            return new RemoteStoreReplicationSource(shard, cancellableThreads);
         } else {
             return new PrimaryShardReplicationSource(
                 shard.recoveryState().getTargetNode(),

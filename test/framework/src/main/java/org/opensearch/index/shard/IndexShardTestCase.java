@@ -1482,7 +1482,7 @@ public abstract class IndexShardTestCase extends OpenSearchTestCase {
                 (repId) -> targetService.get(repId),
                 postGetFilesRunnable
             );
-            when(sourceFactory.get(any())).thenReturn(replicationSource);
+            when(sourceFactory.get(any(), any())).thenReturn(replicationSource);
             // This is needed for force segment sync call. Remote store uses a different recovery mechanism
             when(indicesService.getShardOrNull(any())).thenReturn(target);
         }

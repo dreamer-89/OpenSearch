@@ -15,6 +15,7 @@ import org.apache.lucene.store.FilterDirectory;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.util.Version;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.common.util.CancellableThreads;
 import org.opensearch.index.shard.IndexShard;
 import org.opensearch.index.shard.IndexShardState;
 import org.opensearch.index.store.RemoteSegmentStoreDirectory;
@@ -42,11 +43,14 @@ public class RemoteStoreReplicationSource implements SegmentReplicationSource {
     private final IndexShard indexShard;
     private final RemoteSegmentStoreDirectory remoteDirectory;
 
-    public RemoteStoreReplicationSource(IndexShard indexShard) {
+    private final CancellableThreads cancellableThreads;
+
+    public RemoteStoreReplicationSource(IndexShard indexShard, CancellableThreads cancellableThreads) {
         this.indexShard = indexShard;
         FilterDirectory remoteStoreDirectory = (FilterDirectory) indexShard.remoteStore().directory();
         FilterDirectory byteSizeCachingStoreDirectory = (FilterDirectory) remoteStoreDirectory.getDelegate();
         this.remoteDirectory = (RemoteSegmentStoreDirectory) byteSizeCachingStoreDirectory.getDelegate();
+        this.cancellableThreads = cancellableThreads;
     }
 
     @Override
@@ -59,6 +63,7 @@ public class RemoteStoreReplicationSource implements SegmentReplicationSource {
         // TODO: Need to figure out a way to pass this information for segment metadata via remote store.
         final Version version = indexShard.getSegmentInfosSnapshot().get().getCommitLuceneVersion();
         try {
+            cancellableThreads.checkForCancel();
             RemoteSegmentMetadata mdFile = remoteDirectory.init();
             // During initial recovery flow, the remote store might not have metadata as primary hasn't uploaded anything yet.
             if (mdFile == null && indexShard.state().equals(IndexShardState.STARTED) == false) {
@@ -101,7 +106,7 @@ public class RemoteStoreReplicationSource implements SegmentReplicationSource {
                 return;
             }
             logger.trace("Downloading segments files from remote store {}", filesToFetch);
-
+            cancellableThreads.checkForCancel();
             RemoteSegmentMetadata remoteSegmentMetadata = remoteDirectory.readLatestMetadataFile();
             List<StoreFileMetadata> downloadedSegments = new ArrayList<>();
             Collection<String> directoryFiles = List.of(indexShard.store().directory().listAll());
@@ -111,6 +116,7 @@ public class RemoteStoreReplicationSource implements SegmentReplicationSource {
                     indexShard.remoteStore().incRef();
                     final Directory storeDirectory = indexShard.store().directory();
                     for (StoreFileMetadata fileMetadata : filesToFetch) {
+                        cancellableThreads.checkForCancel();
                         String file = fileMetadata.name();
                         assert directoryFiles.contains(file) == false : "Local store already contains the file " + file;
                         storeDirectory.copyFrom(remoteDirectory, file, file, IOContext.DEFAULT);

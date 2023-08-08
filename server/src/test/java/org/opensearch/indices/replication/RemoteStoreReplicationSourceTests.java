@@ -12,6 +12,7 @@ import org.apache.lucene.store.FilterDirectory;
 import org.opensearch.action.support.PlainActionFuture;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.common.util.CancellableThreads;
 import org.opensearch.index.engine.InternalEngineFactory;
 import org.opensearch.index.engine.NRTReplicationEngineFactory;
 import org.opensearch.index.replication.OpenSearchIndexLevelReplicationTestCase;
@@ -40,6 +41,8 @@ public class RemoteStoreReplicationSourceTests extends OpenSearchIndexLevelRepli
     private IndexShard primaryShard;
 
     private IndexShard replicaShard;
+
+    private CancellableThreads cancellableThreads;
     private final Settings settings = Settings.builder()
         .put(IndexMetadata.SETTING_REMOTE_STORE_ENABLED, true)
         .put(IndexMetadata.SETTING_REMOTE_SEGMENT_STORE_REPOSITORY, "my-repo")
@@ -55,6 +58,7 @@ public class RemoteStoreReplicationSourceTests extends OpenSearchIndexLevelRepli
         indexDoc(primaryShard, "_doc", "2");
         primaryShard.refresh("test");
         replicaShard = newStartedShard(false, settings, new NRTReplicationEngineFactory());
+        cancellableThreads = new CancellableThreads();
     }
 
     @Override
@@ -66,11 +70,28 @@ public class RemoteStoreReplicationSourceTests extends OpenSearchIndexLevelRepli
     public void testGetCheckpointMetadata() throws ExecutionException, InterruptedException {
         final ReplicationCheckpoint checkpoint = primaryShard.getLatestReplicationCheckpoint();
         final PlainActionFuture<CheckpointInfoResponse> res = PlainActionFuture.newFuture();
-        replicationSource = new RemoteStoreReplicationSource(primaryShard);
+        replicationSource = new RemoteStoreReplicationSource(primaryShard, cancellableThreads);
         replicationSource.getCheckpointMetadata(REPLICATION_ID, checkpoint, res);
         CheckpointInfoResponse response = res.get();
         assert (response.getCheckpoint().equals(checkpoint));
         assert (response.getMetadataMap().isEmpty() == false);
+    }
+
+    public void testCancellationDuringGetCheckpointMetadata() throws ExecutionException, InterruptedException {
+        final ReplicationCheckpoint checkpoint = primaryShard.getLatestReplicationCheckpoint();
+        final PlainActionFuture<CheckpointInfoResponse> res = PlainActionFuture.newFuture();
+        replicationSource = new RemoteStoreReplicationSource(primaryShard, cancellableThreads);
+        cancellableThreads.cancel("testGetCheckpointMetadataCancelled test cancellation");
+
+        Exception exceptionOnCheckpointMetadata = expectThrows(Exception.class, () -> {
+            replicationSource.getCheckpointMetadata(REPLICATION_ID, checkpoint, res);
+            CheckpointInfoResponse response = res.get();
+            assert (response.getCheckpoint().equals(checkpoint));
+            assert (response.getMetadataMap().isEmpty() == false);
+        });
+        Throwable nestedException = exceptionOnCheckpointMetadata.getCause();
+        assertTrue(nestedException instanceof CancellableThreads.ExecutionCancelledException);
+        assertEquals("operation was cancelled reason [testGetCheckpointMetadataCancelled test cancellation]", nestedException.getMessage());
     }
 
     public void testGetCheckpointMetadataFailure() {
@@ -78,7 +99,7 @@ public class RemoteStoreReplicationSourceTests extends OpenSearchIndexLevelRepli
         final ReplicationCheckpoint checkpoint = primaryShard.getLatestReplicationCheckpoint();
         when(mockShard.getSegmentInfosSnapshot()).thenThrow(new RuntimeException("test"));
         assertThrows(RuntimeException.class, () -> {
-            replicationSource = new RemoteStoreReplicationSource(mockShard);
+            replicationSource = new RemoteStoreReplicationSource(mockShard, cancellableThreads);
             final PlainActionFuture<CheckpointInfoResponse> res = PlainActionFuture.newFuture();
             replicationSource.getCheckpointMetadata(REPLICATION_ID, checkpoint, res);
             res.get();
@@ -89,7 +110,7 @@ public class RemoteStoreReplicationSourceTests extends OpenSearchIndexLevelRepli
         final ReplicationCheckpoint checkpoint = primaryShard.getLatestReplicationCheckpoint();
         List<StoreFileMetadata> filesToFetch = primaryShard.getSegmentMetadataMap().values().stream().collect(Collectors.toList());
         final PlainActionFuture<GetSegmentFilesResponse> res = PlainActionFuture.newFuture();
-        replicationSource = new RemoteStoreReplicationSource(primaryShard);
+        replicationSource = new RemoteStoreReplicationSource(primaryShard, cancellableThreads);
         replicationSource.getSegmentFiles(REPLICATION_ID, checkpoint, filesToFetch, replicaShard, res);
         GetSegmentFilesResponse response = res.get();
         assertEquals(response.files.size(), filesToFetch.size());
@@ -103,7 +124,7 @@ public class RemoteStoreReplicationSourceTests extends OpenSearchIndexLevelRepli
         CountDownLatch latch = new CountDownLatch(1);
         try {
             final PlainActionFuture<GetSegmentFilesResponse> res = PlainActionFuture.newFuture();
-            replicationSource = new RemoteStoreReplicationSource(primaryShard);
+            replicationSource = new RemoteStoreReplicationSource(primaryShard, cancellableThreads);
             replicationSource.getSegmentFiles(REPLICATION_ID, checkpoint, filesToFetch, primaryShard, res);
             res.get();
         } catch (AssertionError | ExecutionException ex) {
@@ -117,23 +138,39 @@ public class RemoteStoreReplicationSourceTests extends OpenSearchIndexLevelRepli
     public void testGetSegmentFilesReturnEmptyResponse() throws ExecutionException, InterruptedException {
         final ReplicationCheckpoint checkpoint = primaryShard.getLatestReplicationCheckpoint();
         final PlainActionFuture<GetSegmentFilesResponse> res = PlainActionFuture.newFuture();
-        replicationSource = new RemoteStoreReplicationSource(primaryShard);
+        replicationSource = new RemoteStoreReplicationSource(primaryShard, cancellableThreads);
         replicationSource.getSegmentFiles(REPLICATION_ID, checkpoint, Collections.emptyList(), primaryShard, res);
         GetSegmentFilesResponse response = res.get();
         assert (response.files.isEmpty());
+    }
+
+    public void testCancellationDuringGetFiles() throws IOException {
+        final ReplicationCheckpoint checkpoint = primaryShard.getLatestReplicationCheckpoint();
+        final PlainActionFuture<GetSegmentFilesResponse> res = PlainActionFuture.newFuture();
+        List<StoreFileMetadata> filesToFetch = primaryShard.getSegmentMetadataMap().values().stream().collect(Collectors.toList());
+        replicationSource = new RemoteStoreReplicationSource(primaryShard, cancellableThreads);
+        cancellableThreads.cancel("testGetFilesCancelled test cancellation");
+
+        Exception exceptionOnGetFiles = expectThrows(Exception.class, () -> {
+            replicationSource.getSegmentFiles(REPLICATION_ID, checkpoint, filesToFetch, primaryShard, res);
+            res.get();
+        });
+        Throwable nestedException = exceptionOnGetFiles.getCause();
+        assertTrue(nestedException instanceof CancellableThreads.ExecutionCancelledException);
+        assertEquals("operation was cancelled reason [testGetFilesCancelled test cancellation]", nestedException.getMessage());
     }
 
     public void testGetCheckpointMetadataEmpty() throws ExecutionException, InterruptedException, IOException {
         IndexShard mockShard = mock(IndexShard.class);
         // Build mockShard to return replicaShard directory so that empty metadata file is returned.
         buildIndexShardBehavior(mockShard, replicaShard);
-        replicationSource = new RemoteStoreReplicationSource(mockShard);
+        replicationSource = new RemoteStoreReplicationSource(mockShard, cancellableThreads);
 
         // Mock replica shard state to RECOVERING so that getCheckpointInfo return empty map
         final ReplicationCheckpoint checkpoint = replicaShard.getLatestReplicationCheckpoint();
         final PlainActionFuture<CheckpointInfoResponse> res = PlainActionFuture.newFuture();
         when(mockShard.state()).thenReturn(IndexShardState.RECOVERING);
-        replicationSource = new RemoteStoreReplicationSource(mockShard);
+        replicationSource = new RemoteStoreReplicationSource(mockShard, cancellableThreads);
         // Recovering shard should just do a noop and return empty metadata map.
         replicationSource.getCheckpointMetadata(REPLICATION_ID, checkpoint, res);
         CheckpointInfoResponse response = res.get();

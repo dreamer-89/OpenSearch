@@ -86,6 +86,8 @@ public class SegmentReplicationTargetServiceTests extends IndexShardTestCase {
     private SegmentReplicationState state;
     private ReplicationCheckpoint initialCheckpoint;
 
+    private CancellableThreads cancellableThreads;
+
     private static final long TRANSPORT_TIMEOUT = 30000;// 30sec
 
     @Override
@@ -154,6 +156,8 @@ public class SegmentReplicationTargetServiceTests extends IndexShardTestCase {
             "",
             new DiscoveryNode("local", buildNewFakeTransportAddress(), Version.CURRENT)
         );
+
+        cancellableThreads = new CancellableThreads();
     }
 
     @Override
@@ -229,7 +233,8 @@ public class SegmentReplicationTargetServiceTests extends IndexShardTestCase {
                     assertEquals(expectedError, e.getCause());
                     latch.countDown();
                 }
-            }
+            },
+            cancellableThreads
         );
         sut.startReplication(target);
         latch.await(2, TimeUnit.SECONDS);
@@ -281,7 +286,8 @@ public class SegmentReplicationTargetServiceTests extends IndexShardTestCase {
                 replicaShard,
                 primaryShard.getLatestReplicationCheckpoint(),
                 source,
-                mock(SegmentReplicationTargetService.SegmentReplicationListener.class)
+                mock(SegmentReplicationTargetService.SegmentReplicationListener.class),
+                cancellableThreads
             )
         );
 
@@ -354,7 +360,8 @@ public class SegmentReplicationTargetServiceTests extends IndexShardTestCase {
                 replicaShard,
                 updatedCheckpoint,
                 source,
-                mock(SegmentReplicationTargetService.SegmentReplicationListener.class)
+                mock(SegmentReplicationTargetService.SegmentReplicationListener.class),
+                cancellableThreads
             )
         );
 
@@ -601,7 +608,8 @@ public class SegmentReplicationTargetServiceTests extends IndexShardTestCase {
                     assertEquals(SegmentReplicationState.Stage.GET_CHECKPOINT_INFO, state.getStage());
                     assertTrue(e.getCause() instanceof CancellableThreads.ExecutionCancelledException);
                 }
-            }
+            },
+            cancellableThreads
         );
         target.cancel("test");
         sut.startReplication(target);

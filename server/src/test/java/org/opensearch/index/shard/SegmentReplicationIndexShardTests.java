@@ -810,9 +810,7 @@ public class SegmentReplicationIndexShardTests extends OpenSearchIndexLevelRepli
             },
             cancellableThreads
         );
-
         targetService.startReplication(target);
-
         latch.await(5, TimeUnit.SECONDS);
         assertEquals("Should have resolved listener with failure", 0, latch.getCount());
         assertNull(targetService.get(target.getId()));

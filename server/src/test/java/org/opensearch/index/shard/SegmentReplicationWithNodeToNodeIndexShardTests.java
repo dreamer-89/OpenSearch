@@ -144,6 +144,58 @@ public class SegmentReplicationWithNodeToNodeIndexShardTests extends SegmentRepl
         }
     }
 
+    public void testCloseShardWhileGettingCheckpoint() throws Exception {
+        try (ReplicationGroup shards = createGroup(1, getIndexSettings(), new NRTReplicationEngineFactory())) {
+            shards.startAll();
+            IndexShard primary = shards.getPrimary();
+            final IndexShard replica = shards.getReplicas().get(0);
+
+            primary.refresh("Test");
+
+            final SegmentReplicationSourceFactory sourceFactory = mock(SegmentReplicationSourceFactory.class);
+            final SegmentReplicationTargetService targetService = newTargetService(sourceFactory);
+            SegmentReplicationSource source = new TestReplicationSource() {
+
+                ActionListener<CheckpointInfoResponse> listener;
+
+                @Override
+                public void getCheckpointMetadata(
+                    long replicationId,
+                    ReplicationCheckpoint checkpoint,
+                    ActionListener<CheckpointInfoResponse> listener
+                ) {
+                    // set the listener, we will only fail it once we cancel the source.
+                    this.listener = listener;
+                    // shard is closing while we are copying files.
+                    targetService.beforeIndexShardClosed(replica.shardId, replica, Settings.EMPTY);
+                }
+
+                @Override
+                public void getSegmentFiles(
+                    long replicationId,
+                    ReplicationCheckpoint checkpoint,
+                    List<StoreFileMetadata> filesToFetch,
+                    IndexShard indexShard,
+                    ActionListener<GetSegmentFilesResponse> listener
+                ) {
+                    Assert.fail("Unreachable");
+                }
+
+                @Override
+                public void cancel() {
+                    // simulate listener resolving, but only after we have issued a cancel from beforeIndexShardClosed .
+                    final RuntimeException exception = new CancellableThreads.ExecutionCancelledException("retryable action was cancelled");
+                    listener.onFailure(exception);
+                }
+            };
+            when(sourceFactory.get(any(), any())).thenReturn(source);
+            startReplicationAndAssertCancellation(replica, primary, targetService);
+
+            shards.removeReplica(replica);
+            closeShards(replica);
+        }
+    }
+
     public void testPrimaryCancelsExecution() throws Exception {
         try (ReplicationGroup shards = createGroup(1, getIndexSettings(), new NRTReplicationEngineFactory())) {
             shards.startAll();
@@ -642,58 +694,6 @@ public class SegmentReplicationWithNodeToNodeIndexShardTests extends SegmentRepl
             for (IndexShard shard : shards.getReplicas()) {
                 assertEquals(getDocIdAndSeqNos(shard), docsAfterDelete);
             }
-        }
-    }
-
-    public void testCloseShardWhileGettingCheckpoint() throws Exception {
-        try (ReplicationGroup shards = createGroup(1, getIndexSettings(), new NRTReplicationEngineFactory())) {
-            shards.startAll();
-            IndexShard primary = shards.getPrimary();
-            final IndexShard replica = shards.getReplicas().get(0);
-
-            primary.refresh("Test");
-
-            final SegmentReplicationSourceFactory sourceFactory = mock(SegmentReplicationSourceFactory.class);
-            final SegmentReplicationTargetService targetService = newTargetService(sourceFactory);
-            SegmentReplicationSource source = new TestReplicationSource() {
-
-                ActionListener<CheckpointInfoResponse> listener;
-
-                @Override
-                public void getCheckpointMetadata(
-                    long replicationId,
-                    ReplicationCheckpoint checkpoint,
-                    ActionListener<CheckpointInfoResponse> listener
-                ) {
-                    // set the listener, we will only fail it once we cancel the source.
-                    this.listener = listener;
-                    // shard is closing while we are copying files.
-                    targetService.beforeIndexShardClosed(replica.shardId, replica, Settings.EMPTY);
-                }
-
-                @Override
-                public void getSegmentFiles(
-                    long replicationId,
-                    ReplicationCheckpoint checkpoint,
-                    List<StoreFileMetadata> filesToFetch,
-                    IndexShard indexShard,
-                    ActionListener<GetSegmentFilesResponse> listener
-                ) {
-                    Assert.fail("Unreachable");
-                }
-
-                @Override
-                public void cancel() {
-                    // simulate listener resolving, but only after we have issued a cancel from beforeIndexShardClosed .
-                    final RuntimeException exception = new CancellableThreads.ExecutionCancelledException("retryable action was cancelled");
-                    listener.onFailure(exception);
-                }
-            };
-            when(sourceFactory.get(any(), any())).thenReturn(source);
-            startReplicationAndAssertCancellation(replica, primary, targetService);
-
-            shards.removeReplica(replica);
-            closeShards(replica);
         }
     }
 

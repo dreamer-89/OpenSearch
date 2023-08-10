@@ -86,8 +86,6 @@ public class SegmentReplicationTargetServiceTests extends IndexShardTestCase {
     private SegmentReplicationState state;
     private ReplicationCheckpoint initialCheckpoint;
 
-    private CancellableThreads cancellableThreads;
-
     private static final long TRANSPORT_TIMEOUT = 30000;// 30sec
 
     @Override
@@ -156,8 +154,6 @@ public class SegmentReplicationTargetServiceTests extends IndexShardTestCase {
             "",
             new DiscoveryNode("local", buildNewFakeTransportAddress(), Version.CURRENT)
         );
-
-        cancellableThreads = new CancellableThreads();
     }
 
     @Override
@@ -234,7 +230,7 @@ public class SegmentReplicationTargetServiceTests extends IndexShardTestCase {
                     latch.countDown();
                 }
             },
-            cancellableThreads
+            new CancellableThreads()
         );
         sut.startReplication(target);
         latch.await(2, TimeUnit.SECONDS);
@@ -287,7 +283,7 @@ public class SegmentReplicationTargetServiceTests extends IndexShardTestCase {
                 primaryShard.getLatestReplicationCheckpoint(),
                 source,
                 mock(SegmentReplicationTargetService.SegmentReplicationListener.class),
-                cancellableThreads
+                new CancellableThreads()
             )
         );
 
@@ -361,7 +357,7 @@ public class SegmentReplicationTargetServiceTests extends IndexShardTestCase {
                 updatedCheckpoint,
                 source,
                 mock(SegmentReplicationTargetService.SegmentReplicationListener.class),
-                cancellableThreads
+                new CancellableThreads()
             )
         );
 
@@ -609,7 +605,7 @@ public class SegmentReplicationTargetServiceTests extends IndexShardTestCase {
                     assertTrue(e.getCause() instanceof CancellableThreads.ExecutionCancelledException);
                 }
             },
-            cancellableThreads
+            new CancellableThreads()
         );
         target.cancel("test");
         sut.startReplication(target);
